@@ -72,3 +72,21 @@ master (Main)
 ##### 이슈 생성
 
 ![이슈 생성](./images/issue-add.png)
+![이슈 템플릿 적용](./images/issue-templete.png)
+![이슈에서 브랜치 생성](./images/issue-branch-add.png)
+- 이슈에서 작업할 feature branch를 먼저 만듭니다. 이 후 작업 후 PR 시 이슈에 merge branch가 표시됩니다.
+
+#### 2. PR 
+- 작업한 기능을 develop-?에 PR 요청합니다.
+- PR 템플릿을 적용합니다.
+- 템플릿의 컨벤션 요구사항을 모두 만족시킨 후 PR을 날립니다.
+- 팀원이 PR을 확인하고 merge 수락합니다.
+
+#### 3. feature branch 삭제
+- 병합 완료된 branch는 지저분하니 삭제합니다.
+
+#### 4. 이슈 Close
+- 이슈가 끝났다면 닫습니다.
+
+
+
