@@ -63,3 +63,12 @@ master (Main)
 4. 충돌 발생 시 로컬에서 해결
 5. 원격 저장소로 업로드 (`git push origin fe/feature/login`)
 6. GitHub에서 `develop-fe`로 Pull Request 생성
+
+
+### 이슈 발행 및 PR 컨벤션
+
+#### 1. 이슈 발행
+
+##### 이슈 생성
+
+![이슈 생성](./images/issue-add.png)
