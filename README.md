@@ -1,35 +1,8 @@
-제공해주신 Git Flow 변형 전략(FE/BE 분리)과 컨벤션 규칙을 바탕으로, `README.md`에 바로 사용할 수 있도록 가독성 높게 정리해 드립니다.
-
-Markdown의 **테이블, 코드 블럭, 인용문**을 활용하여 팀원들이 한눈에 규칙을 파악할 수 있도록 구성했습니다.
-
----
-
-## 📋 Copy & Paste용 Markdown 내용
-
-아래 내용을 복사하여 README에 붙여넣으세요.
-
-```markdown
 ## 🐙 Git Convention
 
 우리 팀은 **Git Flow**를 기반으로 하되, FE/BE의 원활한 병렬 개발을 위해 **중간 통합 브랜치(`develop-fe`, `develop-be`)**를 두는 전략을 사용합니다.
 
 ### 🌳 Branch Strategy
-
-```mermaid
-gitGraph
-   commit
-   branch release
-   branch develop
-   branch develop-fe
-   branch develop-be
-   checkout develop-fe
-   branch fe/feature/login
-   commit
-   checkout develop-be
-   branch be/feature/login
-   commit
-
-```
 
 * **master**: 실제 라이브 서비스되고 있는 프로덕션 브랜치
 * **release**: 배포 전 QA 및 테스트를 진행하는 브랜치
@@ -90,15 +63,3 @@ master (Main)
 4. 충돌 발생 시 로컬에서 해결
 5. 원격 저장소로 업로드 (`git push origin fe/feature/login`)
 6. GitHub에서 `develop-fe`로 Pull Request 생성
-
-```
-
----
-
-### 💡 작성 팁 (적용 시 참고하세요)
-
-1.  **Mermaid 다이어그램 지원**: 위 코드에 포함된 ` ```mermaid ` 블록은 GitHub README에서 자동으로 시각적인 그래프로 렌더링됩니다. 구조를 이해하는 데 큰 도움이 됩니다.
-2.  **이모지 활용**: 딱딱한 텍스트보다 🌳, 🏷️, ⚠️ 등의 이모지를 사용하여 시선을 집중시켰습니다.
-3.  **강조 구문**: 팀원들이 가장 주의해야 할 `Pull` -> `Resolve Conflict` -> `Push` 과정을 인용문(`>`)으로 감싸 강조했습니다.
-
-```
