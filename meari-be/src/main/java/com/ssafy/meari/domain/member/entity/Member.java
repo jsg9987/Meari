@@ -35,7 +35,4 @@ public class Member extends BaseEntity {
     @Column(name = "native_language", nullable = false, length = 10, columnDefinition = "VARCHAR(10) DEFAULT 'KR'")
     private NativeLanguage nativeLanguage;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "sex", nullable = false, length = 1)
-    private Sex sex;
 }

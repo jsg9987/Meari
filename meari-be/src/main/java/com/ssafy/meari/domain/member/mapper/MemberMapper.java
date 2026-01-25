@@ -14,8 +14,7 @@ public class MemberMapper {
 			member.getEmail(),
 			member.getNickname(),
 			member.getProfileUrl(),
-			member.getNativeLanguage(),
-			member.getSex()
+			member.getNativeLanguage()
 		);
 	}
 }
