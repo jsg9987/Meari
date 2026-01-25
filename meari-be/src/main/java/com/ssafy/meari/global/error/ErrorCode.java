@@ -1,8 +1,9 @@
 package com.ssafy.meari.global.error;
 
+import org.springframework.http.HttpStatus;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.springframework.http.HttpStatus;
 
 @Getter
 @AllArgsConstructor
@@ -22,6 +23,7 @@ public enum ErrorCode {
     BAD_REQUEST_JSON(HttpStatus.BAD_REQUEST, "잘못된 JSON 형식입니다."),
     EXCEEDED_MAX_SIZE(HttpStatus.BAD_REQUEST, "파일 크기가 3MB를 초과했습니다."),
     DUPLICATED_USER(HttpStatus.BAD_REQUEST, "중복된 사용자입니다."),
+    DUPLICATED_USER_NICKNAME(HttpStatus.BAD_REQUEST, "중복된 사용자 닉네임입니다."),
     NO_FILE_EXTENSION(HttpStatus.BAD_REQUEST, "파일에 확장자가 없습니다."),
     FRIEND_REQUEST_MYSELF(HttpStatus.BAD_REQUEST, "자기 자신에게 친구 요청을 보낼 수 없습니다."),
     INVALID_TRIP_DATE(HttpStatus.BAD_REQUEST, "여행 종료일이 시작일보다 이전일 수 없습니다."),
