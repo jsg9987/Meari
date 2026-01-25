@@ -23,10 +23,10 @@ public class JwtUtil {
     private String secretKey;
 
     @Value("${jwt.access-token-expire-period}")
-    private long accessTokenExpirePeriod;
+    private long accessTokenExpirePeriodMs;
 
     @Value("${jwt.refresh-token-expire-period}")
-    private long refreshTokenExpirePeriod;
+    private long refreshTokenExpirePeriodMs;
 
     private SecretKey cachedSecretKey;
 
@@ -47,7 +47,7 @@ public class JwtUtil {
     // Access Token 생성
     public String generateAccessToken(UserDetailsImpl userDetails) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + accessTokenExpirePeriod);
+        Date expiry = new Date(now.getTime() + accessTokenExpirePeriodMs);
 
         return Jwts.builder()
                 .subject(userDetails.getUsername()) // email
@@ -61,7 +61,7 @@ public class JwtUtil {
     // Refresh Token 생성
     public String generateRefreshToken(UserDetailsImpl userDetails) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + refreshTokenExpirePeriod);
+        Date expiry = new Date(now.getTime() + refreshTokenExpirePeriodMs);
 
         return Jwts.builder()
                 .subject(userDetails.getUsername()) // email

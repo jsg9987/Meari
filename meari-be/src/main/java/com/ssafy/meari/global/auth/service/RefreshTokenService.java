@@ -15,14 +15,14 @@ public class RefreshTokenService {
 	private final RedisTemplate<String, String> redisTemplate;
 
 	@Value("${jwt.refresh-token-expire-period}")
-	private Long refreshTokenExpirePeriod;
+	private Long refreshTokenExpirePeriodMs;
 
 	// Refresh Token 저장
 	public void saveRefreshToken(String email, String refreshToken) {
 		redisTemplate.opsForValue().set(
 			"refresh:" + email,
 			refreshToken,
-			refreshTokenExpirePeriod,
+			refreshTokenExpirePeriodMs,
 			TimeUnit.MILLISECONDS
 		);
 	}
