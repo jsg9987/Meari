@@ -13,4 +13,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     boolean existsByEmail(String email);
 
     boolean existsByNickname(String nickname);
+
+    // 전달받은 memberId의 것을 제외하고, 동일한 닉네임이 존재하는지 확인
+    boolean existsByNicknameAndMemberIdNot(String nickname, Long memberId);
 }

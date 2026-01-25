@@ -35,4 +35,8 @@ public class Member extends BaseEntity {
     @Column(name = "native_language", nullable = false, length = 10, columnDefinition = "VARCHAR(10) DEFAULT 'KR'")
     private NativeLanguage nativeLanguage;
 
+    public void updateProfile(String nickname, NativeLanguage nativeLanguage) {
+        this.nickname = nickname;
+        this.nativeLanguage = nativeLanguage;
+    }
 }
