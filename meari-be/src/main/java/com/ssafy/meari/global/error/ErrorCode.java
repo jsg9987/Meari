@@ -43,6 +43,7 @@ public enum ErrorCode {
     INVALID_ROOM_PASSWORD(HttpStatus.FORBIDDEN, "방 비밀번호가 일치하지 않습니다."),
     NOT_ROOM_OWNER(HttpStatus.FORBIDDEN, "방장 권한이 필요합니다."),
     NOT_ROOM_MEMBER(HttpStatus.FORBIDDEN, "방 참여자가 아닙니다."),
+    OWNER_CANNOT_READY(HttpStatus.BAD_REQUEST, "방장은 준비 상태를 변경할 수 없습니다."),
 
 	// Not Found Error: 404
 	NOT_FOUND(HttpStatus.NOT_FOUND, "Not Found "),
@@ -65,6 +66,10 @@ public enum ErrorCode {
     ROOM_ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여 중인 방입니다."),
     ROLE_ALREADY_TAKEN(HttpStatus.CONFLICT, "이미 선점된 역할입니다."),
     ROOM_NOT_JOINABLE(HttpStatus.CONFLICT, "입장할 수 없는 방입니다."),
+    ROOM_NOT_WAITING(HttpStatus.CONFLICT, "대기 중인 방이 아닙니다."),
+    ROOM_NOT_IN_PROGRESS(HttpStatus.CONFLICT, "진행 중인 방이 아닙니다."),
+    NOT_ALL_READY(HttpStatus.CONFLICT, "모든 참여자가 준비 완료되지 않았습니다."),
+    INVALID_PHASE(HttpStatus.CONFLICT, "현재 단계에서 수행할 수 없는 작업입니다."),
     
 	
 	// Unsupported Media Type: 415

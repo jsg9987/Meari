@@ -1,5 +1,7 @@
 package com.ssafy.meari.domain.room.service;
 
+import com.ssafy.meari.domain.content.repository.ContentRepository;
+import com.ssafy.meari.domain.content.repository.RoleRepository;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
 import com.ssafy.meari.domain.room.dto.request.RoomCreateRequest;
@@ -38,6 +40,8 @@ public class RoomService {
     private final MemberRoomRepository memberRoomRepository;
     private final MemberRepository memberRepository;
     private final ThemeRepository themeRepository;
+    private final ContentRepository contentRepository;
+    private final RoleRepository roleRepository;
     private final RoomSessionService roomSessionService;
 
     /**
@@ -240,6 +244,165 @@ public class RoomService {
                     log.info("방장 위임: roomId={}, newOwnerId={}",
                             room.getRoomId(), mr.getMember().getMemberId());
                 });
+    }
+
+    /**
+     * 준비 상태 토글
+     * @return 변경 후 준비 상태
+     */
+    public boolean toggleReady(Long roomId, Long memberId) {
+        log.info("준비 상태 토글: roomId={}, memberId={}", roomId, memberId);
+
+        // 방 존재 확인
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
+
+        // 방장은 준비 상태 변경 불가 (항상 준비 완료 상태)
+        if (room.getOwner().getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.OWNER_CANNOT_READY);
+        }
+
+        // 참여 중인지 확인
+        if (!memberRoomRepository.existsByRoom_RoomIdAndMember_MemberId(roomId, memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_MEMBER);
+        }
+
+        // 현재 준비 상태 조회 후 토글
+        boolean currentReady = roomSessionService.isReady(roomId, memberId);
+        boolean newReady = !currentReady;
+        roomSessionService.setReady(roomId, memberId, newReady);
+
+        log.info("준비 상태 변경 완료: roomId={}, memberId={}, ready={}", roomId, memberId, newReady);
+        return newReady;
+    }
+
+    /**
+     * 게임 시작 (방장 전용)
+     */
+    @Transactional
+    public void startGame(Long roomId, Long memberId) {
+        log.info("게임 시작 요청: roomId={}, memberId={}", roomId, memberId);
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
+
+        // 방장 권한 확인
+        if (!room.getOwner().getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        // 이미 진행 중인지 확인
+        if (room.getStatus() != RoomStatus.WAITING) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_WAITING);
+        }
+
+        // 모든 참여자(방장 제외)가 준비 완료인지 확인
+        if (!isAllMembersReady(roomId, memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ALL_READY);
+        }
+
+        // 방 상태 변경
+        room.updateStatus(RoomStatus.IN_PROGRESS);
+        roomSessionService.setPhase(roomId, "SELECTING");
+
+        log.info("게임 시작 완료: roomId={}", roomId);
+    }
+
+    /**
+     * 방장 제외 모든 참여자가 준비 완료인지 확인
+     */
+    private boolean isAllMembersReady(Long roomId, Long ownerId) {
+        List<MemberRoom> memberRooms = memberRoomRepository.findByRoomIdWithMember(roomId);
+
+        for (MemberRoom mr : memberRooms) {
+            Long memberId = mr.getMember().getMemberId();
+            // 방장은 제외
+            if (memberId.equals(ownerId)) {
+                continue;
+            }
+            // 준비 안 된 참여자가 있으면 false
+            if (!roomSessionService.isReady(roomId, memberId)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 동영상 선택 (방장 전용)
+     */
+    @Transactional
+    public void selectContent(Long roomId, Long contentId, Long memberId) {
+        log.info("동영상 선택 요청: roomId={}, contentId={}, memberId={}", roomId, contentId, memberId);
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
+
+        // 방장 권한 확인
+        if (!room.getOwner().getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        // 진행 중 상태인지 확인
+        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        // SELECTING 단계인지 확인
+        String phase = roomSessionService.getPhase(roomId);
+        if (!"SELECTING".equals(phase)) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
+        }
+
+        // 콘텐츠 존재 확인
+        if (!contentRepository.existsById(contentId)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_CONTENT);
+        }
+
+        // Redis에 콘텐츠 설정 및 단계 변경
+        roomSessionService.setContent(roomId, contentId);
+        roomSessionService.setPhase(roomId, "WATCHING");
+
+        log.info("동영상 선택 완료: roomId={}, contentId={}", roomId, contentId);
+    }
+
+    /**
+     * 역할 선점
+     */
+    public void selectRole(Long roomId, Long roleId, Long memberId) {
+        log.info("역할 선점 요청: roomId={}, roleId={}, memberId={}", roomId, roleId, memberId);
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
+
+        // 참여 중인지 확인
+        if (!memberRoomRepository.existsByRoom_RoomIdAndMember_MemberId(roomId, memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_MEMBER);
+        }
+
+        // 진행 중 상태인지 확인
+        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        // ROLE_PICK 단계인지 확인
+        String phase = roomSessionService.getPhase(roomId);
+        if (!"ROLE_PICK".equals(phase)) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
+        }
+
+        // 역할 존재 확인
+        if (!roleRepository.existsById(roleId)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ROLE);
+        }
+
+        // Redis로 원자적 선점 시도
+        boolean success = roomSessionService.tryAssignRole(roomId, roleId, memberId);
+        if (!success) {
+            throw new BusinessException(ErrorCode.ROLE_ALREADY_TAKEN);
+        }
+
+        log.info("역할 선점 완료: roomId={}, roleId={}, memberId={}", roomId, roleId, memberId);
     }
 
     /**

@@ -1,5 +1,7 @@
 package com.ssafy.meari.domain.room.controller;
 
+import com.ssafy.meari.domain.room.dto.request.ContentSelectRequest;
+import com.ssafy.meari.domain.room.dto.request.RoleSelectRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomCreateRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomEnterRequest;
 import com.ssafy.meari.domain.room.dto.response.RoomDetailResponse;
@@ -90,6 +92,52 @@ public class RoomController {
     ) {
         log.info("방 퇴장 요청: roomId={}, memberId={}", roomId, memberId);
         roomService.leaveRoom(roomId, memberId);
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
+    @Operation(summary = "준비 상태 토글", description = "준비 상태를 토글합니다. 방장은 사용할 수 없습니다.")
+    @PostMapping("/{roomId}/ready")
+    public ResponseEntity<ApiResponse<Boolean>> toggleReady(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId
+    ) {
+        log.info("준비 상태 토글 요청: roomId={}, memberId={}", roomId, memberId);
+        boolean ready = roomService.toggleReady(roomId, memberId);
+        return ResponseEntity.ok(ApiResponse.success(ready));
+    }
+
+    @Operation(summary = "게임 시작", description = "게임을 시작합니다. 방장만 가능하며, 모든 참여자가 준비 완료 상태여야 합니다.")
+    @PostMapping("/{roomId}/start")
+    public ResponseEntity<ApiResponse<Void>> startGame(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId
+    ) {
+        log.info("게임 시작 요청: roomId={}, memberId={}", roomId, memberId);
+        roomService.startGame(roomId, memberId);
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
+    @Operation(summary = "동영상 선택", description = "학습할 동영상을 선택합니다. 방장만 가능하며, 게임 시작 후 SELECTING 단계에서만 가능합니다.")
+    @PostMapping("/{roomId}/content")
+    public ResponseEntity<ApiResponse<Void>> selectContent(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId,
+            @Valid @RequestBody ContentSelectRequest request
+    ) {
+        log.info("동영상 선택 요청: roomId={}, contentId={}, memberId={}", roomId, request.getContentId(), memberId);
+        roomService.selectContent(roomId, request.getContentId(), memberId);
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
+    @Operation(summary = "역할 선점", description = "역할을 선점합니다. ROLE_PICK 단계에서만 가능합니다.")
+    @PostMapping("/{roomId}/role")
+    public ResponseEntity<ApiResponse<Void>> selectRole(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId,
+            @Valid @RequestBody RoleSelectRequest request
+    ) {
+        log.info("역할 선점 요청: roomId={}, roleId={}, memberId={}", roomId, request.getRoleId(), memberId);
+        roomService.selectRole(roomId, request.getRoleId(), memberId);
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 }
