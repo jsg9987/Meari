@@ -29,6 +29,6 @@ public class SentenceWord extends BaseEntity {
     @JoinColumn(name = "sentence_id", nullable = false, foreignKey = @ForeignKey(name = "FK_sentence_TO_sentence_word_1"))
     private Sentence sentence;
 
-    @Column(name = "order", nullable = false)
-    private Integer order;
+    @Column(name = "sequence", nullable = false)
+    private Integer sequence;
 }
