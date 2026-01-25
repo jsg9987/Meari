@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.ssafy.meari.domain.member.dto.SignupRequestDto;
+import com.ssafy.meari.domain.member.dto.request.SignupRequestDto;
 import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
 import com.ssafy.meari.domain.member.dto.response.MemberInfoResponseDto;
 import com.ssafy.meari.domain.member.dto.response.NicknameCheckResponseDto;
