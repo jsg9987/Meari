@@ -58,7 +58,10 @@ dependencies {
 
     // 8. RabbitMQ
 
-    // 9. Test
+    // 9. Swagger (SpringDoc OpenAPI UI)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui'
+
+    // 10. Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
