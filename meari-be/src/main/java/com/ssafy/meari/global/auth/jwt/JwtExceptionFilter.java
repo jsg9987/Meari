@@ -33,6 +33,8 @@ public class JwtExceptionFilter extends OncePerRequestFilter {
 			setErrorResponse(response, ErrorCode.TOKEN_MALFORMED_ERROR);
 		} catch (UnsupportedJwtException e) {
 			setErrorResponse(response, ErrorCode.TOKEN_UNSUPPORTED_ERROR);
+		} catch (BusinessException e) {
+			setErrorResponse(response, e.getErrorCode());
 		} catch (IllegalArgumentException e) {
 			setErrorResponse(response, ErrorCode.TOKEN_TYPE_ERROR);
 		} catch (Exception e) {

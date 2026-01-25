@@ -73,6 +73,8 @@ public class SecurityConfig {
                 // 인증 없이 접근 가능
                 // TODO 명세서엔 member/** 로 되어있으므로, auth/** 로 변경할지 확인필요 (Jwt 필터도 함께 확인)
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/v1/members/signup").permitAll()
+                .requestMatchers("/api/v1/members/login").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()

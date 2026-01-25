@@ -77,7 +77,7 @@ public class DefaultAuthenticationFilter extends AbstractAuthenticationProcessin
 		refreshTokenService.saveRefreshToken(email, refreshToken);
 
 		// 응답 헤더에 Refresh Token 추가
-		response.setHeader("RefreshToken", refreshToken);
+		response.setHeader("refresh_token", refreshToken);
 		response.setContentType("application/json;charset=UTF-8");
 		response.setStatus(HttpServletResponse.SC_OK);
 
