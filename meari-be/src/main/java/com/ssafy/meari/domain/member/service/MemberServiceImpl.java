@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ssafy.meari.domain.member.dto.SignupRequestDto;
 import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
+import com.ssafy.meari.domain.member.dto.response.NicknameCheckResponseDto;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.mapper.MemberMapper;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
@@ -51,5 +52,11 @@ public class MemberServiceImpl implements MemberService {
 	public EmailCheckResponseDto checkEmailExists(String email) {
 		boolean exists = memberRepository.existsByEmail(email);
 		return new EmailCheckResponseDto(exists);
+	}
+
+	@Override
+	public NicknameCheckResponseDto checkNicknameExists(String nickname) {
+		boolean exists = memberRepository.existsByNickname(nickname);
+		return new NicknameCheckResponseDto(exists);
 	}
 }

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.ssafy.meari.domain.member.dto.SignupRequestDto;
 import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
+import com.ssafy.meari.domain.member.dto.response.NicknameCheckResponseDto;
 import com.ssafy.meari.domain.member.service.MemberService;
 import com.ssafy.meari.global.common.ApiResponse;
 
@@ -34,6 +35,12 @@ public class MemberController {
 	@GetMapping("/email/check")
 	public ResponseEntity<ApiResponse<EmailCheckResponseDto>> checkEmail(@RequestParam String email) {
 		EmailCheckResponseDto response = memberService.checkEmailExists(email);
+		return ResponseEntity.ok(ApiResponse.success(response));
+	}
+
+	@GetMapping("/nickname/check")
+	public ResponseEntity<ApiResponse<NicknameCheckResponseDto>> checkNickname(@RequestParam String nickname) {
+		NicknameCheckResponseDto response = memberService.checkNicknameExists(nickname);
 		return ResponseEntity.ok(ApiResponse.success(response));
 	}
 }
