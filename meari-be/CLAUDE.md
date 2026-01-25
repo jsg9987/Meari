@@ -19,44 +19,14 @@
 - 
 
 # 4. 데이터베이스 및 기술 세부 지시
-- 우리 DB와 관련없는 member 예시 entity야. 스타일만 숙지하고 적용은 우리 db에 맞게 해줘.
-```
-@Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Entity
-public class Member {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    private String email;
-    
-    private String password;
-    
-    private String nickname;
-
-    public void updateNickname(String nickname) {
-        this.nickname = nickname;
-    }
-
-    @Builder
-    public Member(String email, String password) {
-        this.email = email;
-        this.password = password;
-        this.nickname = "닉네임을 설정하세요";
-    }
-
-    @Builder
-    public Member(String email, String password, String nickname) {
-        this.email = email;
-        this.password = password;
-        this.nickname = nickname;
-    }
-}
-```
+- 만약에 현재 대화에서 Claude가 Entity를 정의하는 컨벤션 맥락을 기억하고있지 못하면 common_response.md나 Entity 코드 하나를 읽어 컨벤션을 이해한다.~~~~
 - JPA 생성자 규칙이야. 예시일 뿐 이부분에 대해서 필요한 점이 있다면 적용하고 보고해줘.  
 - AllArgs 남발을 주의하기 위해 @Bilder를 생성자마다 적용하도록했어. 
 - Logging: "주요 로직의 시작과 끝, 특히 예외 발생 지점에는 Slf4j를 사용해 의미 있는 로그를 남겨줘."
 - Dirty Checking 활용해 도메인 메서드 설계해.
 - Swagger(SpringDoc) 적용: "모든 컨트롤러와 DTO에는 API 문서화를 위해 Swagger 어노테이션(@Tag, @Operation, @Schema)을 상세히 작성해."
+
+# 5. Context & Logging Rules
+- **로그 최소화**: 단순 확인용 로그는 생략하고, 비즈니스 로직의 핵심 상태 변화에만 `log.debug()`를 사용한다.
+- **코드 압축**: 코드 리뷰 요청 시 변경되지 않은 클래스는 메서드 시그니처(이름, 파라미터)만 포함하여 컨텍스트를 절약한다.
+- **구조 리마인드**: 필요시 `tree` 명령 결과만 제공하여 전체 맥락을 유지한다.
