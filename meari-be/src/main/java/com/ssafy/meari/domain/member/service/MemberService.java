@@ -11,4 +11,6 @@ public interface MemberService {
 	EmailCheckResponseDto checkEmailExists(String email);
 
 	NicknameCheckResponseDto checkNicknameExists(String nickname);
+
+	void deleteMember(Long memberId);
 }

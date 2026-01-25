@@ -2,6 +2,8 @@ package com.ssafy.meari.domain.member.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,6 +15,7 @@ import com.ssafy.meari.domain.member.dto.SignupRequestDto;
 import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
 import com.ssafy.meari.domain.member.dto.response.NicknameCheckResponseDto;
 import com.ssafy.meari.domain.member.service.MemberService;
+import com.ssafy.meari.global.auth.UserDetailsImpl;
 import com.ssafy.meari.global.common.ApiResponse;
 
 import jakarta.validation.Valid;
@@ -42,5 +45,11 @@ public class MemberController {
 	public ResponseEntity<ApiResponse<NicknameCheckResponseDto>> checkNickname(@RequestParam String nickname) {
 		NicknameCheckResponseDto response = memberService.checkNicknameExists(nickname);
 		return ResponseEntity.ok(ApiResponse.success(response));
+	}
+
+	@DeleteMapping("/delete")
+	public ResponseEntity<ApiResponse<Void>> deleteMember(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+		memberService.deleteMember(userDetails.getMember().getMemberId());
+		return ResponseEntity.ok(ApiResponse.successWithoutData());
 	}
 }

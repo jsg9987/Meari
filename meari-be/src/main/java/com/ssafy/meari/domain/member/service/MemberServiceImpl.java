@@ -59,4 +59,12 @@ public class MemberServiceImpl implements MemberService {
 		boolean exists = memberRepository.existsByNickname(nickname);
 		return new NicknameCheckResponseDto(exists);
 	}
+
+	@Override
+	@Transactional
+	public void deleteMember(Long memberId) {
+		Member member = memberRepository.findById(memberId)
+			.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+		memberRepository.delete(member);
+	}
 }
