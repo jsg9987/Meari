@@ -18,7 +18,7 @@
 ### Room Entity
 - ❌ `content_id` FK 제거 (동영상은 게임 시작 후 선택)
 - ✅ `theme_id` FK 추가 (방 목록 테마 필터링용)
-- ✅ `maxPeople` 추가 (2~4명)
+- ✅ `maxPeople` 추가 (1~4명)
 - ✅ `status` (is_active → status로 변경)
 - ✅ 도메인 메서드 추가: `updateOwner()`, `updateStatus()`, `isPasswordMatch()`, `isJoinable()`
 
@@ -170,27 +170,30 @@ report:{roomId}:{memberId}:{round}:result:{sentenceId} = JSON { accuracy, intona
 
 ## 7. 구현 진행 상황
 
-### Issue 1: Room CRUD
-- [ ] RoomRepository 생성
-- [ ] RoomService 생성
-- [ ] RoomController 생성
-- [ ] DTO 클래스 생성
-- [ ] ErrorCode 추가
-- [ ] 테스트 코드 작성
+### Issue 1: Room CRUD ✅ 완료
+- [x] Entity 수정 (Room, MemberRoom, Member, ShadowingReport, RoomStatus, ReportStatus)
+- [x] DTO 클래스 생성 (Request 3개, Response 5개)
+- [x] RoomRepository 생성 (커서 기반 페이징)
+- [x] MemberRoomRepository 생성
+- [x] RoomSessionService 생성 (Redis 세션 관리)
+- [x] RoomService 생성 (CRUD 비즈니스 로직)
+- [x] RoomController 생성 (5개 엔드포인트)
+- [x] ErrorCode 추가 (12개)
+- [x] 테스트 코드 작성 (RoomServiceTest - 15개 케이스)
 
 ### Issue 2: Redis + WebSocket 설정
+- [x] Redis 세션 관리 서비스 (RoomSessionService로 완료)
 - [ ] WebSocketConfig
-- [ ] Redis 세션 관리 서비스
 - [ ] STOMP 메시지 핸들러
 
 ### Issue 3: 입장/퇴장 및 상태 동기화
-- [ ] 입장 권한 확인 로직
-- [ ] 퇴장 처리 로직
+- [x] 입장 권한 확인 로직 (RoomService.enterRoom)
+- [x] 퇴장 처리 로직 (RoomService.leaveRoom)
 - [ ] WebSocket 브로드캐스트
 
 ### Issue 4: 역할 선점 시스템
-- [ ] Redis HSETNX 구현
-- [ ] 역할 변경 로직
+- [x] Redis HSETNX 구현 (RoomSessionService.tryAssignRole)
+- [ ] 역할 변경 로직 (Controller/Service)
 - [ ] WebSocket 알림
 
 ---
@@ -228,4 +231,59 @@ report:{roomId}:{memberId}:{round}:result:{sentenceId} = JSON { accuracy, intona
 
 ---
 
-*마지막 업데이트: 2026-01-25*
+---
+
+## 10. Issue 1 작업 파일 상세
+
+### Entity
+| 파일 | 작업 | 설명 |
+|------|------|------|
+| Room.java | 수정 | theme FK, maxPeople, status, 도메인 메서드 |
+| MemberRoom.java | 수정 | @Builder 패턴 적용 |
+| RoomStatus.java | 생성 | WAITING, IN_PROGRESS, COMPLETED |
+| Member.java | 수정 | sex 제거, 도메인 메서드 |
+| ShadowingReport.java | 수정 | round 추가, audioUrl 제거 |
+| ReportStatus.java | 수정 | FAILED 추가 |
+| Sex.java | 삭제 | - |
+
+### DTO
+| 파일 | 타입 |
+|------|------|
+| RoomCreateRequest | Request |
+| RoomEnterRequest | Request |
+| RoleSelectRequest | Request |
+| RoomResponse | Response |
+| RoomListResponse | Response |
+| RoomPageResponse | Response |
+| RoomMemberResponse | Response |
+| RoomDetailResponse | Response |
+
+### Repository
+| 파일 | 주요 메서드 |
+|------|-------------|
+| RoomRepository | findRoomsWithCursor, findAllRoomsWithCursor |
+| MemberRoomRepository | countByRoom_RoomId, findByRoomIdWithMember 등 |
+
+### Service
+| 파일 | 주요 메서드 |
+|------|-------------|
+| RoomService | createRoom, getRoomList, getRoomDetail, enterRoom, leaveRoom |
+| RoomSessionService | addMember, removeMember, setReady, tryAssignRole 등 |
+
+### Controller
+| Method | URL | 설명 |
+|--------|-----|------|
+| POST | /api/v1/rooms | 방 생성 |
+| GET | /api/v1/rooms | 방 목록 조회 |
+| GET | /api/v1/rooms/{roomId} | 방 상세 조회 |
+| POST | /api/v1/rooms/{roomId}/enter | 방 입장 |
+| DELETE | /api/v1/rooms/{roomId}/leave | 방 퇴장 |
+
+### ErrorCode 추가
+- NOT_FOUND_ROOM, NOT_FOUND_THEME, NOT_FOUND_CONTENT, NOT_FOUND_ROLE, NOT_FOUND_MEMBER_ROOM
+- INVALID_ROOM_PASSWORD, NOT_ROOM_OWNER, NOT_ROOM_MEMBER
+- ROOM_FULL, ROOM_ALREADY_JOINED, ROLE_ALREADY_TAKEN, ROOM_NOT_JOINABLE
+
+---
+
+*마지막 업데이트: 2026-01-26*
