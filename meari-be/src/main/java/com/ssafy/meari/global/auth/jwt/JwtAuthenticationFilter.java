@@ -1,4 +1,4 @@
-package com.ssafy.meari.global.jwt;
+package com.ssafy.meari.global.auth.jwt;
 
 import java.io.IOException;
 
@@ -12,7 +12,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
-import com.ssafy.meari.global.service.TokenBlacklistService;
+import com.ssafy.meari.global.auth.service.TokenBlacklistService;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;

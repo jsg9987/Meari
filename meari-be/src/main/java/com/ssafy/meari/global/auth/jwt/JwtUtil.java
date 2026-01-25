@@ -1,4 +1,4 @@
-package com.ssafy.meari.global.jwt;
+package com.ssafy.meari.global.auth.jwt;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;

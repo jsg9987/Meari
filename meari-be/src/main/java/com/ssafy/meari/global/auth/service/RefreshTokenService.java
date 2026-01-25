@@ -1,4 +1,4 @@
-package com.ssafy.meari.global.service;
+package com.ssafy.meari.global.auth.service;
 
 import java.util.concurrent.TimeUnit;
 

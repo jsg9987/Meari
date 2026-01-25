@@ -1,11 +1,11 @@
-package com.ssafy.meari.global.service;
+package com.ssafy.meari.global.auth.service;
 
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import com.ssafy.meari.global.jwt.JwtUtil;
+import com.ssafy.meari.global.auth.jwt.JwtUtil;
 
 import lombok.RequiredArgsConstructor;
 

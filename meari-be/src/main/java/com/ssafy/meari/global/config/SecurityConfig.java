@@ -16,11 +16,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.meari.global.auth.DefaultAuthenticationFilter;
 import com.ssafy.meari.global.auth.UserDetailsServiceImpl;
-import com.ssafy.meari.global.jwt.JwtAuthenticationFilter;
-import com.ssafy.meari.global.jwt.JwtExceptionFilter;
-import com.ssafy.meari.global.jwt.JwtUtil;
-import com.ssafy.meari.global.service.RefreshTokenService;
-import com.ssafy.meari.global.service.TokenBlacklistService;
+import com.ssafy.meari.global.auth.jwt.JwtAuthenticationFilter;
+import com.ssafy.meari.global.auth.jwt.JwtExceptionFilter;
+import com.ssafy.meari.global.auth.jwt.JwtUtil;
+import com.ssafy.meari.global.auth.service.RefreshTokenService;
+import com.ssafy.meari.global.auth.service.TokenBlacklistService;
 
 import lombok.RequiredArgsConstructor;
 

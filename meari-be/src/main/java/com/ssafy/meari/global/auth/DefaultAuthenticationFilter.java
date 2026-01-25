@@ -17,8 +17,8 @@ import com.ssafy.meari.domain.member.dto.request.LoginRequestDto;
 import com.ssafy.meari.global.common.ApiResponse;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
-import com.ssafy.meari.global.jwt.JwtUtil;
-import com.ssafy.meari.global.service.RefreshTokenService;
+import com.ssafy.meari.global.auth.jwt.JwtUtil;
+import com.ssafy.meari.global.auth.service.RefreshTokenService;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
