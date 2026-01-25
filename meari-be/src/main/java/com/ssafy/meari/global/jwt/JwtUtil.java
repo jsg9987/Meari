@@ -14,13 +14,7 @@ import com.ssafy.meari.global.auth.UserDetailsImpl;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.UnsupportedJwtException;
-import io.jsonwebtoken.security.SecurityException;
-import lombok.extern.slf4j.Slf4j;
 
-// TODO 아직 redis 적용하지 않음. => 추후 redis에 stateful하게 저장하도록 변경 예정
 @Component
 public class JwtUtil {
     // 추후 JwtProperties를 이용한 자바 객체 기반 설정으로 리팩토링 가능 (@Value를 통한 바인딩 x)
@@ -48,7 +42,8 @@ public class JwtUtil {
         return cachedSecretKey;
     }
 
-    // TODO 현재의 방식은 지연생성방식으로, 멀티스레드 환경에서 중복 생성을 막으려면 synchronized 처리를 고려해봐야 함
+    // TODO 현재의 방식은 지연생성방식으로, 멀티스레드 환경에서
+    //  중복 생성을 막으려면 synchronized 처리를 고려해봐야 함
     // Access Token 생성
     public String generateAccessToken(UserDetailsImpl userDetails) {
         Date now = new Date();
