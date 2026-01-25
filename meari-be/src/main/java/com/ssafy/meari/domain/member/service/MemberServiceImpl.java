@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ssafy.meari.domain.member.dto.SignupRequestDto;
+import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.mapper.MemberMapper;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
@@ -44,5 +45,11 @@ public class MemberServiceImpl implements MemberService {
 
 		// 3. 저장
 		memberRepository.save(member);
+	}
+
+	@Override
+	public EmailCheckResponseDto checkEmailExists(String email) {
+		boolean exists = memberRepository.existsByEmail(email);
+		return new EmailCheckResponseDto(exists);
 	}
 }

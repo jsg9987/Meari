@@ -2,12 +2,15 @@ package com.ssafy.meari.domain.member.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ssafy.meari.domain.member.dto.SignupRequestDto;
+import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
 import com.ssafy.meari.domain.member.service.MemberService;
 import com.ssafy.meari.global.common.ApiResponse;
 
@@ -26,5 +29,11 @@ public class MemberController {
 		memberService.signup(request);
 		return ResponseEntity.status(HttpStatus.CREATED)
 			.body(ApiResponse.successWithoutData());
+	}
+
+	@GetMapping("/email/check")
+	public ResponseEntity<ApiResponse<EmailCheckResponseDto>> checkEmail(@RequestParam String email) {
+		EmailCheckResponseDto response = memberService.checkEmailExists(email);
+		return ResponseEntity.ok(ApiResponse.success(response));
 	}
 }
