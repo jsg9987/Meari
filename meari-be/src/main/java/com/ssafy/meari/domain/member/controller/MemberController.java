@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.ssafy.meari.domain.member.dto.SignupRequestDto;
 import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
+import com.ssafy.meari.domain.member.dto.response.MemberInfoResponseDto;
 import com.ssafy.meari.domain.member.dto.response.NicknameCheckResponseDto;
 import com.ssafy.meari.domain.member.service.MemberService;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
@@ -51,5 +52,11 @@ public class MemberController {
 	public ResponseEntity<ApiResponse<Void>> deleteMember(@AuthenticationPrincipal UserDetailsImpl userDetails) {
 		memberService.deleteMember(userDetails.getMember().getMemberId());
 		return ResponseEntity.ok(ApiResponse.successWithoutData());
+	}
+
+	@GetMapping("/me")
+	public ResponseEntity<ApiResponse<MemberInfoResponseDto>> getMyInfo(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+		MemberInfoResponseDto response = memberService.getMyInfo(userDetails.getMember().getMemberId());
+		return ResponseEntity.ok(ApiResponse.success(response));
 	}
 }

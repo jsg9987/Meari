@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ssafy.meari.domain.member.dto.SignupRequestDto;
 import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
+import com.ssafy.meari.domain.member.dto.response.MemberInfoResponseDto;
 import com.ssafy.meari.domain.member.dto.response.NicknameCheckResponseDto;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.mapper.MemberMapper;
@@ -66,5 +67,16 @@ public class MemberServiceImpl implements MemberService {
 		Member member = memberRepository.findById(memberId)
 			.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
 		memberRepository.delete(member);
+	}
+
+	@Override
+	public MemberInfoResponseDto getMyInfo(Long memberId) {
+		Member member = memberRepository.findById(memberId)
+			.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+		return new MemberInfoResponseDto(
+			member.getEmail(),
+			member.getProfileUrl(),
+			member.getNickname()
+		);
 	}
 }
