@@ -11,6 +11,7 @@ import com.ssafy.meari.domain.member.dto.response.NicknameCheckResponseDto;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.mapper.MemberMapper;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
+import com.ssafy.meari.global.auth.service.RefreshTokenService;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
 
@@ -24,6 +25,7 @@ public class MemberServiceImpl implements MemberService {
 	private final MemberRepository memberRepository;
 	private final MemberMapper memberMapper;
 	private final PasswordEncoder passwordEncoder;
+	private final RefreshTokenService refreshTokenService;
 
 	@Override
 	@Transactional
@@ -66,6 +68,10 @@ public class MemberServiceImpl implements MemberService {
 	public void deleteMember(Long memberId) {
 		Member member = memberRepository.findById(memberId)
 			.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+
+		// Redis에서 RefreshToken 삭제
+		refreshTokenService.deleteRefreshToken(member.getEmail());
+
 		memberRepository.delete(member);
 	}
 
