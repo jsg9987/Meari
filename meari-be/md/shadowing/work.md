@@ -6,10 +6,15 @@
 
 ### 핵심 플로우
 ```
-방 생성 → 입장 → 준비 → [시작] → 동영상 선택 → 시청 → 역할 선택 → Round1 → Round2 → 준비로 회귀
-                       ↑
-                  여기서부터 입장 불가
+방 생성 → 입장 → 동영상 선택 → 준비 → [시작] → 시청 → 역할 선택 → Round1 → Round2 → 준비로 회귀
+                                        ↑
+                                   여기서부터 입장 불가
 ```
+
+**변경 사항 (2026-01-26):**
+- 기존: 준비 → 시작 → 동영상 선택
+- 변경: 동영상 선택 → 준비 → 시작
+- 이유: UX 개선 (모두가 동영상을 확인 후 준비, 시작 시 즉시 다운로드)
 
 ---
 
@@ -47,9 +52,13 @@
 
 ### 세부 진행 상태 (Redis 관리)
 ```redis
-room:{room_id}:phase = "SELECTING" | "WATCHING" | "ROLE_PICK" | "ROUND_1" | "ROUND_2"
-room:{room_id}:content_id = 현재 선택된 콘텐츠 ID
+room:{room_id}:phase = "WATCHING" | "ROLE_PICK" | "ROUND_1" | "ROUND_2"
+room:{room_id}:content_id = 현재 선택된 콘텐츠 ID (WAITING 단계에서 설정)
 ```
+
+**변경 사항:**
+- `SELECTING` phase 제거 (동영상은 WAITING 단계에서 선택)
+- 시작 시 바로 `WATCHING` phase로 전환
 
 ### 퇴장/연결 끊김 처리
 | 상황 | 처리 |
@@ -70,17 +79,22 @@ room:{room_id}:content_id = 현재 선택된 콘텐츠 ID
 ## 4. API 설계
 
 ### HTTP API
-| Method | URL | 설명 |
-|--------|-----|------|
-| POST | /api/v1/rooms | 방 생성 |
-| GET | /api/v1/rooms | 방 목록 조회 (커서 기반) |
-| GET | /api/v1/rooms/{roomId} | 방 상세 조회 |
-| POST | /api/v1/rooms/{roomId}/enter | 방 입장 |
-| DELETE | /api/v1/rooms/{roomId}/leave | 방 퇴장 |
-| POST | /api/v1/rooms/{roomId}/ready | 준비 상태 토글 |
-| POST | /api/v1/rooms/{roomId}/start | 게임 시작 (방장) |
-| POST | /api/v1/rooms/{roomId}/content | 동영상 선택 (방장) |
-| POST | /api/v1/rooms/{roomId}/role | 역할 선점 |
+| Method | URL | 설명 | 호출 순서 |
+|--------|-----|------|----------|
+| POST | /api/v1/rooms | 방 생성 | 1 |
+| GET | /api/v1/rooms | 방 목록 조회 (커서 기반) | - |
+| GET | /api/v1/rooms/{roomId} | 방 상세 조회 | - |
+| POST | /api/v1/rooms/{roomId}/enter | 방 입장 | 2 |
+| POST | /api/v1/rooms/{roomId}/content | 동영상 선택 (방장, WAITING) | 3 |
+| POST | /api/v1/rooms/{roomId}/ready | 준비 상태 토글 | 4 |
+| POST | /api/v1/rooms/{roomId}/start | 게임 시작 (방장, contentId 필요) | 5 |
+| DELETE | /api/v1/rooms/{roomId}/leave | 방 퇴장 | - |
+| POST | /api/v1/rooms/{roomId}/role | 역할 선점 (ROLE_PICK) | 6 |
+
+**변경 사항:**
+- `/start`: Request Body에 `content_id` 추가
+- `/content`: WAITING 단계에서만 호출 가능, phase 변경 없음
+- 호출 순서: 동영상 선택(3) → 준비(4) → 시작(5)
 
 ### WebSocket Topics
 | Topic | 설명 |
@@ -108,7 +122,7 @@ room:{roomId}:ready = Hash { memberId -> "true" | "false" }
 room:{roomId}:content_id = contentId
 
 # 진행 단계
-room:{roomId}:phase = "SELECTING" | "WATCHING" | "ROLE_PICK" | "ROUND_1" | "ROUND_2"
+room:{roomId}:phase = "WATCHING" | "ROLE_PICK" | "ROUND_1" | "ROUND_2"
 
 # 연결 끊김 추적 (Grace Period)
 room:{roomId}:disconnected = Hash { memberId -> timestamp }
@@ -172,29 +186,31 @@ report:{roomId}:{memberId}:{round}:result:{sentenceId} = JSON { accuracy, intona
 
 ### Issue 1: Room CRUD ✅ 완료
 - [x] Entity 수정 (Room, MemberRoom, Member, ShadowingReport, RoomStatus, ReportStatus)
-- [x] DTO 클래스 생성 (Request 3개, Response 5개)
+- [x] DTO 클래스 생성 (Request 4개, Response 5개)
 - [x] RoomRepository 생성 (커서 기반 페이징)
 - [x] MemberRoomRepository 생성
 - [x] RoomSessionService 생성 (Redis 세션 관리)
 - [x] RoomService 생성 (CRUD 비즈니스 로직)
-- [x] RoomController 생성 (5개 엔드포인트)
-- [x] ErrorCode 추가 (12개)
+- [x] RoomController 생성 (9개 엔드포인트)
+- [x] ErrorCode 추가 (15개)
 - [x] 테스트 코드 작성 (RoomServiceTest - 15개 케이스)
 
-### Issue 2: Redis + WebSocket 설정
-- [x] Redis 세션 관리 서비스 (RoomSessionService로 완료)
-- [ ] WebSocketConfig
-- [ ] STOMP 메시지 핸들러
+### Issue 2: WebSocket 설정 ✅ 완료
+- [x] Redis 세션 관리 서비스 (RoomSessionService)
+- [x] WebSocketConfig (기존에 이미 완료됨)
+- [x] WebSocket DTO (RoomStateMessage 등)
 
-### Issue 3: 입장/퇴장 및 상태 동기화
-- [x] 입장 권한 확인 로직 (RoomService.enterRoom)
-- [x] 퇴장 처리 로직 (RoomService.leaveRoom)
-- [ ] WebSocket 브로드캐스트
+### Issue 3: 입장/퇴장 및 상태 동기화 ✅ 완료
+- [x] 입장 시 브로드캐스트 (RoomService.enterRoom)
+- [x] 퇴장 시 브로드캐스트 (RoomService.leaveRoom)
+- [x] 준비 상태 변경 브로드캐스트 (RoomService.toggleReady)
+- [x] 게임 시작 브로드캐스트 (RoomService.startGame)
+- [x] 동영상 선택 브로드캐스트 (RoomService.selectContent)
 
-### Issue 4: 역할 선점 시스템
+### Issue 4: 역할 선점 시스템 ✅ 완료
 - [x] Redis HSETNX 구현 (RoomSessionService.tryAssignRole)
-- [ ] 역할 변경 로직 (Controller/Service)
-- [ ] WebSocket 알림
+- [x] 역할 선점 API (RoomController.selectRole)
+- [x] 역할 선점 브로드캐스트 (RoomService.selectRole)
 
 ---
 
