@@ -26,7 +26,7 @@ services:
           memory: 2G
 
   # ============================================================
-  # PostgreSQL - 메인 데이터베이스
+  # 1. PostgreSQL - 메인 데이터베이스
   # ============================================================
   postgres:
     image: postgres:15-alpine
@@ -53,7 +53,7 @@ services:
       retries: 5
 
   # ============================================================
-  # Redis - 캐시 및 세션 관리
+  # 2. Redis - 캐시 및 세션 관리
   # ============================================================
   redis:
     image: redis:alpine
@@ -77,7 +77,7 @@ services:
       retries: 5
 
   # ============================================================
-  # RabbitMQ - 메시지 브로커
+  # 3. RabbitMQ - 메시지 브로커
   # ============================================================
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -104,7 +104,7 @@ services:
       retries: 5
 
   # ============================================================
-  # OpenVidu - WebRTC 미디어 서버
+  # 4. OpenVidu - WebRTC 미디어 서버
   # ============================================================
   openvidu:
     image: openvidu/openvidu-dev:2.29.0
@@ -132,23 +132,44 @@ services:
           memory: 4G
 
   # ============================================================
-  # Spring Boot API - 메인 백엔드 (Jenkins가 빌드/배포)
+  # 5. Frontend (Nginx + React)
+  # ============================================================
+  frontend:
+    container_name: meari-frontend
+    image: frontend-image:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - meari-network
+    restart: always
+    depends_on:
+      - spring-api
+
+  # ============================================================
+  # 6. Spring Boot API - 메인 백엔드 서버
   # ============================================================
   spring-api:
-    image: meari-spring:latest
+    image: backend-image:latest
     container_name: meari-spring
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      # PostgreSQL 연결 정보
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meari_db
       SPRING_DATASOURCE_USERNAME: ssafy
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      # Redis 연결 정보
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # RabbitMQ 연결 정보
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ssafy
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      # OpenVidu 연결 정보
       OPENVIDU_URL: https://openvidu:4443
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
     ports:
@@ -169,23 +190,34 @@ services:
           memory: 2G
 
   # ============================================================
-  # Nginx - 프론트엔드 (Jenkins가 빌드/배포)
+  # 7. FastAPI - AI 분석 서버
   # ============================================================
-  frontend:
-    image: meari-frontend:latest
-    container_name: meari-frontend
+  fastapi:
+    image: meari-fastapi:latest
+    container_name: meari-fastapi
+    environment:
+      # PostgreSQL 연결 URL
+      DATABASE_URL: postgresql://ssafy:${DB_PASSWORD}@postgres:5432/meari_db
+      # Redis 연결 URL
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # RabbitMQ 연결 URL
+      RABBITMQ_URL: amqp://ssafy:${RABBITMQ_PASSWORD}@rabbitmq:5672
     ports:
-      - "80:80"
-      - "443:443"
+      - "8000:8000"
     networks:
       - meari-network
     depends_on:
-      - spring-api
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 2G
 
 # ============================================================
 # 네트워크 설정

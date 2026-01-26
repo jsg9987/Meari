@@ -6,108 +6,71 @@ pipeline {
         pollSCM('* * * * *')
     }
 
-    environment {
-        // Docker 이미지 이름
-        BACKEND_IMAGE = "meari-spring:latest"
-        FRONTEND_IMAGE = "meari-frontend:latest"
-
-        // GitLab Credentials ID (Jenkins에서 설정)
-        GITLAB_CREDENTIALS = credentials('gitlab-credentials')
-
-        // 환경 변수 Credentials (Jenkins에서 설정)
-        DB_PASSWORD = credentials('db-password')
-        REDIS_PASSWORD = credentials('redis-password')
-        RABBITMQ_PASSWORD = credentials('rabbitmq-password')
-        OPENVIDU_SECRET = credentials('openvidu-secret')
-        OPENVIDU_DOMAIN = credentials('openvidu-domain')
-    }
-
     stages {
+
         stage('Checkout') {
             steps {
-                script {
-                    echo "=== Checkout Stage ==="
-                    echo "Branch: ${env.GIT_BRANCH}"
-                    checkout scm
-                }
+                checkout scm
             }
         }
 
-        stage('Build Backend') {
-            steps {
-                script {
-                    echo "=== Building Backend ==="
-                    dir('meari-be') {
-                        sh '''
-                            docker build -t ${BACKEND_IMAGE} .
-                        '''
+        stage('Build & Docker Image') {
+            parallel {
+
+                stage('Backend Build') {
+                    steps {
+                        dir('meari-be') {
+                            sh 'chmod +x ./gradlew'
+                            sh './gradlew clean build -x test --refresh-dependencies'
+                            sh 'docker build -t backend-image:latest .'
+                        }
                     }
                 }
-            }
-        }
 
-        stage('Test Backend') {
-            steps {
-                script {
-                    echo "=== Testing Backend ==="
-                    dir('meari-be') {
-                        sh '''
-                            ./gradlew test --no-daemon
-                        '''
+                stage('Frontend Build') {
+                    steps {
+                        dir('meari-fe') {
+                            sh 'docker build -t frontend-image:latest .'
+                        }
                     }
-                }
-            }
-        }
-
-        stage('Build Frontend') {
-            steps {
-                script {
-                    echo "=== Building Frontend ==="
-                    sh '''
-                        docker build -t ${FRONTEND_IMAGE} -f meari-fe/Dockerfile .
-                    '''
                 }
             }
         }
 
         stage('Deploy') {
             when {
-                branch 'release'
+                branch 'release'  // release 브랜치만 배포
             }
             steps {
-                script {
-                    echo "=== Deploying to EC2 ==="
+                withCredentials([
+                    string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
+                    string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PW'),
+                    string(credentialsId: 'RABBITMQ_PASSWORD', variable: 'RABBITMQ_PW'),
+                    string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET'),
+                    string(credentialsId: 'OPENVIDU_DOMAIN', variable: 'OV_DOMAIN')
+                ]) {
+                    script {
+                        // 1. .env 파일 생성
+                        sh """
+                        # --- Database 설정 ---
+                        echo "DB_PASSWORD=${DB_PW}" > .env
 
-                    // .env 파일 생성
-                    sh '''
-                        cat > .env << EOF
-DB_PASSWORD=${DB_PASSWORD}
-REDIS_PASSWORD=${REDIS_PASSWORD}
-RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
-OPENVIDU_SECRET=${OPENVIDU_SECRET}
-OPENVIDU_DOMAIN=${OPENVIDU_DOMAIN}
-EOF
-                    '''
+                        # --- Redis 설정 ---
+                        echo "REDIS_PASSWORD=${REDIS_PW}" >> .env
 
-                    // Docker Compose로 배포
-                    sh '''
-                        docker compose down spring-api frontend || true
-                        docker compose up -d spring-api frontend
-                    '''
+                        # --- RabbitMQ 설정 ---
+                        echo "RABBITMQ_PASSWORD=${RABBITMQ_PW}" >> .env
 
-                    // .env 파일 삭제 (보안)
-                    sh 'rm -f .env'
-                }
-            }
-        }
+                        # --- OpenVidu 설정 ---
+                        echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
+                        echo "OPENVIDU_DOMAIN=${OV_DOMAIN}" >> .env
+                        """
 
-        stage('Clean Up') {
-            steps {
-                script {
-                    echo "=== Cleaning Up ==="
-                    sh '''
-                        docker image prune -f
-                    '''
+                        // 2. 배포 실행
+                        sh 'docker-compose down frontend spring-api || true'
+                        sh 'docker-compose up -d frontend spring-api'
+                        sh 'docker image prune -f'
+                    }
                 }
             }
         }
@@ -116,36 +79,45 @@ EOF
     post {
         success {
             script {
-                def message = """
-                ✅ 빌드 성공!
-                - Branch: ${env.GIT_BRANCH}
-                - Build: #${env.BUILD_NUMBER}
-                - Stage: ${env.STAGE_NAME}
-                """
+                def message = "✅ 빌드 성공! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
 
                 if (env.GIT_BRANCH == 'release') {
-                    message += "\n🚀 배포 완료!"
+                    message = "✅ 배포 성공!: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                }
+
+                // Mattermost 알림 (설정되어 있는 경우)
+                try {
+                    mattermostSend (
+                        color: 'good',
+                        message: message + " (<${env.BUILD_URL}|상세보기>)"
+                    )
+                } catch (Exception e) {
+                    echo "Mattermost 알림 실패: ${e.message}"
                 }
 
                 echo message
             }
         }
-
         failure {
             script {
-                def message = """
-                ❌ 빌드 실패!
-                - Branch: ${env.GIT_BRANCH}
-                - Build: #${env.BUILD_NUMBER}
-                - Stage: ${env.STAGE_NAME}
-                """
+                def message = "🚨 빌드 실패! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
+
+                if (env.GIT_BRANCH == 'release') {
+                    message = "🚨 배포 실패(확인요망): ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                }
+
+                // Mattermost 알림 (설정되어 있는 경우)
+                try {
+                    mattermostSend (
+                        color: 'danger',
+                        message: message + " (<${env.BUILD_URL}|상세보기>)"
+                    )
+                } catch (Exception e) {
+                    echo "Mattermost 알림 실패: ${e.message}"
+                }
 
                 echo message
             }
-        }
-
-        always {
-            cleanWs()
         }
     }
 }
