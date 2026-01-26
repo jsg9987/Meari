@@ -2,6 +2,25 @@
 
 우리 팀은 **Git Flow**를 기반으로 하되, FE/BE의 원활한 병렬 개발을 위해 **중간 통합 브랜치(`develop-fe`, `develop-be`)**를 두는 전략을 사용합니다.
 
+### 📝 커밋 메시지 컨벤션
+
+```
+[FE] <type>: <summary>
+```
+Prefix: `[FE]`, `[BE]`, `[AI]`, `[INFRA]`
+
+Type: `feature` | `fix` | `refactor` 처럼 브랜치명과 동일한 타입 사용용
+
+Prefix는 대문자, type은 소문자 사용
+
+summary는 명령형으로 간결하게 작성
+
+**Examples**
+```
+[FE] feature: add dark mode toggle
+[FE] fix: resolve modal close issue
+[FE] refactor: simplify Zustand store
+```
 ### 🌳 Branch Strategy
 
 * **master**: 실제 라이브 서비스되고 있는 프로덕션 브랜치
@@ -63,3 +82,30 @@ master (Main)
 4. 충돌 발생 시 로컬에서 해결
 5. 원격 저장소로 업로드 (`git push origin fe/feature/login`)
 6. GitHub에서 `develop-fe`로 Pull Request 생성
+
+
+### 이슈 발행 및 PR 컨벤션
+
+#### 1. 이슈 발행
+
+##### 이슈 생성
+
+![이슈 생성](./images/issue-add.png)
+![이슈 템플릿 적용](./images/issue-templete.png)
+![이슈에서 브랜치 생성](./images/issue-branch-add.png)
+- 이슈에서 작업할 feature branch를 먼저 만듭니다. 이 후 작업 후 PR 시 이슈에 merge branch가 표시됩니다.
+
+#### 2. PR 
+- 작업한 기능을 develop-?에 PR 요청합니다.
+- PR 템플릿을 적용합니다.
+- 템플릿의 컨벤션 요구사항을 모두 만족시킨 후 PR을 날립니다.
+- 팀원이 PR을 확인하고 merge 수락합니다.
+
+#### 3. feature branch 삭제
+- 병합 완료된 branch는 지저분하니 삭제합니다.
+
+#### 4. 이슈 Close
+- 이슈가 끝났다면 닫습니다.
+
+
+

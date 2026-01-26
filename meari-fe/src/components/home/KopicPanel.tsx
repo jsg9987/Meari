@@ -1,6 +1,6 @@
 
 
-const CopikPanel = () => {
+const KopicPanel = () => {
   return (
     <section className='rounded-2xl border border-white/10 bg-white/5 p-6 text-black'>
       <h2 className='text-xl font-semibold'>코픽</h2>
@@ -11,4 +11,4 @@ const CopikPanel = () => {
   )
 }
 
-export default CopikPanel
+export default KopicPanel
