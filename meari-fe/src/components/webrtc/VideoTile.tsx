@@ -7,9 +7,11 @@ interface VideoTileProps {
   muted?: boolean;
   label?: string;
   isSpeaker?: boolean;
+  className?: string;
+  videoClassName?: string;
 }
 
-export default function VideoTile({ streamManager, muted, label, isSpeaker }: VideoTileProps) {
+export default function VideoTile({ streamManager, muted, label, isSpeaker, className, videoClassName }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -21,14 +23,14 @@ export default function VideoTile({ streamManager, muted, label, isSpeaker }: Vi
     <div
       className={`relative overflow-hidden rounded-xl bg-gray-100 border border-gray-200 ${
         isSpeaker ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-white" : ""
-      }`}
+      } ${className || ""}`}
     >
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted={muted}
-        className="w-full aspect-video object-cover"
+        className={`w-full object-cover ${videoClassName || "aspect-video"}`}
       />
       {label && (
         <span className="absolute bottom-0 left-0 px-2 py-1 text-sm text-gray-900 bg-white/90 rounded-tr-lg font-medium">

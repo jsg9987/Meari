@@ -2,6 +2,7 @@ import axiosInstance from './axiosInstance';
 
 export interface CreateRoomRequest {
   title: string;
+  theme_id: number;
   password: string | null;
   max_people: number;
 }
@@ -32,7 +33,7 @@ export const createRoomMock = async (
           room_id: 'room_uuid_1234',
           title: payload.title,
           owner_id: 1,
-          content_id: 101,
+          content_id: payload.theme_id,
           is_active: 'ACTIVE',
         },
         error: null,

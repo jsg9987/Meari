@@ -35,6 +35,7 @@ body {
     --color-bg-button: oklch(0.62 0.21 253);
     --color-bg-control-button: oklch(0.34 0.03 255 / 0.5);
     --color-bg-chat-button: oklch(0.64 0.23 255);
+    --color-tab-active: oklch(0.63 0.12 232);
     --radius-button: 2rem;
     --header-height: 5rem;
   }

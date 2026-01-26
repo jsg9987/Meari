@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, MessageCircle, Lock, Unlock, Copy, Check } from "lucide-react";
+import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2 } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
 import VideoControls from "../components/webrtc/VideoControls";
@@ -10,6 +10,7 @@ import type { VideoTileData, ConnectionStatus } from "../hooks/useVideoRoom";
 import type { Publisher, Subscriber } from "openvidu-browser";
 
 type SidebarTab = "video" | "chat";
+type LayoutMode = "narrow" | "grid" | "wide";
 
 // TODO: 헤더 변경, 비디오 타일 변경
 export default function ShadowingRoom() {
@@ -17,8 +18,25 @@ export default function ShadowingRoom() {
   const navigate = useNavigate();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("video");
   const [copiedPassword, setCopiedPassword] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("narrow");
+  const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
+  const layoutDropdownRef = useRef<HTMLDivElement>(null);
 
   const nickname = "User";
+
+  // 드롭다운 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (layoutDropdownRef.current && !layoutDropdownRef.current.contains(event.target as Node)) {
+        setIsLayoutDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Mock 방 정보 (실제로는 API에서 가져와야 함)
   const roomInfo = {
@@ -170,6 +188,17 @@ export default function ShadowingRoom() {
     }
   };
 
+  const handleLayoutChange = (mode: LayoutMode) => {
+    setLayoutMode(mode);
+    setIsLayoutDropdownOpen(false);
+  };
+
+  const layoutConfigs = {
+    narrow: { width: "w-90", label: "1열 (기본)", icon: LayoutList },
+    grid: { width: "w-[600px]", label: "2x2 그리드", icon: LayoutGrid },
+    wide: { width: "w-[480px]", label: "넓은 사이드바", icon: Maximize2 },
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* 왼쪽 메인 영역 */}
@@ -268,38 +297,77 @@ export default function ShadowingRoom() {
         </div>
       </div>
 
-      {/* 오른쪽 사이드바 (360px) */}
-      <div className="w-90 flex flex-col border-l border-gray-200 bg-white">
+      {/* 오른쪽 사이드바 (동적 너비) */}
+      <div className={`${layoutConfigs[layoutMode].width} flex flex-col border-l border-gray-200 bg-white transition-all duration-300`}>
         {/* 탭 버튼 */}
         <div className="flex gap-2 p-3 py-4 bg-gray-50">
-          <button
-            onClick={() => setSidebarTab("video")}
-            className={`flex-1 flex items-center cursor-pointer justify-center gap-4 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-              sidebarTab === "video"
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
-            }`}
-          >
-            <Users size={18} />
-            <span>참여자</span>
-          </button>
-          <button
-            onClick={() => setSidebarTab("chat")}
-            className={`flex-1 flex items-center cursor-pointer justify-center gap-4 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-              sidebarTab === "chat"
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
-            }`}
-          >
-            <MessageCircle size={18} />
-            <span>채팅</span>
-          </button>
+          <div className="flex gap-2 flex-1">
+            <button
+              onClick={() => setSidebarTab("video")}
+              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+                sidebarTab === "video"
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+              }`}
+            >
+              <Users size={18} />
+              <span>참여자</span>
+            </button>
+            <button
+              onClick={() => setSidebarTab("chat")}
+              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+                sidebarTab === "chat"
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+              }`}
+            >
+              <MessageCircle size={18} />
+              <span>채팅</span>
+            </button>
+          </div>
+
+          {/* 레이아웃 드롭다운 */}
+          <div className="relative" ref={layoutDropdownRef}>
+            <button
+              onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
+              className="flex items-center justify-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition-all bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+              title="레이아웃 변경"
+            >
+              {(() => {
+                const Icon = layoutConfigs[layoutMode].icon;
+                return <Icon size={18} />;
+              })()}
+            </button>
+
+            {/* 드롭다운 메뉴 */}
+            {isLayoutDropdownOpen && (
+              <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-10 min-w-48">
+                {(Object.entries(layoutConfigs) as [LayoutMode, typeof layoutConfigs[LayoutMode]][]).map(([mode, config]) => {
+                  const Icon = config.icon;
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => handleLayoutChange(mode)}
+                      className={`flex items-center gap-3 px-4 py-3 w-full hover:bg-gray-50 transition-colors text-left ${
+                        layoutMode === mode ? "bg-blue-50 text-blue-600" : "text-gray-700"
+                      }`}
+                    >
+                      <Icon size={18} />
+                      <span className="text-sm">{config.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 탭 콘텐츠 */}
         <div className="flex-1 overflow-hidden bg-white">
           {sidebarTab === "video" && (
-            <div className="h-full overflow-y-auto p-3 space-y-3">
+            <div className={`h-full overflow-y-auto p-3 ${
+              layoutMode === "grid" ? "grid grid-cols-2 gap-3 auto-rows-min" : "space-y-3"
+            }`}>
               {status === "connected" && tiles.length > 0 ? (
                 tiles.map((t) => (
                   <VideoTile
@@ -308,10 +376,11 @@ export default function ShadowingRoom() {
                     muted={t.muted}
                     label={t.label}
                     isSpeaker={t.isSpeaker}
+                    videoClassName={layoutMode === "wide" ? "aspect-[21/9]" : undefined}
                   />
                 ))
               ) : (
-                <p className="text-center text-gray-500 text-sm py-8">
+                <p className="text-center text-gray-500 text-sm py-8 col-span-2">
                   {status === "connecting" ? "연결 중..." : "참여자가 없습니다"}
                 </p>
               )}
