@@ -70,6 +70,9 @@ public enum ErrorCode {
     ROOM_NOT_IN_PROGRESS(HttpStatus.CONFLICT, "진행 중인 방이 아닙니다."),
     NOT_ALL_READY(HttpStatus.CONFLICT, "모든 참여자가 준비 완료되지 않았습니다."),
     INVALID_PHASE(HttpStatus.CONFLICT, "현재 단계에서 수행할 수 없는 작업입니다."),
+    CONTENT_NOT_SELECTED(HttpStatus.CONFLICT, "동영상이 선택되지 않았습니다."),
+    CONTENT_MISMATCH(HttpStatus.CONFLICT, "선택된 동영상과 일치하지 않습니다."),
+    CONTENT_SELECT_ONLY_WAITING(HttpStatus.CONFLICT, "동영상은 대기 중일 때만 선택할 수 있습니다."),
     
 	
 	// Unsupported Media Type: 415
