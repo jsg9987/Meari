@@ -8,6 +8,7 @@ import lombok.Getter;
 
 import java.util.List;
 
+// 무한 스크롤 페이징용 공통 응답 클래스
 @Schema(description = "커서 기반 페이지네이션 응답")
 @Getter
 @Builder
