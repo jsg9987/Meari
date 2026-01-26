@@ -1,60 +1,141 @@
-// =========================================================================================
-// [Step 3] Login UI Implementation
-// - Auth Store(Zustand)와 연동하여 로그인 처리
-// =========================================================================================
-
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
 
+// Assets
+import logoDark from '../assets/images/common/logo-dark.svg';
+import loginIllustration from '../assets/images/auth/login-illustration.svg';
+
 const Login = () => {
+    const navigate = useNavigate();
+    const { login, isLoading, error } = useAuthStore();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-
-    // Store에서 상태와 액션 가져오기
-    const { login, isLoading, error } = useAuthStore();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         await login({ email, password });
     };
 
+    const labelClass = 'text-sm font-medium text-[#001C27]';
+
+    const inputClass =
+        'h-12 w-full rounded-lg border border-[#e5e5e5] bg-white ' +
+        'px-4 text-sm text-[#001C27] ' +
+        'placeholder:text-[#bebebe] ' +
+        'focus:outline-none focus:ring-2 focus:ring-[#001C27]/20';
+
+    const buttonClass =
+        'mt-4 h-12 w-full rounded-lg ' +
+        'bg-[#001C27] text-white font-semibold ' +
+        'transition hover:bg-[#002D3F] ' +
+        'disabled:bg-[#ccc] disabled:cursor-not-allowed disabled:hover:bg-[#ccc]';
+
     return (
-        <div>
-            <h2>로그인</h2>
-            <form onSubmit={handleSubmit}>
-                <div>
-                    <label htmlFor="email">이메일: </label>
-                    <input
-                        type="email"
-                        id="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="이메일을 입력해주세요."
-                    />
-                </div>
-                <div>
-                    <label htmlFor="password">비밀번호: </label>
-                    <input
-                        type="password"
-                        id="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="비밀번호를 입력해주세요."
-                    />
+        <div className="min-h-screen bg-white flex">
+            <div className="mx-auto w-full max-w-[1280px] px-6 lg:px-10 min-h-screen flex flex-col">
+
+                {/* Header Logo */}
+                <div className="w-[200px] h-[80px] p-[10px] flex items-center justify-center">
+                    <img src={logoDark} alt="MEARI Logo" className="w-full h-full object-contain" />
                 </div>
 
-                {error && (
-                    <div style={{ color: 'red' }}>
-                        {error}
+                {/* Content Area */}
+                <div className="flex-1 flex flex-col lg:flex-row items-center justify-center">
+
+                    {/* Login Card */}
+                    <div
+                        className={
+                            'w-full max-w-[400px] rounded-xl border border-[#bebebe] bg-white p-6 sm:p-10 ' +
+                            'shadow-[0_1px_2px_rgba(0,0,0,0.25)]' +
+                            'transition-opacity duration-200'
+                        }
+                    >
+                        <form onSubmit={handleSubmit} className="space-y-5">
+                            <div className="mb-6 space-y-2">
+                                <h2 className="text-2xl font-bold font-pretendard text-[#001C27]">로그인</h2>
+                                <p className="text-xs font-pretendard text-[#666]">로그인을 수행하고, 나만의 학습 리포트를 확인하세요.</p>
+                            </div>
+
+                            {/* Email */}
+
+                            {/* 이메일 */}
+                            <div className="space-y-2">
+                                <label htmlFor="email" className={labelClass}>
+                                    이메일
+                                </label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    className={inputClass}
+                                    placeholder="이메일을 입력 해주세요."
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    autoComplete="email"
+                                />
+                            </div>
+
+                            {/* 비밀번호 */}
+                            <div className="space-y-2">
+                                <label htmlFor="password" className={labelClass}>
+                                    비밀번호
+                                </label>
+                                <input
+                                    id="password"
+                                    type="password"
+                                    className={inputClass}
+                                    placeholder="비밀번호를 입력 해주세요."
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete="current-password"
+                                />
+                            </div>
+
+                            {/* remember me */}
+                            <label className="mt-2 flex items-center gap-2 text-sm text-[#666] cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-[#e5e5e5] accent-[#001C27]"
+                                />
+                                remember me?
+                            </label>
+
+                            {/* 로그인 버튼 */}
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className={buttonClass}
+                            >
+                                {isLoading ? '로그인 중...' : '로그인'}
+                            </button>
+
+                            {/* 가입 링크 */}
+                            <p className="mt-4 text-center text-sm text-[#666]">
+                                아직 계정이 없으신가요?
+                                <button
+                                    type="button"
+                                    className="ml-1 font-bold text-[#001C27] hover:underline"
+                                    onClick={() => navigate('/signup')}
+                                >
+                                    가입하기
+                                </button>
+                            </p>
+
+                            {/* 에러 메시지 */}
+                            {error && (
+                                <div className="text-red-500 text-sm">
+                                    {error}
+                                </div>
+                            )}
+                        </form>
                     </div>
-                )}
 
-                <button type="submit" disabled={isLoading}>
-                    {isLoading ? '로그인 중...' : '로그인'}
-                </button>
-            </form>
-            <div>
-                <p>테스트 계정: user@gmail.com / 1234</p>
+                    {/* Illustration */}
+                    <div className="hidden lg:flex items-center justify-center">
+                        <img src={loginIllustration} className="w-full max-w-[600px]" alt="Login Illustration" />
+                    </div>
+
+                </div>
             </div>
         </div>
     );
