@@ -25,7 +25,7 @@ public class Member extends BaseEntity {
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
-    @Column(name = "nickname", nullable = false, length = 100)
+    @Column(name = "nickname", nullable = false, unique = true, length = 100)
     private String nickname;
 
     @Column(name = "profile_url", length = 2048)
@@ -35,7 +35,12 @@ public class Member extends BaseEntity {
     @Column(name = "native_language", nullable = false, length = 10, columnDefinition = "VARCHAR(10) DEFAULT 'KR'")
     private NativeLanguage nativeLanguage;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "sex", nullable = false, length = 1)
-    private Sex sex;
+    public void updateProfile(String nickname, NativeLanguage nativeLanguage) {
+        this.nickname = nickname;
+        this.nativeLanguage = nativeLanguage;
+    }
+
+    public void updatePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
 }

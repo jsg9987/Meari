@@ -2,6 +2,25 @@
 
 우리 팀은 **Git Flow**를 기반으로 하되, FE/BE의 원활한 병렬 개발을 위해 **중간 통합 브랜치(`develop-fe`, `develop-be`)**를 두는 전략을 사용합니다.
 
+### 📝 커밋 메시지 컨벤션
+
+```
+[FE] <type>: <summary>
+```
+Prefix: `[FE]`, `[BE]`, `[AI]`, `[INFRA]`
+
+Type: `feature` | `fix` | `refactor` 처럼 브랜치명과 동일한 타입 사용용
+
+Prefix는 대문자, type은 소문자 사용
+
+summary는 명령형으로 간결하게 작성
+
+**Examples**
+```
+[FE] feature: add dark mode toggle
+[FE] fix: resolve modal close issue
+[FE] refactor: simplify Zustand store
+```
 ### 🌳 Branch Strategy
 
 * **master**: 실제 라이브 서비스되고 있는 프로덕션 브랜치

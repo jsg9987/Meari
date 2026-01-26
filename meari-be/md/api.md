@@ -37,7 +37,7 @@ Error: * 404 USER NOT FOUND: 존재하지 않는 이메일
 ### 2.1 이메일 중복확인
 회원가입 전 이메일 사용 가능 여부를 확인합니다.
 Method: GET
-URL: /api/v1/member/email/check
+URL: /api/v1/members/email/check
 Query Parameter: email=test@ssafy.com
 Response Body: { "has_email": true/false }
 
@@ -259,7 +259,7 @@ Request Body:
 ### 2.1 비밀번호 확인
 민감한 정보 수정 전, 사용자가 입력한 현재 비밀번호가 일치하는지 확인합니다.
 Method: POST
-URL: /api/v1/member/check-password
+URL: /api/v1/members/check-password
 Request Body:
 ```
 {
