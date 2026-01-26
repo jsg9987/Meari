@@ -270,6 +270,13 @@ public class RoomSessionService {
         return value != null ? Long.parseLong(value) : null;
     }
 
+    /**
+     * 현재 선택된 콘텐츠 ID 조회 (별칭)
+     */
+    public Long getContentId(Long roomId) {
+        return getContent(roomId);
+    }
+
     // === 진행 단계 관리 ===
 
     /**
