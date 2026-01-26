@@ -10,6 +10,7 @@ import com.ssafy.meari.domain.room.dto.response.RoomDetailResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomListResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomMemberResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomResponse;
+import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
 import com.ssafy.meari.global.common.CursorPageResponse;
 import com.ssafy.meari.domain.room.entity.MemberRoom;
 import com.ssafy.meari.domain.room.entity.Room;
@@ -23,6 +24,7 @@ import com.ssafy.meari.global.error.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,7 @@ public class RoomService {
     private final ContentRepository contentRepository;
     private final RoleRepository roleRepository;
     private final RoomSessionService roomSessionService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * 방 생성
@@ -194,6 +197,10 @@ public class RoomService {
         // Redis에 참여자 추가
         roomSessionService.addMember(roomId, memberId);
 
+        // 입장 알림 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.memberJoin(memberId, member.getNickname());
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
         log.info("방 입장 완료: roomId={}, memberId={}", roomId, memberId);
     }
 
@@ -217,10 +224,15 @@ public class RoomService {
         // Redis에서 참여자 제거 (준비 상태, 역할도 함께 제거됨)
         roomSessionService.removeMember(roomId, memberId);
 
-        // 방장이 나간 경우 처리
+        // 방장이 나간 경우 처리 및 새 방장 ID 반환
+        Long newOwnerId = null;
         if (room.getOwner().getMemberId().equals(memberId)) {
-            handleOwnerLeave(room);
+            newOwnerId = handleOwnerLeave(room);
         }
+
+        // 퇴장 알림 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.memberLeave(memberId, newOwnerId);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
         // 마지막 사람이 나간 경우 방 종료
         long remainingCount = memberRoomRepository.countByRoom_RoomId(roomId);
@@ -235,15 +247,18 @@ public class RoomService {
 
     /**
      * 방장 퇴장 시 처리 (위임)
+     * @return 새 방장 ID (위임된 경우), 없으면 null
      */
-    private void handleOwnerLeave(Room room) {
+    private Long handleOwnerLeave(Room room) {
         // 가장 먼저 입장한 사람에게 방장 위임
-        memberRoomRepository.findFirstByRoomIdOrderByCreatedAtAsc(room.getRoomId())
-                .ifPresent(mr -> {
+        return memberRoomRepository.findFirstByRoomIdOrderByCreatedAtAsc(room.getRoomId())
+                .map(mr -> {
                     room.updateOwner(mr.getMember());
-                    log.info("방장 위임: roomId={}, newOwnerId={}",
-                            room.getRoomId(), mr.getMember().getMemberId());
-                });
+                    Long newOwnerId = mr.getMember().getMemberId();
+                    log.info("방장 위임: roomId={}, newOwnerId={}", room.getRoomId(), newOwnerId);
+                    return newOwnerId;
+                })
+                .orElse(null);
     }
 
     /**
@@ -272,6 +287,10 @@ public class RoomService {
         boolean newReady = !currentReady;
         roomSessionService.setReady(roomId, memberId, newReady);
 
+        // 준비 상태 변경 알림 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.ready(memberId, newReady);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
         log.info("준비 상태 변경 완료: roomId={}, memberId={}, ready={}", roomId, memberId, newReady);
         return newReady;
     }
@@ -280,8 +299,8 @@ public class RoomService {
      * 게임 시작 (방장 전용)
      */
     @Transactional
-    public void startGame(Long roomId, Long memberId) {
-        log.info("게임 시작 요청: roomId={}, memberId={}", roomId, memberId);
+    public void startGame(Long roomId, Long contentId, Long memberId) {
+        log.info("게임 시작 요청: roomId={}, contentId={}, memberId={}", roomId, contentId, memberId);
 
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
@@ -296,6 +315,15 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ROOM_NOT_WAITING);
         }
 
+        // 동영상이 선택되었는지 확인 (Redis의 contentId와 일치해야 함)
+        Long selectedContentId = roomSessionService.getContentId(roomId);
+        if (selectedContentId == null) {
+            throw new BusinessException(ErrorCode.CONTENT_NOT_SELECTED);
+        }
+        if (!selectedContentId.equals(contentId)) {
+            throw new BusinessException(ErrorCode.CONTENT_MISMATCH);
+        }
+
         // 모든 참여자(방장 제외)가 준비 완료인지 확인
         if (!isAllMembersReady(roomId, memberId)) {
             throw new BusinessException(ErrorCode.NOT_ALL_READY);
@@ -303,9 +331,13 @@ public class RoomService {
 
         // 방 상태 변경
         room.updateStatus(RoomStatus.IN_PROGRESS);
-        roomSessionService.setPhase(roomId, "SELECTING");
+        roomSessionService.setPhase(roomId, "WATCHING");
 
-        log.info("게임 시작 완료: roomId={}", roomId);
+        // 게임 시작 알림 브로드캐스트 (contentId + phase)
+        RoomStateMessage message = RoomStateMessage.gameStart(contentId, "WATCHING");
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
+        log.info("게임 시작 완료: roomId={}, contentId={}", roomId, contentId);
     }
 
     /**
@@ -343,15 +375,9 @@ public class RoomService {
             throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
         }
 
-        // 진행 중 상태인지 확인
-        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
-            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
-        }
-
-        // SELECTING 단계인지 확인
-        String phase = roomSessionService.getPhase(roomId);
-        if (!"SELECTING".equals(phase)) {
-            throw new BusinessException(ErrorCode.INVALID_PHASE);
+        // WAITING 상태인지 확인 (게임 시작 전에만 선택 가능)
+        if (room.getStatus() != RoomStatus.WAITING) {
+            throw new BusinessException(ErrorCode.CONTENT_SELECT_ONLY_WAITING);
         }
 
         // 콘텐츠 존재 확인
@@ -359,9 +385,12 @@ public class RoomService {
             throw new BusinessException(ErrorCode.NOT_FOUND_CONTENT);
         }
 
-        // Redis에 콘텐츠 설정 및 단계 변경
+        // Redis에 콘텐츠 저장 (phase는 변경하지 않음)
         roomSessionService.setContent(roomId, contentId);
-        roomSessionService.setPhase(roomId, "WATCHING");
+
+        // 동영상 선택 알림 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.contentSelected(contentId);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
         log.info("동영상 선택 완료: roomId={}, contentId={}", roomId, contentId);
     }
@@ -401,6 +430,10 @@ public class RoomService {
         if (!success) {
             throw new BusinessException(ErrorCode.ROLE_ALREADY_TAKEN);
         }
+
+        // 역할 선점 알림 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.roleAssigned(memberId, roleId);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
         log.info("역할 선점 완료: roomId={}, roleId={}, memberId={}", roomId, roleId, memberId);
     }
