@@ -43,6 +43,10 @@ export default function ShadowingRoom() {
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [volume, setVolume] = useState(100);
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
+  const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
+  const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
+  const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
 
   // Mock StreamManager 생성
   const createMockStreamManager = (id: string): Publisher | Subscriber => {
@@ -104,6 +108,19 @@ export default function ShadowingRoom() {
   };
   const toggleAudio = () => setIsAudioEnabled(!isAudioEnabled);
   const toggleVideo = () => setIsVideoEnabled(!isVideoEnabled);
+  const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
+
+  const handleAudioDeviceChange = (deviceId: string) => {
+    setSelectedAudioDevice(deviceId);
+    // TODO: 실제 구현시 미디어 스트림 변경 로직 추가
+    console.log('Audio device changed to:', deviceId);
+  };
+
+  const handleVideoDeviceChange = (deviceId: string) => {
+    setSelectedVideoDevice(deviceId);
+    // TODO: 실제 구현시 미디어 스트림 변경 로직 추가
+    console.log('Video device changed to:', deviceId);
+  };
   // ============================================================================
   // MOCK DATA 끝
   // ============================================================================
@@ -198,7 +215,7 @@ export default function ShadowingRoom() {
 
         {/* 메인 비디오 영역 */}
         <div className="flex-1 p-4 bg-white">
-          <div className="relative h-full w-full rounded-2xl bg-gray-900 flex items-center justify-center">
+          <div className="relative h-full w-full rounded-lg bg-gray-900 flex items-center justify-center">
             {status === "connecting" && (
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -239,6 +256,14 @@ export default function ShadowingRoom() {
             onLeave={handleLeave}
             volume={volume}
             onVolumeChange={setVolume}
+            selectedAudioDevice={selectedAudioDevice}
+            selectedVideoDevice={selectedVideoDevice}
+            onAudioDeviceChange={handleAudioDeviceChange}
+            onVideoDeviceChange={handleVideoDeviceChange}
+            selectedNationality={selectedNationality}
+            onNationalityChange={setSelectedNationality}
+            isSubtitleEnabled={isSubtitleEnabled}
+            onToggleSubtitle={toggleSubtitle}
           />
         </div>
       </div>

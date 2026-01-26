@@ -23,7 +23,7 @@ export default function VideoRoom({ sessionName, nickname, autoJoin = true }: Vi
 
   if (status === "idle") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <div className="flex flex-col items-center justify-center min-h-100 gap-4">
         <p className="text-gray-400">세션에 참여하려면 버튼을 클릭하세요</p>
         <button
           onClick={join}
@@ -37,7 +37,7 @@ export default function VideoRoom({ sessionName, nickname, autoJoin = true }: Vi
 
   if (status === "connecting") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <div className="flex flex-col items-center justify-center min-h-100 gap-4">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         <p className="text-gray-400">연결 중...</p>
       </div>
@@ -46,7 +46,7 @@ export default function VideoRoom({ sessionName, nickname, autoJoin = true }: Vi
 
   if (status === "error") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <div className="flex flex-col items-center justify-center min-h-100 gap-4">
         <div className="text-red-500 text-center">
           <p className="text-lg font-medium">연결 실패</p>
           <p className="text-sm mt-1">{error}</p>
