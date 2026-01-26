@@ -13,13 +13,14 @@ import lombok.Getter;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class RoomStateMessage {
 
-    private String type;      // MEMBER_JOIN, MEMBER_LEAVE, READY, ROLE_ASSIGNED, ROLE_RELEASED, PHASE_CHANGE
+    private String type;      // MEMBER_JOIN, MEMBER_LEAVE, READY, ROLE_ASSIGNED, ROLE_RELEASED, PHASE_CHANGE, CONTENT_SELECTED
     private Long memberId;
     private Boolean ready;
     private Long roleId;
     private String phase;
     private String nickname;
     private Long newOwnerId;  // 방장 변경 시
+    private Long contentId;   // 동영상 선택 시
 
     public static RoomStateMessage memberJoin(Long memberId, String nickname) {
         return RoomStateMessage.builder()
@@ -64,6 +65,21 @@ public class RoomStateMessage {
     public static RoomStateMessage phaseChange(String phase) {
         return RoomStateMessage.builder()
                 .type("PHASE_CHANGE")
+                .phase(phase)
+                .build();
+    }
+
+    public static RoomStateMessage contentSelected(Long contentId) {
+        return RoomStateMessage.builder()
+                .type("CONTENT_SELECTED")
+                .contentId(contentId)
+                .build();
+    }
+
+    public static RoomStateMessage gameStart(Long contentId, String phase) {
+        return RoomStateMessage.builder()
+                .type("GAME_START")
+                .contentId(contentId)
                 .phase(phase)
                 .build();
     }
