@@ -39,4 +39,8 @@ public class Member extends BaseEntity {
         this.nickname = nickname;
         this.nativeLanguage = nativeLanguage;
     }
+
+    public void updatePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
 }

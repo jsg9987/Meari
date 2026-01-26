@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ssafy.meari.domain.mypage.dto.request.MyPageUpdateRequestDto;
+import com.ssafy.meari.domain.mypage.dto.request.PasswordCheckRequestDto;
+import com.ssafy.meari.domain.mypage.dto.request.PasswordUpdateRequestDto;
 import com.ssafy.meari.domain.mypage.dto.response.MyPageResponseDto;
 import com.ssafy.meari.domain.mypage.service.MyPageService;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
@@ -34,6 +36,22 @@ public class MyPageController {
 		@AuthenticationPrincipal UserDetailsImpl userDetails,
 		@RequestBody MyPageUpdateRequestDto request) {
 		myPageService.updateMyPage(userDetails.getMember().getMemberId(), request);
+		return ResponseEntity.ok(ApiResponse.successWithoutData());
+	}
+
+	@PatchMapping("/change/pw")
+	public ResponseEntity<ApiResponse<Void>> updatePassword(
+		@AuthenticationPrincipal UserDetailsImpl userDetails,
+		@RequestBody PasswordUpdateRequestDto request) {
+		myPageService.updatePassword(userDetails.getMember().getMemberId(), request);
+		return ResponseEntity.ok(ApiResponse.successWithoutData());
+	}
+
+	@GetMapping("/check-password")
+	public ResponseEntity<ApiResponse<Void>> checkPassword(
+		@AuthenticationPrincipal UserDetailsImpl userDetails,
+		@RequestBody PasswordCheckRequestDto request) {
+		myPageService.checkPassword(userDetails.getMember().getMemberId(), request);
 		return ResponseEntity.ok(ApiResponse.successWithoutData());
 	}
 }
