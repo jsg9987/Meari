@@ -20,8 +20,7 @@ pipeline {
                 stage('Backend Build') {
                     steps {
                         dir('meari-be') {
-                            sh 'chmod +x ./gradlew'
-                            sh './gradlew clean build -x test --refresh-dependencies'
+                            // Dockerfile이 Gradle로 빌드하므로 gradlew 제거
                             sh 'docker build -t backend-image:latest .'
                         }
                     }
@@ -67,8 +66,8 @@ pipeline {
                         """
 
                         // 2. 배포 실행
-                        sh 'docker-compose down frontend spring-api || true'
-                        sh 'docker-compose up -d frontend spring-api'
+                        sh 'docker compose down frontend spring-api || true'
+                        sh 'docker compose up -d frontend spring-api'
                         sh 'docker image prune -f'
                     }
                 }
@@ -85,7 +84,7 @@ pipeline {
                     message = "✅ 배포 성공!: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                 }
 
-                // Mattermost 알림 (설정되어 있는 경우)
+                // Mattermost 알림
                 try {
                     mattermostSend (
                         color: 'good',
@@ -106,7 +105,7 @@ pipeline {
                     message = "🚨 배포 실패(확인요망): ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                 }
 
-                // Mattermost 알림 (설정되어 있는 경우)
+                // Mattermost 알림
                 try {
                     mattermostSend (
                         color: 'danger',
