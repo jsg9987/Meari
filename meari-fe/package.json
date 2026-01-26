@@ -10,8 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@stomp/stompjs": "^7.2.1",
+    "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-query": "^5.90.19",
+    "axios": "^1.7.9",
+    "openvidu-browser": "^2.32.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.1.1",
+    "tailwindcss": "^4.1.18",
+    "zustand": "^5.0.10"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
