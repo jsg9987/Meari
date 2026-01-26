@@ -7,67 +7,57 @@ import logoDark from '../assets/images/common/logo-dark.svg';
 import loginIllustration from '../assets/images/auth/login-illustration.svg';
 
 const Login = () => {
+    const navigate = useNavigate();
+    const { login, isLoading, error } = useAuthStore();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-
-    const navigate = useNavigate();
-
-    // Store에서 상태와 액션 가져오기
-    const { login, isLoading, error } = useAuthStore();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         await login({ email, password });
     };
 
-    const labelClass = 'text-sm font-medium text-[#1a1a1a]';
+    const labelClass = 'text-sm font-medium text-[#001C27]';
 
     const inputClass =
         'h-12 w-full rounded-lg border border-[#e5e5e5] bg-white ' +
-        'px-4 text-sm text-[#1a1a1a] ' +
+        'px-4 text-sm text-[#001C27] ' +
         'placeholder:text-[#bebebe] ' +
-        'focus:outline-none focus:ring-2 focus:ring-[#1a1a1a]/20';
+        'focus:outline-none focus:ring-2 focus:ring-[#001C27]/20';
 
     const buttonClass =
         'mt-4 h-12 w-full rounded-lg ' +
-        'bg-[#1a1a1a] text-white font-semibold ' +
-        'transition hover:bg-[#333] ' +
+        'bg-[#001C27] text-white font-semibold ' +
+        'transition hover:bg-[#002D3F] ' +
         'disabled:bg-[#ccc] disabled:cursor-not-allowed disabled:hover:bg-[#ccc]';
 
     return (
         <div className="min-h-screen bg-white flex">
-            <div className="mx-auto w-full max-w-[1280px] px-6 lg:px-10 flex flex-col">
+            <div className="mx-auto w-full max-w-[1280px] px-6 lg:px-10 min-h-screen flex flex-col">
 
-                {/* Logo (Top) */}
-                <div className="pt-10">
-                    <img
-                        src={logoDark}
-                        alt="MEARI Logo"
-                        className="w-24 sm:w-28 h-auto"
-                    />
+                {/* Header Logo */}
+                <div className="w-[200px] h-[80px] p-[10px] flex items-center justify-center">
+                    <img src={logoDark} alt="MEARI Logo" className="w-full h-full object-contain" />
                 </div>
 
-                {/* Center Area */}
-                <div className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-16">
+                {/* Content Area */}
+                <div className="flex-1 flex flex-col lg:flex-row items-center justify-center">
 
-                    {/* 로그인 카드 */}
+                    {/* Login Card */}
                     <div
                         className={
                             'w-full max-w-[400px] rounded-xl border border-[#bebebe] bg-white p-6 sm:p-10 ' +
-                            'shadow-[0_1px_2px_rgba(0,0,0,0.25)]'
+                            'shadow-[0_1px_2px_rgba(0,0,0,0.25)]' +
+                            'transition-opacity duration-200'
                         }
                     >
                         <form onSubmit={handleSubmit} className="space-y-5">
-
-                            {/* 헤더 */}
                             <div className="mb-6 space-y-2">
-                                <h2 className="text-2xl font-bold font-pretendard text-[#1a1a1a]">
-                                    로그인
-                                </h2>
-                                <p className="text-xs font-pretendard text-[#666]">
-                                    로그인을 수행하고, 나만의 학습 리포트를 확인하세요.
-                                </p>
+                                <h2 className="text-2xl font-bold font-pretendard text-[#001C27]">로그인</h2>
+                                <p className="text-xs font-pretendard text-[#666]">로그인을 수행하고, 나만의 학습 리포트를 확인하세요.</p>
                             </div>
+
+                            {/* Email */}
 
                             {/* 이메일 */}
                             <div className="space-y-2">
@@ -105,7 +95,7 @@ const Login = () => {
                             <label className="mt-2 flex items-center gap-2 text-sm text-[#666] cursor-pointer select-none">
                                 <input
                                     type="checkbox"
-                                    className="h-4 w-4 rounded border-[#e5e5e5] accent-[#1a1a1a]"
+                                    className="h-4 w-4 rounded border-[#e5e5e5] accent-[#001C27]"
                                 />
                                 remember me?
                             </label>
@@ -124,7 +114,7 @@ const Login = () => {
                                 아직 계정이 없으신가요?
                                 <button
                                     type="button"
-                                    className="ml-1 font-bold text-[#1a1a1a] hover:underline"
+                                    className="ml-1 font-bold text-[#001C27] hover:underline"
                                     onClick={() => navigate('/signup')}
                                 >
                                     가입하기
@@ -140,13 +130,9 @@ const Login = () => {
                         </form>
                     </div>
 
-                    {/* Illustration (Desktop only) */}
-                    <div className="hidden lg:flex flex-1 items-center justify-center">
-                        <img
-                            src={loginIllustration}
-                            className="w-full max-w-[520px]"
-                            alt="Login Illustration"
-                        />
+                    {/* Illustration */}
+                    <div className="hidden lg:flex items-center justify-center">
+                        <img src={loginIllustration} className="w-full max-w-[600px]" alt="Login Illustration" />
                     </div>
 
                 </div>
