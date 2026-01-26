@@ -16,27 +16,42 @@ API 하나씩 Controller - Service 순서로 개발해줘.
 
 ---
 
-## 오늘 완료한 작업 (2026-01-26)
+## 완료한 작업 (2026-01-26)
+
+### 커밋 내역
+```
+aaebd31 [BE] docs(shadowing): 작업 진행 문서 추가
+b2fb1f6 [BE] feat(room): 방 상태 관리 API 추가
+16a9a56 [BE] feat(room/dto): 동영상 선택 요청 DTO 추가
+2c078ad [BE] feat(content/repository): Content, Role Repository 추가
+```
 
 ### HTTP API 전체 완료
-- [x] POST /api/v1/rooms/{roomId}/ready - 준비 상태 토글
-- [x] POST /api/v1/rooms/{roomId}/start - 게임 시작
-- [x] POST /api/v1/rooms/{roomId}/content - 동영상 선택
-- [x] POST /api/v1/rooms/{roomId}/role - 역할 선점
+| API | 설명 |
+|-----|------|
+| POST /api/v1/rooms | 방 생성 |
+| GET /api/v1/rooms | 방 목록 조회 |
+| GET /api/v1/rooms/{roomId} | 방 상세 조회 |
+| POST /api/v1/rooms/{roomId}/enter | 방 입장 |
+| DELETE /api/v1/rooms/{roomId}/leave | 방 퇴장 |
+| POST /api/v1/rooms/{roomId}/ready | 준비 상태 토글 |
+| POST /api/v1/rooms/{roomId}/start | 게임 시작 |
+| POST /api/v1/rooms/{roomId}/content | 동영상 선택 |
+| POST /api/v1/rooms/{roomId}/role | 역할 선점 |
 
 ### 추가된 파일
-- `ContentSelectRequest.java`
-- `ContentRepository.java`
-- `RoleRepository.java`
+- `ContentSelectRequest.java` - 동영상 선택 요청 DTO
+- `ContentRepository.java` - 콘텐츠 존재 확인용
+- `RoleRepository.java` - 역할 존재 확인용
 
 ### 수정된 파일
-- `RoomService.java` - toggleReady, startGame, selectContent, selectRole 메서드 추가
+- `RoomService.java` - toggleReady, startGame, selectContent, selectRole 추가
 - `RoomController.java` - 4개 엔드포인트 추가
-- `ErrorCode.java` - OWNER_CANNOT_READY, ROOM_NOT_WAITING, ROOM_NOT_IN_PROGRESS, NOT_ALL_READY, INVALID_PHASE 추가
+- `ErrorCode.java` - 5개 에러코드 추가
 
 ---
 
-## 다음 작업 (Issue 2~4 남은 부분)
+## 다음 작업
 
 ### Issue 2: WebSocket 설정
 - [ ] WebSocketConfig 생성
@@ -54,4 +69,5 @@ API 하나씩 Controller - Service 순서로 개발해줘.
 
 ## 참고
 
-work.md에 전체 설계와 Redis 구조가 있으니 꼭 먼저 읽을 것.
+- `work.md`: 전체 설계, Redis 구조, API 설계
+- `CLAUDE.md`: 프로젝트 컨벤션, 아키텍처 원칙
