@@ -1,9 +1,9 @@
 package com.ssafy.meari.domain.member.service;
 
-import com.ssafy.meari.domain.member.dto.request.SignupRequestDto;
-import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
+import com.ssafy.meari.global.auth.request.SignupRequestDto;
+import com.ssafy.meari.global.auth.response.EmailCheckResponseDto;
 import com.ssafy.meari.domain.member.dto.response.MemberInfoResponseDto;
-import com.ssafy.meari.domain.member.dto.response.NicknameCheckResponseDto;
+import com.ssafy.meari.global.auth.response.NicknameCheckResponseDto;
 
 public interface MemberService {
 

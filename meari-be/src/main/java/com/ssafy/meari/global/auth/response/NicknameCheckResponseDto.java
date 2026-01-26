@@ -1,4 +1,4 @@
-package com.ssafy.meari.domain.member.dto.response;
+package com.ssafy.meari.global.auth.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

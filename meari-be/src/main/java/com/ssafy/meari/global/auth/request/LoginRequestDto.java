@@ -1,4 +1,4 @@
-package com.ssafy.meari.domain.member.dto.request;
+package com.ssafy.meari.global.auth.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

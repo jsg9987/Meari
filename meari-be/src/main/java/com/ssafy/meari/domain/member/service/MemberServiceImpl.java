@@ -4,10 +4,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.ssafy.meari.domain.member.dto.request.SignupRequestDto;
-import com.ssafy.meari.domain.member.dto.response.EmailCheckResponseDto;
+import com.ssafy.meari.global.auth.request.SignupRequestDto;
+import com.ssafy.meari.global.auth.response.EmailCheckResponseDto;
 import com.ssafy.meari.domain.member.dto.response.MemberInfoResponseDto;
-import com.ssafy.meari.domain.member.dto.response.NicknameCheckResponseDto;
+import com.ssafy.meari.global.auth.response.NicknameCheckResponseDto;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.mapper.MemberMapper;
 import com.ssafy.meari.domain.member.repository.MemberRepository;

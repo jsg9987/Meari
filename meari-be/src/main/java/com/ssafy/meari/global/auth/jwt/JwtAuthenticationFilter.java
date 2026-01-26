@@ -35,10 +35,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String requestURI = request.getRequestURI();
 
         // JWT 검증 스킵할 경로들
-        if ("/api/v1/members/login".equals(requestURI) ||
-            "/api/v1/members/signup".equals(requestURI) ||
-            "/api/v1/members/email/check".equals(requestURI) ||
-            "/api/v1/members/nickname/check".equals(requestURI) ||
+        if ("/api/v1/auth/login".equals(requestURI) ||
+            "/api/v1/auth/signup".equals(requestURI) ||
+            "/api/v1/auth/email/check".equals(requestURI) ||
+            "/api/v1/auth/nickname/check".equals(requestURI) ||
             "/api/v1/auth/refresh".equals(requestURI)) {
             log.debug("JwtAuthentication 스킵");
             filterChain.doFilter(request, response);

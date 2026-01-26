@@ -13,7 +13,7 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ssafy.meari.domain.member.dto.request.LoginRequestDto;
+import com.ssafy.meari.global.auth.request.LoginRequestDto;
 import com.ssafy.meari.global.common.ApiResponse;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
@@ -30,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
 
 	private static final RequestMatcher DEFAULT_REQUEST_MATCHER =
-		PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/members/login");
+		PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/auth/login");
 
 	private final AuthenticationManager authenticationManager;
 	private final JwtUtil jwtUtil;

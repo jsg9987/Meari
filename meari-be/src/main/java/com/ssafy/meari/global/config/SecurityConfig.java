@@ -71,12 +71,7 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(authz -> authz
                 // 인증 없이 접근 가능
-                // TODO 명세서엔 member/** 로 되어있으므로, auth/** 로 변경할지 확인필요 (Jwt 필터도 함께 확인)
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/v1/members/signup").permitAll()
-                .requestMatchers("/api/v1/members/login").permitAll()
-                .requestMatchers("/api/v1/members/email/check").permitAll()
-                .requestMatchers("/api/v1/members/nickname/check").permitAll()
+                .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()
