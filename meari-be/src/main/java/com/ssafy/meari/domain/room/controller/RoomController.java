@@ -1,6 +1,7 @@
 package com.ssafy.meari.domain.room.controller;
 
 import com.ssafy.meari.domain.room.dto.request.ContentSelectRequest;
+import com.ssafy.meari.domain.room.dto.request.GameStartRequest;
 import com.ssafy.meari.domain.room.dto.request.RoleSelectRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomCreateRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomEnterRequest;
@@ -106,18 +107,7 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.success(ready));
     }
 
-    @Operation(summary = "게임 시작", description = "게임을 시작합니다. 방장만 가능하며, 모든 참여자가 준비 완료 상태여야 합니다.")
-    @PostMapping("/{roomId}/start")
-    public ResponseEntity<ApiResponse<Void>> startGame(
-            @Parameter(description = "방 ID") @PathVariable Long roomId,
-            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId
-    ) {
-        log.info("게임 시작 요청: roomId={}, memberId={}", roomId, memberId);
-        roomService.startGame(roomId, memberId);
-        return ResponseEntity.ok(ApiResponse.successWithoutData());
-    }
-
-    @Operation(summary = "동영상 선택", description = "학습할 동영상을 선택합니다. 방장만 가능하며, 게임 시작 후 SELECTING 단계에서만 가능합니다.")
+    @Operation(summary = "동영상 선택", description = "학습할 동영상을 선택합니다. 방장만 가능하며, WAITING 단계에서만 가능합니다.")
     @PostMapping("/{roomId}/content")
     public ResponseEntity<ApiResponse<Void>> selectContent(
             @Parameter(description = "방 ID") @PathVariable Long roomId,
@@ -126,6 +116,18 @@ public class RoomController {
     ) {
         log.info("동영상 선택 요청: roomId={}, contentId={}, memberId={}", roomId, request.getContentId(), memberId);
         roomService.selectContent(roomId, request.getContentId(), memberId);
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
+    @Operation(summary = "게임 시작", description = "게임을 시작합니다. 방장만 가능하며, 동영상을 선택하고 모든 참여자가 준비 완료 상태여야 합니다.")
+    @PostMapping("/{roomId}/start")
+    public ResponseEntity<ApiResponse<Void>> startGame(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId,
+            @Valid @RequestBody GameStartRequest request
+    ) {
+        log.info("게임 시작 요청: roomId={}, contentId={}, memberId={}", roomId, request.getContentId(), memberId);
+        roomService.startGame(roomId, request.getContentId(), memberId);
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
