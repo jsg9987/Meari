@@ -17,8 +17,6 @@ import org.hibernate.type.SqlTypes;
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
-@Builder
 public class ShadowingReport extends BaseEntity {
 
     @Id
@@ -42,8 +40,8 @@ public class ShadowingReport extends BaseEntity {
     @JoinColumn(name = "content_id", nullable = false, foreignKey = @ForeignKey(name = "FK_content_TO_shadowing_report_1"))
     private Content content;
 
-    @Column(name = "audio_url", nullable = false, length = 2048)
-    private String audioUrl;
+    @Column(name = "round", nullable = false)
+    private Integer round;
 
     @Column(name = "accuracy")
     private Integer accuracy;
@@ -58,4 +56,32 @@ public class ShadowingReport extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ReportStatus status;
+
+    @Builder
+    public ShadowingReport(Member member, Room room, Role role, Content content, Integer round) {
+        this.member = member;
+        this.room = room;
+        this.role = role;
+        this.content = content;
+        this.round = round;
+        this.status = ReportStatus.PROCESSING;
+    }
+
+    // 도메인 메서드: 분석 결과 업데이트
+    public void updateAnalysisResult(Integer accuracy, Integer intonation, String detailedAnalysis) {
+        this.accuracy = accuracy;
+        this.intonation = intonation;
+        this.detailedAnalysis = detailedAnalysis;
+        this.status = ReportStatus.COMPLETED;
+    }
+
+    // 도메인 메서드: 분석 실패 처리
+    public void markAsFailed() {
+        this.status = ReportStatus.FAILED;
+    }
+
+    // 도메인 메서드: 분석 완료 여부
+    public boolean isCompleted() {
+        return this.status == ReportStatus.COMPLETED;
+    }
 }
