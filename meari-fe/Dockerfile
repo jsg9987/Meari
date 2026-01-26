@@ -17,8 +17,10 @@ WORKDIR /usr/share/nginx/html
 # 기본 nginx 설정 제거
 RUN rm -rf /etc/nginx/conf.d/default.conf
 
+
 # 커스텀 nginx 설정 복사
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+
 
 # 빌드된 파일 복사
 COPY --from=build /app/dist /usr/share/nginx/html
