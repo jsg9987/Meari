@@ -101,22 +101,58 @@ const Login = () => {
                                 />
                             </div>
 
-                            {/* 에러 메시지 표시 */}
+                            {/* remember me */}
+                            <label className="mt-2 flex items-center gap-2 text-sm text-[#666] cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-[#e5e5e5] accent-[#1a1a1a]"
+                                />
+                                remember me?
+                            </label>
+
+                            {/* 로그인 버튼 */}
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className={buttonClass}
+                            >
+                                {isLoading ? '로그인 중...' : '로그인'}
+                            </button>
+
+                            {/* 가입 링크 */}
+                            <p className="mt-4 text-center text-sm text-[#666]">
+                                아직 계정이 없으신가요?
+                                <button
+                                    type="button"
+                                    className="ml-1 font-bold text-[#1a1a1a] hover:underline"
+                                    onClick={() => navigate('/signup')}
+                                >
+                                    가입하기
+                                </button>
+                            </p>
+
+                            {/* 에러 메시지 */}
                             {error && (
-                                <div style={{ color: 'red' }}>
+                                <div className="text-red-500 text-sm">
                                     {error}
                                 </div>
                             )}
-
-                            <button type="submit" disabled={isLoading}>
-                                {isLoading ? '로그인 중...' : '로그인'}
-                            </button>
                         </form>
-                        <div>
-                            <p>테스트 계정: user@gmail.com / 1234</p>
-                        </div>
                     </div>
-                    );
+
+                    {/* Illustration (Desktop only) */}
+                    <div className="hidden lg:flex flex-1 items-center justify-center">
+                        <img
+                            src={loginIllustration}
+                            className="w-full max-w-[520px]"
+                            alt="Login Illustration"
+                        />
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    );
 };
 
-                    export default Login;
+export default Login;
