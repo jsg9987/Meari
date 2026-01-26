@@ -1,0 +1,350 @@
+package com.ssafy.meari.domain.room.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Redis 기반 방 세션 관리 서비스
+ * - 참여자 목록
+ * - 준비 상태
+ * - 역할 선점
+ * - 콘텐츠 선택
+ * - 진행 단계
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class RoomSessionService {
+
+    private final RedisTemplate<String, String> redisTemplate;
+
+    private static final long SESSION_TTL_HOURS = 24;
+
+    // Redis Key 패턴
+    private static final String KEY_MEMBERS = "room:%d:members";
+    private static final String KEY_READY = "room:%d:ready";
+    private static final String KEY_ROLES = "room:%d:roles";
+    private static final String KEY_CONTENT = "room:%d:content_id";
+    private static final String KEY_PHASE = "room:%d:phase";
+    private static final String KEY_DISCONNECTED = "room:%d:disconnected";
+
+    // === 참여자 관리 ===
+
+    /**
+     * 참여자 추가
+     */
+    public void addMember(Long roomId, Long memberId) {
+        String key = String.format(KEY_MEMBERS, roomId); // Redis key 생성
+        redisTemplate.opsForSet().add(key, memberId.toString()); // SADD 명령어: Set 구조에 memberId 추가
+        setExpire(key); // key 만료시간 설정
+        log.info("방 {} 참여자 추가: memberId={}", roomId, memberId);
+    }
+
+    /**
+     * 참여자 제거
+     */
+    public void removeMember(Long roomId, Long memberId) {
+        String key = String.format(KEY_MEMBERS, roomId);
+        redisTemplate.opsForSet().remove(key, memberId.toString()); // SREM: Set에서 특정 참여자 삭제
+
+        // 연관된 세션 데이터(준비 상태, 역할) 순차적 제거
+        removeReady(roomId, memberId); // 준비 상태도 제거
+        releaseRoleByMember(roomId, memberId); // 역할 선점도 해제
+
+        log.info("방 {} 참여자 제거: memberId={}", roomId, memberId);
+    }
+
+    /**
+     * 참여자 목록 조회
+     */
+    public Set<String> getMembers(Long roomId) {
+        String key = String.format(KEY_MEMBERS, roomId);
+        return redisTemplate.opsForSet().members(key);
+    }
+
+    /**
+     * 참여자 수 조회
+     */
+    public long getMemberCount(Long roomId) {
+        String key = String.format(KEY_MEMBERS, roomId);
+        Long size = redisTemplate.opsForSet().size(key);
+        return size != null ? size : 0;
+    }
+
+    /**
+     * 참여 여부 확인
+     */
+    public boolean isMember(Long roomId, Long memberId) {
+        String key = String.format(KEY_MEMBERS, roomId); // Redis key 생성
+        Boolean isMember = redisTemplate.opsForSet().isMember(key, memberId.toString()); // SISMEMBER: 존재 여부 확인 (O(1))
+        return Boolean.TRUE.equals(isMember);
+    }
+
+    // === 준비 상태 관리 ===
+
+    /**
+     * 준비 상태 설정
+     */
+    public void setReady(Long roomId, Long memberId, boolean ready) {
+        String key = String.format(KEY_READY, roomId);
+        // HSET: Hash 구조에 멤버별 준비 상태 기록 (field: memberId, value: true/false)
+        redisTemplate.opsForHash().put(key, memberId.toString(), String.valueOf(ready));
+        setExpire(key);
+        log.info("방 {} 준비 상태 변경: memberId={}, ready={}", roomId, memberId, ready);
+    }
+
+    /**
+     * 준비 상태 조회
+     */
+    public boolean isReady(Long roomId, Long memberId) {
+        String key = String.format(KEY_READY, roomId);
+        Object value = redisTemplate.opsForHash().get(key, memberId.toString());
+        return "true".equals(value);
+    }
+
+    /**
+     * 준비 상태 제거
+     */
+    public void removeReady(Long roomId, Long memberId) {
+        String key = String.format(KEY_READY, roomId);
+        redisTemplate.opsForHash().delete(key, memberId.toString());
+    }
+
+    /**
+     * 전체 준비 상태 조회
+     */
+    public Map<Long, Boolean> getAllReadyStatus(Long roomId) {
+        String key = String.format(KEY_READY, roomId);
+
+        // 1. HGETALL: Hash 구조의 모든 필드(memberId)와 값(ready 여부)을 일괄 조회
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(key); // 방 Id로
+
+        // 2. 응답 가공: Redis의 String 데이터를 자바의 Long(ID)과 Boolean(상태) 타입으로 변환
+        Map<Long, Boolean> result = new HashMap<>();
+        entries.forEach((k, v) -> result.put(Long.parseLong(k.toString()), "true".equals(v)));
+        return result;
+    }
+
+    /**
+     * 모든 참여자가 준비 완료인지 확인
+     */
+    public boolean isAllReady(Long roomId) {
+        Set<String> members = getMembers(roomId); // 1. 현재 참여자 목록(Set) 조회
+        if (members == null || members.isEmpty()) {
+            return false;
+        }
+
+        Map<Long, Boolean> readyStatus = getAllReadyStatus(roomId); // 2. 전체 준비 현황(Hash) 조회
+
+        // 3. 모두 준비 완료인지 체크
+        for (String memberId : members) {
+            if (!Boolean.TRUE.equals(readyStatus.get(Long.parseLong(memberId)))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // === 역할 선점 관리 ===
+
+    /**
+     * 역할 선점 시도 (원자성 보장)
+     * @return true: 선점 성공, false: 이미 선점됨
+     */
+    public boolean tryAssignRole(Long roomId, Long roleId, Long memberId) {
+        String key = String.format(KEY_ROLES, roomId);
+
+        // 1. 이미 다른 역할을 선점했다면 기존 역할 먼저 해제
+        releaseRoleByMember(roomId, memberId);
+
+        // 2. HSETNX: 해당 역할(Field)이 비어있을 때만 원자적으로 memberId 기록
+        Boolean success = redisTemplate.opsForHash().putIfAbsent(key, roleId.toString(), memberId.toString());
+        if (Boolean.TRUE.equals(success)) {
+            setExpire(key);
+            log.info("방 {} 역할 선점 성공: roleId={}, memberId={}", roomId, roleId, memberId);
+            return true;
+        }
+
+        log.info("방 {} 역할 선점 실패 (이미 선점됨): roleId={}", roomId, roleId);
+        return false;
+    }
+
+    /**
+     * 역할 선점 해제
+     */
+    public void releaseRole(Long roomId, Long roleId) {
+        String key = String.format(KEY_ROLES, roomId);
+        redisTemplate.opsForHash().delete(key, roleId.toString());
+        log.info("방 {} 역할 해제: roleId={}", roomId, roleId);
+    }
+
+    /**
+     * 특정 멤버가 선점한 역할 해제
+     */
+    public void releaseRoleByMember(Long roomId, Long memberId) {
+        String key = String.format(KEY_ROLES, roomId);
+        Map<Object, Object> roles = redisTemplate.opsForHash().entries(key);
+
+        // 특정 멤버가 선점한 역할 있다면 제거
+        for (Map.Entry<Object, Object> entry : roles.entrySet()) {
+            if (memberId.toString().equals(entry.getValue())) {
+                redisTemplate.opsForHash().delete(key, entry.getKey());
+                log.info("방 {} 멤버의 역할 해제: memberId={}, roleId={}", roomId, memberId, entry.getKey());
+                break;
+            }
+        }
+    }
+
+    /**
+     * 역할 선점자 조회
+     * @return memberId 또는 null (선점자 없음)
+     */
+    public Long getRoleOwner(Long roomId, Long roleId) {
+        String key = String.format(KEY_ROLES, roomId);
+        Object value = redisTemplate.opsForHash().get(key, roleId.toString());
+        if (value != null && !"SYSTEM".equals(value)) {
+            return Long.parseLong(value.toString());
+        }
+        return null;
+    }
+
+    /**
+     * 역할을 시스템으로 지정 (탈주 시)
+     */
+    public void assignRoleToSystem(Long roomId, Long roleId) {
+        String key = String.format(KEY_ROLES, roomId);
+        redisTemplate.opsForHash().put(key, roleId.toString(), "SYSTEM");
+        log.info("방 {} 역할 시스템 지정: roleId={}", roomId, roleId);
+    }
+
+    /**
+     * 전체 역할 선점 현황 조회
+     * @return Map<roleId, memberId or "SYSTEM">
+     */
+    public Map<Long, String> getAllRoles(Long roomId) {
+        String key = String.format(KEY_ROLES, roomId);
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
+        Map<Long, String> result = new HashMap<>();
+        entries.forEach((k, v) -> result.put(Long.parseLong(k.toString()), v.toString()));
+        return result;
+    }
+
+    /**
+     * 특정 멤버가 선점한 역할 ID 조회
+     */
+    public Long getMemberRole(Long roomId, Long memberId) {
+        Map<Long, String> roles = getAllRoles(roomId);
+        for (Map.Entry<Long, String> entry : roles.entrySet()) {
+            if (memberId.toString().equals(entry.getValue())) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    // === 콘텐츠 관리 ===
+
+    /**
+     * 현재 선택된 콘텐츠 설정
+     */
+    public void setContent(Long roomId, Long contentId) {
+        String key = String.format(KEY_CONTENT, roomId);
+        redisTemplate.opsForValue().set(key, contentId.toString());
+        setExpire(key);
+        log.info("방 {} 콘텐츠 설정: contentId={}", roomId, contentId);
+    }
+
+    /**
+     * 현재 선택된 콘텐츠 조회
+     */
+    public Long getContent(Long roomId) {
+        String key = String.format(KEY_CONTENT, roomId);
+        String value = redisTemplate.opsForValue().get(key);
+        return value != null ? Long.parseLong(value) : null;
+    }
+
+    /**
+     * 현재 선택된 콘텐츠 ID 조회 (별칭)
+     */
+    public Long getContentId(Long roomId) {
+        return getContent(roomId);
+    }
+
+    // === 진행 단계 관리 ===
+
+    /**
+     * 진행 단계 설정
+     */
+    public void setPhase(Long roomId, String phase) {
+        String key = String.format(KEY_PHASE, roomId);
+        redisTemplate.opsForValue().set(key, phase);
+        setExpire(key);
+        log.info("방 {} 진행 단계 변경: phase={}", roomId, phase);
+    }
+
+    /**
+     * 진행 단계 조회
+     */
+    public String getPhase(Long roomId) {
+        String key = String.format(KEY_PHASE, roomId);
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    // === 연결 끊김 관리 (Grace Period) ===
+
+    /**
+     * 연결 끊김 마킹
+     */
+    public void markDisconnected(Long roomId, Long memberId) {
+        String key = String.format(KEY_DISCONNECTED, roomId);
+        redisTemplate.opsForHash().put(key, memberId.toString(), String.valueOf(System.currentTimeMillis()));
+        setExpire(key);
+        log.info("방 {} 연결 끊김 마킹: memberId={}", roomId, memberId);
+    }
+
+    /**
+     * 연결 끊김 해제 (재연결 시)
+     */
+    public void clearDisconnected(Long roomId, Long memberId) {
+        String key = String.format(KEY_DISCONNECTED, roomId);
+        redisTemplate.opsForHash().delete(key, memberId.toString());
+        log.info("방 {} 연결 복구: memberId={}", roomId, memberId);
+    }
+
+    /**
+     * 연결 끊김 여부 확인
+     */
+    public boolean isDisconnected(Long roomId, Long memberId) {
+        String key = String.format(KEY_DISCONNECTED, roomId);
+        return redisTemplate.opsForHash().hasKey(key, memberId.toString());
+    }
+
+    // === 세션 정리 ===
+
+    /**
+     * 방 세션 전체 삭제
+     */
+    public void clearRoomSession(Long roomId) {
+        redisTemplate.delete(String.format(KEY_MEMBERS, roomId));
+        redisTemplate.delete(String.format(KEY_READY, roomId));
+        redisTemplate.delete(String.format(KEY_ROLES, roomId));
+        redisTemplate.delete(String.format(KEY_CONTENT, roomId));
+        redisTemplate.delete(String.format(KEY_PHASE, roomId));
+        redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
+        log.info("방 {} 세션 전체 삭제", roomId);
+    }
+
+    // === 유틸리티 ===
+
+    // key의 만료 시간 설정
+    private void setExpire(String key) {
+        redisTemplate.expire(key, SESSION_TTL_HOURS, TimeUnit.HOURS);
+    }
+}
