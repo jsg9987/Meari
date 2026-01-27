@@ -125,6 +125,7 @@ pipeline {
                             echo "# --- OpenVidu 설정 ---" >> .env
                             echo "OPENVIDU_URL=${OV_URL}" >> .env
                             echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
+                            echo "OPENVIDU_DOMAIN=localhost" >> .env
                             echo "" >> .env
                             echo "# --- Backend URL (for frontend) ---" >> .env
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
@@ -133,7 +134,8 @@ pipeline {
                         // 홈 디렉토리에서 배포 실행
                         sh '''
                             cd /home/ubuntu
-                            docker-compose down frontend spring-api || true
+                            docker-compose stop frontend spring-api || true
+                            docker-compose rm -f frontend spring-api || true
                             docker-compose up -d frontend spring-api
                         '''
                         sh 'docker image prune -f'
