@@ -80,7 +80,9 @@ pipeline {
 
         stage('Deploy') {
             when {
-                branch 'release'  // release 브랜치만 배포!
+                expression {
+                    return env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
+                }
             }
             steps {
                 withCredentials([
