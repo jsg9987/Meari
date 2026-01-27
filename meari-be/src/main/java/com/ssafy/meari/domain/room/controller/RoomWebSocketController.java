@@ -1,6 +1,8 @@
 package com.ssafy.meari.domain.room.controller;
 
 import com.ssafy.meari.domain.room.dto.websocket.*;
+import com.ssafy.meari.domain.room.entity.Chat;
+import com.ssafy.meari.domain.room.repository.ChatRepository;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ public class RoomWebSocketController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final RoomSessionService roomSessionService;
+    private final ChatRepository chatRepository;
 
     private static final String TOPIC_STATE = "/topic/room/%d/state";
     private static final String TOPIC_CHAT = "/topic/room/%d/chat";
@@ -101,11 +104,26 @@ public class RoomWebSocketController {
             @DestinationVariable Long roomId,
             @Payload ChatMessage message
     ) {
-        log.info("채팅 메시지: roomId={}, memberId={}, message={}",
-                roomId, message.getMemberId(), message.getContent());
+        log.info("[Chat] 채팅 메시지 서버수신: roomId={}, senderId={}, nickname={}, message={}",
+                roomId, message.getSenderId(), message.getNickname(), message.getMessage());
+
+        // 타임스탬프 자동 설정
+        message.setTimestampNow();
+
+        // Redis에 채팅 메시지 저장
+        Chat chat = Chat.builder()
+                .roomId(roomId)
+                .senderId(message.getSenderId())
+                .nickname(message.getNickname())
+                .message(message.getMessage())
+                .timestamp(message.getTimestamp())
+                .build();
+        chatRepository.save(chat);
 
         // 전체 참여자에게 브로드캐스트
         broadcast(roomId, TOPIC_CHAT, message);
+
+        log.debug("[Chat] 채팅 메시지 브로드캐스트 완료: roomId={}", roomId);
     }
 
     /**
