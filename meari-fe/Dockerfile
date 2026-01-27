@@ -4,7 +4,7 @@ WORKDIR /app
 
 # 의존성 설치 (캐싱 최적화)
 COPY package*.json ./
-RUN npm install
+RUN pnpm install
 
 # 소스 코드 복사 및 빌드
 COPY . .
