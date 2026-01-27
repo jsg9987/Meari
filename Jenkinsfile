@@ -1,7 +1,7 @@
 pipeline {
     agent any
 
-    // 1분마다 GitLab 폴링
+    // GitLab 웹훅 트리거 (1분마다 폴링)
     triggers {
         pollSCM('* * * * *')
     }
@@ -103,8 +103,10 @@ pipeline {
                     string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
                 ]) {
                     script {
-                        // .env 파일 생성 - 각 라인을 echo로 추가
+                        // 홈 디렉토리에 .env 파일 생성
                         sh '''
+                            cd /home/ubuntu
+
                             echo "# --- Database 설정 ---" > .env
                             echo "DB_PASSWORD=${DB_PW}" >> .env
                             echo "" >> .env
@@ -128,9 +130,12 @@ pipeline {
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
                         '''
 
-                        // 배포 실행!!
-                        sh 'docker-compose down frontend spring-api || true'
-                        sh 'docker-compose up -d frontend spring-api'
+                        // 홈 디렉토리에서 배포 실행
+                        sh '''
+                            cd /home/ubuntu
+                            docker-compose down frontend spring-api || true
+                            docker-compose up -d frontend spring-api
+                        '''
                         sh 'docker image prune -f'
                     }
                 }

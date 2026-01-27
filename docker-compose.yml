@@ -4,26 +4,26 @@ services:
   # ============================================================
   # Jenkins - CI/CD 서버 (localhost:9090만 접근 가능)
   # ============================================================
-  jenkins:
-    image: jenkins/jenkins:lts
-    container_name: meari-jenkins
-    user: root
-    ports:
-      - "127.0.0.1:9090:8080"   # localhost에서만 접근
-      - "127.0.0.1:50000:50000" # Jenkins 에이전트
-    volumes:
-      - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock  # Docker 명령어 사용
-    environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
-      - TZ=Asia/Seoul
-    networks:
-      - meari-network
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G
+#  jenkins:
+#    image: jenkins/jenkins:lts
+#    container_name: meari-jenkins
+#    user: root
+#    ports:
+#      - "127.0.0.1:9090:8080"   # localhost에서만 접근
+#      - "127.0.0.1:50000:50000" # Jenkins 에이전트
+#    volumes:
+#      - jenkins_home:/var/jenkins_home
+#      - /var/run/docker.sock:/var/run/docker.sock  # Docker 명령어 사용
+#    environment:
+#      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+#      - TZ=Asia/Seoul
+#    networks:
+#      - meari-network
+#    restart: unless-stopped
+#    deploy:
+#      resources:
+#        limits:
+#          memory: 2G
 
   # ============================================================
   # 1. PostgreSQL - 메인 데이터베이스
