@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Header, { type HomeTab } from '../components/common/Header'
 import ShadowingPanel from '../components/home/ShadowingPanel'
-import CopikPanel from '../components/home/CopikPanel'
+import CopikPanel from '../components/home/KopicPanel'
 import DailyStudyPanel from '../components/home/DailyStudyPanel'
 
 const Home = () => {
