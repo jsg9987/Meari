@@ -1,15 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, MessageCircle, Lock, Unlock, Copy, Check } from "lucide-react";
+import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2 } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
 import VideoControls from "../components/webrtc/VideoControls";
 import ChatPanel from "../components/webrtc/ChatPanel";
+import MediaCheckScreen from "../components/webrtc/MediaCheckScreen";
+import ContentSelectModal from "../components/webrtc/ContentSelectModal";
 // import { useVideoRoom } from "../hooks/useVideoRoom";
 import type { VideoTileData, ConnectionStatus } from "../hooks/useVideoRoom";
 import type { Publisher, Subscriber } from "openvidu-browser";
+import type { Content } from "../api/contents.api";
 
 type SidebarTab = "video" | "chat";
+type LayoutMode = "narrow" | "grid" | "wide";
 
 // TODO: 헤더 변경, 비디오 타일 변경
 export default function ShadowingRoom() {
@@ -17,14 +21,144 @@ export default function ShadowingRoom() {
   const navigate = useNavigate();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("video");
   const [copiedPassword, setCopiedPassword] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("narrow");
+  const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
+  const [isMediaChecked, setIsMediaChecked] = useState(false);
+  const [, setInitialAudioEnabled] = useState(true);
+  const [, setInitialVideoEnabled] = useState(true);
+  const [, setInitialAudioDeviceId] = useState<string>();
+  const [, setInitialVideoDeviceId] = useState<string>();
+  const [isContentSelectOpen, setIsContentSelectOpen] = useState(false);
+  const [selectedContent, setSelectedContent] = useState<Content | null>(null);
+  const [isHost, ] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
+  const [isReady, setIsReady] = useState(false); // 내 준비 상태
+  const [participantsReady, setParticipantsReady] = useState<Record<string, boolean>>({
+    me: false,
+    user1: false,
+    user2: false,
+    user3: false,
+  }); // 각 참가자의 준비 상태
+  const layoutDropdownRef = useRef<HTMLDivElement>(null);
+
+  // 영상 재생 관련 상태
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [currentSubtitle, setCurrentSubtitle] = useState<string>("");
+  const [subtitles, setSubtitles] = useState<Array<{ start: number; end: number; text: string }>>([]);
 
   const nickname = "User";
+
+  // 자막 데이터 로드
+  useEffect(() => {
+    const loadSubtitles = async () => {
+      if (selectedContent) {
+        try {
+          const useMock = import.meta.env.VITE_USE_MOCK_CONTENTS === 'true';
+          if (useMock) {
+            // Mock 자막 데이터 로드
+            const response = await fetch('/src/assets/video/description.txt');
+            const data = await response.json();
+            setSubtitles(data);
+          }
+        } catch (error) {
+          console.error('Failed to load subtitles:', error);
+        }
+      }
+    };
+    loadSubtitles();
+  }, [selectedContent]);
+
+  // 카운트다운 처리
+  useEffect(() => {
+    if (countdown !== null && countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (countdown === 0) {
+      // 카운트다운 끝나면 영상 재생
+      setCountdown(null);
+      if (videoRef.current) {
+        videoRef.current.play();
+        setIsPlaying(true);
+      }
+    }
+  }, [countdown]);
+
+  // 영상 시간에 따른 자막 업데이트
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const updateSubtitle = () => {
+      const currentTime = video.currentTime;
+      const subtitle = subtitles.find(
+        (sub) => currentTime >= sub.start && currentTime <= sub.end
+      );
+      setCurrentSubtitle(subtitle ? subtitle.text : "");
+    };
+
+    video.addEventListener('timeupdate', updateSubtitle);
+    return () => video.removeEventListener('timeupdate', updateSubtitle);
+  }, [subtitles]);
+
+  // 모든 참가자가 준비 완료되었는지 확인
+  // TODO: 실제 배포 시에는 Object.values(participantsReady).every(ready => ready)로 변경
+  const allParticipantsReady = participantsReady.me; // 테스트: 본인만 준비되면 시작 가능
+
+  // 드롭다운 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (layoutDropdownRef.current && !layoutDropdownRef.current.contains(event.target as Node)) {
+        setIsLayoutDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Mock 방 정보 (실제로는 API에서 가져와야 함)
   const roomInfo = {
     isLocked: true,
     title: "English Conversation Practice Room",
-    password: "abc123"
+    password: "abc123",
+    themeId: 1 // 방 생성 시 선택한 테마 ID
+  };
+
+  const handleContentSelect = (content: Content) => {
+    setSelectedContent(content);
+    setIsContentSelectOpen(false);
+    // 컨텐츠 선택 시 모든 참가자의 준비 상태 초기화
+    setIsReady(false);
+    setParticipantsReady({
+      me: false,
+      user1: false,
+      user2: false,
+      user3: false,
+    });
+    // TODO: 실제로는 선택한 컨텐츠의 비디오를 로드하고 재생
+    console.log('Selected content:', content);
+  };
+
+  const handleToggleReady = () => {
+    const newReadyState = !isReady;
+    setIsReady(newReadyState);
+    setParticipantsReady(prev => ({
+      ...prev,
+      me: newReadyState,
+    }));
+    // TODO: WebSocket으로 준비 상태 전송
+    console.log('Ready state:', newReadyState);
+  };
+
+  const handleStartShadowing = () => {
+    // 카운트다운 시작 (3초)
+    setCountdown(3);
+    console.log('Starting shadowing countdown...');
   };
 
   const mockProfileImages: Record<string, string> = {
@@ -39,10 +173,14 @@ export default function ShadowingRoom() {
   // MOCK DATA - UI 개발용 (실제 배포시 주석 제거하고 아래 useVideoRoom 주석 해제)
   // ============================================================================
   const [status, setStatus] = useState<ConnectionStatus>("connected");
-  const [error, setError] = useState<string | null>(null);
+  const [error, ] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [volume, setVolume] = useState(100);
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
+  const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
+  const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
+  const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
 
   // Mock StreamManager 생성
   const createMockStreamManager = (id: string): Publisher | Subscriber => {
@@ -74,23 +212,27 @@ export default function ShadowingRoom() {
       id: "me",
       streamManager: createMockStreamManager("me"),
       muted: true,
-      label: `${nickname} (Me)`
+      label: `${nickname} (Me)`,
+      isReady: participantsReady.me,
     },
     {
       id: "user1",
       streamManager: createMockStreamManager("user1"),
       label: "User 1",
       isSpeaker: true,
+      isReady: participantsReady.user1,
     },
     {
       id: "user2",
       streamManager: createMockStreamManager("user2"),
       label: "User 2",
+      isReady: participantsReady.user2,
     },
     {
       id: "user3",
       streamManager: createMockStreamManager("user3"),
       label: "User 3",
+      isReady: participantsReady.user3,
     },
   ];
 
@@ -104,6 +246,19 @@ export default function ShadowingRoom() {
   };
   const toggleAudio = () => setIsAudioEnabled(!isAudioEnabled);
   const toggleVideo = () => setIsVideoEnabled(!isVideoEnabled);
+  const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
+
+  const handleAudioDeviceChange = (deviceId: string) => {
+    setSelectedAudioDevice(deviceId);
+    // TODO: 실제 구현시 미디어 스트림 변경 로직 추가
+    console.log('Audio device changed to:', deviceId);
+  };
+
+  const handleVideoDeviceChange = (deviceId: string) => {
+    setSelectedVideoDevice(deviceId);
+    // TODO: 실제 구현시 미디어 스트림 변경 로직 추가
+    console.log('Video device changed to:', deviceId);
+  };
   // ============================================================================
   // MOCK DATA 끝
   // ============================================================================
@@ -153,6 +308,41 @@ export default function ShadowingRoom() {
     }
   };
 
+  const handleLayoutChange = (mode: LayoutMode) => {
+    setLayoutMode(mode);
+    setIsLayoutDropdownOpen(false);
+  };
+
+  const layoutConfigs = {
+    narrow: { width: "w-90", label: "1열 (기본)", icon: LayoutList },
+    grid: { width: "w-[600px]", label: "2x2 그리드", icon: LayoutGrid },
+    wide: { width: "w-[480px]", label: "넓은 사이드바", icon: Maximize2 },
+  };
+
+  const handleMediaCheckComplete = (
+    audioEnabled: boolean,
+    videoEnabled: boolean,
+    audioDeviceId?: string,
+    videoDeviceId?: string
+  ) => {
+    setInitialAudioEnabled(audioEnabled);
+    setInitialVideoEnabled(videoEnabled);
+    setInitialAudioDeviceId(audioDeviceId);
+    setInitialVideoDeviceId(videoDeviceId);
+    setIsMediaChecked(true);
+
+    // TODO: 실제 구현 시 선택된 장치 정보를 useVideoRoom에 전달
+    setIsAudioEnabled(audioEnabled);
+    setIsVideoEnabled(videoEnabled);
+    setSelectedAudioDevice(audioDeviceId);
+    setSelectedVideoDevice(videoDeviceId);
+  };
+
+  // 미디어 체크가 완료되지 않았으면 미디어 체크 화면 표시
+  if (!isMediaChecked) {
+    return <MediaCheckScreen onJoin={handleMediaCheckComplete} roomTitle={roomInfo.title} />;
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* 왼쪽 메인 영역 */}
@@ -198,7 +388,7 @@ export default function ShadowingRoom() {
 
         {/* 메인 비디오 영역 */}
         <div className="flex-1 p-4 bg-white">
-          <div className="relative h-full w-full rounded-2xl bg-gray-900 flex items-center justify-center">
+          <div className="relative h-full w-full rounded-lg bg-gray-900 flex items-center justify-center">
             {status === "connecting" && (
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -217,7 +407,94 @@ export default function ShadowingRoom() {
               </div>
             )}
             {status === "connected" && (
-              <p className="text-gray-500 text-sm">쉐도잉 콘텐츠 영역</p>
+              <>
+                {/* 카운트다운 오버레이 */}
+                {countdown !== null && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-20 rounded-lg">
+                    <div className="text-white text-9xl font-bold animate-pulse">
+                      {countdown}
+                    </div>
+                  </div>
+                )}
+
+                {/* 영상 재생 중 */}
+                {isPlaying && selectedContent && (
+                  <div className="relative w-full h-full">
+                    <video
+                      ref={videoRef}
+                      src={selectedContent.video_url}
+                      className="w-full h-full object-contain"
+                      onContextMenu={(e) => e.preventDefault()}
+                      style={{ pointerEvents: 'none' }}
+                    />
+
+                    {/* 자막 표시 */}
+                    {isSubtitleEnabled && currentSubtitle && (
+                      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 px-6 py-3 rounded-lg">
+                        <p className="text-white text-xl font-medium text-center whitespace-pre-line">
+                          {currentSubtitle}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 영상 재생 전 */}
+                {!isPlaying && (
+                  <div className="flex flex-col items-center gap-4">
+                    {!selectedContent ? (
+                      <div className="text-center">
+                        <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
+                        {isHost && (
+                          <p className="text-gray-400 text-xs">컨텐츠를 선택해주세요</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <p className="text-gray-600 font-medium mb-2">현재 컨텐츠</p>
+                        <p className="text-gray-900 text-lg font-semibold mb-4">{selectedContent.title}</p>
+
+                        <div className="flex flex-col items-center gap-3">
+                          {/* 준비 완료 버튼 (모든 참가자) */}
+                          <button
+                            onClick={handleToggleReady}
+                            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                              isReady
+                                ? "bg-green-500 hover:bg-green-600 text-white"
+                                : "bg-blue-600 hover:bg-blue-700 text-white"
+                            }`}
+                          >
+                            {isReady ? "준비 완료" : "준비하기"}
+                          </button>
+
+                          {/* 시작 버튼 (방장만) */}
+                          {isHost && (
+                            <div className="flex flex-col items-center gap-2 mt-2">
+                              <div className="text-sm text-gray-600 mb-1">
+                                준비 완료: {Object.values(participantsReady).filter(r => r).length} / {Object.keys(participantsReady).length}
+                              </div>
+                              <button
+                                onClick={handleStartShadowing}
+                                disabled={!allParticipantsReady}
+                                className={`px-8 py-3 rounded-lg font-semibold transition-all ${
+                                  allParticipantsReady
+                                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                }`}
+                              >
+                                쉐도잉 시작
+                              </button>
+                              {!allParticipantsReady && (
+                                <p className="text-xs text-gray-500">모든 참가자가 준비될 때까지 기다려주세요</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
             {status === "idle" && (
               <button
@@ -225,6 +502,16 @@ export default function ShadowingRoom() {
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 참여하기
+              </button>
+            )}
+
+            {/* 컨텐츠 변경 버튼 (방장만) - 영상 재생 중이 아닐 때만 표시 */}
+            {status === "connected" && isHost && !isPlaying && (
+              <button
+                onClick={() => setIsContentSelectOpen(true)}
+                className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
+              >
+                컨텐츠 변경
               </button>
             )}
           </div>
@@ -239,42 +526,89 @@ export default function ShadowingRoom() {
             onLeave={handleLeave}
             volume={volume}
             onVolumeChange={setVolume}
+            selectedAudioDevice={selectedAudioDevice}
+            selectedVideoDevice={selectedVideoDevice}
+            onAudioDeviceChange={handleAudioDeviceChange}
+            onVideoDeviceChange={handleVideoDeviceChange}
+            selectedNationality={selectedNationality}
+            onNationalityChange={setSelectedNationality}
+            isSubtitleEnabled={isSubtitleEnabled}
+            onToggleSubtitle={toggleSubtitle}
           />
         </div>
       </div>
 
-      {/* 오른쪽 사이드바 (360px) */}
-      <div className="w-90 flex flex-col border-l border-gray-200 bg-white">
+      {/* 오른쪽 사이드바 (동적 너비) */}
+      <div className={`${layoutConfigs[layoutMode].width} flex flex-col border-l border-gray-200 bg-white transition-all duration-300`}>
         {/* 탭 버튼 */}
         <div className="flex gap-2 p-3 py-4 bg-gray-50">
-          <button
-            onClick={() => setSidebarTab("video")}
-            className={`flex-1 flex items-center cursor-pointer justify-center gap-4 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-              sidebarTab === "video"
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
-            }`}
-          >
-            <Users size={18} />
-            <span>참여자</span>
-          </button>
-          <button
-            onClick={() => setSidebarTab("chat")}
-            className={`flex-1 flex items-center cursor-pointer justify-center gap-4 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-              sidebarTab === "chat"
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
-            }`}
-          >
-            <MessageCircle size={18} />
-            <span>채팅</span>
-          </button>
+          <div className="flex gap-2 flex-1">
+            <button
+              onClick={() => setSidebarTab("video")}
+              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+                sidebarTab === "video"
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+              }`}
+            >
+              <Users size={18} />
+              <span>참여자</span>
+            </button>
+            <button
+              onClick={() => setSidebarTab("chat")}
+              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+                sidebarTab === "chat"
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+              }`}
+            >
+              <MessageCircle size={18} />
+              <span>채팅</span>
+            </button>
+          </div>
+
+          {/* 레이아웃 드롭다운 */}
+          <div className="relative" ref={layoutDropdownRef}>
+            <button
+              onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
+              className="flex items-center justify-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition-all bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+              title="레이아웃 변경"
+            >
+              {(() => {
+                const Icon = layoutConfigs[layoutMode].icon;
+                return <Icon size={18} />;
+              })()}
+            </button>
+
+            {/* 드롭다운 메뉴 */}
+            {isLayoutDropdownOpen && (
+              <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-10 min-w-48">
+                {(Object.entries(layoutConfigs) as [LayoutMode, typeof layoutConfigs[LayoutMode]][]).map(([mode, config]) => {
+                  const Icon = config.icon;
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => handleLayoutChange(mode)}
+                      className={`flex items-center gap-3 px-4 py-3 w-full hover:bg-gray-50 transition-colors text-left ${
+                        layoutMode === mode ? "bg-blue-50 text-blue-600" : "text-gray-700"
+                      }`}
+                    >
+                      <Icon size={18} />
+                      <span className="text-sm">{config.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 탭 콘텐츠 */}
         <div className="flex-1 overflow-hidden bg-white">
           {sidebarTab === "video" && (
-            <div className="h-full overflow-y-auto p-3 space-y-3">
+            <div className={`h-full overflow-y-auto p-3 ${
+              layoutMode === "grid" ? "grid grid-cols-2 gap-3 auto-rows-min" : "space-y-3"
+            }`}>
               {status === "connected" && tiles.length > 0 ? (
                 tiles.map((t) => (
                   <VideoTile
@@ -283,10 +617,12 @@ export default function ShadowingRoom() {
                     muted={t.muted}
                     label={t.label}
                     isSpeaker={t.isSpeaker}
+                    isReady={t.isReady}
+                    videoClassName={layoutMode === "wide" ? "aspect-[21/9]" : undefined}
                   />
                 ))
               ) : (
-                <p className="text-center text-gray-500 text-sm py-8">
+                <p className="text-center text-gray-500 text-sm py-8 col-span-2">
                   {status === "connecting" ? "연결 중..." : "참여자가 없습니다"}
                 </p>
               )}
@@ -299,6 +635,15 @@ export default function ShadowingRoom() {
           )}
         </div>
       </div>
+
+      {/* 컨텐츠 선택 모달 */}
+      {isContentSelectOpen && (
+        <ContentSelectModal
+          themeId={roomInfo.themeId}
+          onClose={() => setIsContentSelectOpen(false)}
+          onSelect={handleContentSelect}
+        />
+      )}
     </div>
   );
 }

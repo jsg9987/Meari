@@ -3,6 +3,7 @@ import { apiConfig } from './apiConfig';
 
 export interface CreateRoomRequest {
   title: string;
+  theme_id: number;
   password: string | null;
   max_people: number;
 }
@@ -34,7 +35,7 @@ export const createRoomMock = async (
           room_id: 'room_uuid_1234',
           title: payload.title,
           owner_id: 1,
-          content_id: 101,
+          content_id: payload.theme_id,
           is_active: 'ACTIVE',
         },
         error: null,
@@ -46,6 +47,10 @@ export const createRoomMock = async (
 export const createRoomReal = async (
   payload: CreateRoomRequest
 ): Promise<CreateRoomResponse> => {
+  const useMock = import.meta.env.VITE_USE_MOCK_ROOMS === 'true';
+  if (useMock) {
+    return createRoomMock(payload);
+  }
   const response = await axiosInstance.post('/api/v1/rooms', payload);
   const responseData = (response as { data?: CreateRoomResponse }).data ?? response;
   return responseData as CreateRoomResponse;

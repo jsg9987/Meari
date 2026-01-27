@@ -36,7 +36,7 @@ CREATE TABLE "shadowing_report" (
 "room_id"	BIGINT		NOT NULL,
 "role_id"	BIGINT		NOT NULL,
 "content_id"	BIGINT		NOT NULL,
-"audio_url"	VARCHAR(2048)		NOT NULL,
+"round"	INTEGER		NOT NULL,
 "accuracy"	INTEGER	DEFAULT NULL	NULL,
 "intonation"	INTEGER	DEFAULT NULL	NULL,
 "detailed_analysis"	JSONB	DEFAULT NULL	NULL,
@@ -67,12 +67,15 @@ CREATE TABLE "sentence" (
 CREATE TABLE "room" (
 "room_id"	BIGSERIAL		NOT NULL,
 "owner_id"	BIGINT		NOT NULL,
+"theme_id"	BIGINT		NOT NULL,
 "title"	VARCHAR(100)		NOT NULL,
-"is_active"	VARCHAR(20)		NOT NULL,
+"max_people"	INTEGER		NOT NULL,
+"status"	VARCHAR(20)		NOT NULL,
 "password"	VARCHAR(20)		NULL
 );
 
-COMMENT ON COLUMN "room"."is_active" IS '대기 중, 학습 중, 종료됨';
+COMMENT ON COLUMN "room"."status" IS 'WAITING, IN_PROGRESS, COMPLETED';
+COMMENT ON COLUMN "room"."max_people" IS '최대 인원 (2~4)';
 
 CREATE TABLE "kopic_sentence" (
 "kopic_sentence_id"	BIGSERIAL		NOT NULL,
@@ -87,9 +90,12 @@ CREATE TABLE "member" (
 "password"	VARCHAR(255)		NOT NULL,
 "nickname"	VARCHAR(100)		NOT NULL,
 "profile_url"	VARCHAR(2048)		NULL,
-"native_language"	VARCHAR(10)	DEFAULT 'KR'	NOT NULL,
-"sex"	VARCHAR(1)		NOT NULL
+"native_language"	VARCHAR(10)	DEFAULT 'KR'	NOT NULL
 );
+
+COMMENT ON COLUMN "member"."email" IS '중복불가';
+
+COMMENT ON COLUMN "member"."nickname" IS '중복불가';
 
 COMMENT ON COLUMN "member"."native_language" IS 'ISO 국가 코드';
 
@@ -97,7 +103,7 @@ CREATE TABLE "sentence_word" (
 "sentence_word_id"	BIGSERIAL		NOT NULL,
 "word_id"	BIGINT		NOT NULL,
 "sentence_id"	BIGINT		NOT NULL,
-"order"	INTEGER		NOT NULL
+"sequence"	INTEGER		NOT NULL
 );
 
 CREATE TABLE "role" (
@@ -236,6 +242,13 @@ ALTER TABLE "room" ADD CONSTRAINT "FK_member_TO_room_1" FOREIGN KEY (
 )
 REFERENCES "member" (
 "member_id"
+);
+
+ALTER TABLE "room" ADD CONSTRAINT "FK_theme_TO_room_1" FOREIGN KEY (
+"theme_id"
+)
+REFERENCES "theme" (
+"theme_id"
 );
 
 ALTER TABLE "kopic_sentence" ADD CONSTRAINT "FK_theme_TO_kopic_sentence_1" FOREIGN KEY (
