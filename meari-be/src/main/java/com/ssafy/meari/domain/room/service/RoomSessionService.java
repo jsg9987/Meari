@@ -31,6 +31,7 @@ public class RoomSessionService {
     private static final String KEY_MEMBERS = "room:%d:members";
     private static final String KEY_READY = "room:%d:ready";
     private static final String KEY_ROLES = "room:%d:roles";
+    private static final String KEY_ROLES_CONFIRMED = "room:%d:roles_confirmed";
     private static final String KEY_CONTENT = "room:%d:content_id";
     private static final String KEY_PHASE = "room:%d:phase";
     private static final String KEY_DISCONNECTED = "room:%d:disconnected";
@@ -186,6 +187,25 @@ public class RoomSessionService {
     }
 
     /**
+     * 모든 역할 초기화
+     */
+    public void clearRoles(Long roomId) {
+        String key = String.format(KEY_ROLES, roomId);
+        redisTemplate.delete(key);
+        log.info("방 {} 모든 역할 초기화", roomId);
+    }
+
+    /**
+     * 역할 직접 할당 (확정 시 사용)
+     */
+    public void assignRole(Long roomId, Long roleId, Long memberId) {
+        String key = String.format(KEY_ROLES, roomId);
+        redisTemplate.opsForHash().put(key, roleId.toString(), memberId.toString());
+        setExpire(key);
+        log.info("방 {} 역할 할당: roleId={}, memberId={}", roomId, roleId, memberId);
+    }
+
+    /**
      * 특정 멤버가 선점한 역할 해제
      */
     public void releaseRoleByMember(Long roomId, Long memberId) {
@@ -249,6 +269,25 @@ public class RoomSessionService {
         return null;
     }
 
+    /**
+     * 역할 확정 상태 설정
+     */
+    public void setRolesConfirmed(Long roomId, boolean confirmed) {
+        String key = String.format(KEY_ROLES_CONFIRMED, roomId);
+        redisTemplate.opsForValue().set(key, String.valueOf(confirmed));
+        setExpire(key);
+        log.info("방 {} 역할 확정 상태 변경: confirmed={}", roomId, confirmed);
+    }
+
+    /**
+     * 역할 확정 여부 확인
+     */
+    public boolean isRolesConfirmed(Long roomId) {
+        String key = String.format(KEY_ROLES_CONFIRMED, roomId);
+        String value = redisTemplate.opsForValue().get(key);
+        return "true".equals(value);
+    }
+
     // === 콘텐츠 관리 ===
 
     /**
@@ -282,9 +321,9 @@ public class RoomSessionService {
     /**
      * 진행 단계 설정
      */
-    public void setPhase(Long roomId, String phase) {
+    public void setPhase(Long roomId, com.ssafy.meari.domain.room.entity.GamePhase phase) {
         String key = String.format(KEY_PHASE, roomId);
-        redisTemplate.opsForValue().set(key, phase);
+        redisTemplate.opsForValue().set(key, phase.name());
         setExpire(key);
         log.info("방 {} 진행 단계 변경: phase={}", roomId, phase);
     }
@@ -292,9 +331,13 @@ public class RoomSessionService {
     /**
      * 진행 단계 조회
      */
-    public String getPhase(Long roomId) {
+    public com.ssafy.meari.domain.room.entity.GamePhase getPhase(Long roomId) {
         String key = String.format(KEY_PHASE, roomId);
-        return redisTemplate.opsForValue().get(key);
+        String value = redisTemplate.opsForValue().get(key);
+        if (value == null) {
+            return null;
+        }
+        return com.ssafy.meari.domain.room.entity.GamePhase.valueOf(value);
     }
 
     // === 연결 끊김 관리 (Grace Period) ===
@@ -335,6 +378,7 @@ public class RoomSessionService {
         redisTemplate.delete(String.format(KEY_MEMBERS, roomId));
         redisTemplate.delete(String.format(KEY_READY, roomId));
         redisTemplate.delete(String.format(KEY_ROLES, roomId));
+        redisTemplate.delete(String.format(KEY_ROLES_CONFIRMED, roomId));
         redisTemplate.delete(String.format(KEY_CONTENT, roomId));
         redisTemplate.delete(String.format(KEY_PHASE, roomId));
         redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
