@@ -1,35 +1,26 @@
-/**
- * =========================================================================================
- * [Step 5] Signup UI Implementation
- * - 스타일(CSS) 적용 금지 (User Rule)
- * - Pure HTML 태그로 기능 위주 구현
- * - 필수 필드: 이메일, 닉네임, 비밀번호, 비밀번호 확인, 성별, 모국어
- * =========================================================================================
- */
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { signup } from '../api/auth.api';
+
+// Assets
+import logoDark from '../assets/images/common/logo-dark.svg';
+import signupIllustration from '../assets/images/auth/Signup-illustaration.svg';
 
 const Signup = () => {
     const navigate = useNavigate();
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // 입력 상태 관리
     const [formData, setFormData] = useState({
         email: '',
         nickname: '',
         password: '',
         confirmPassword: '',
-        sex: '',
-        native_language: 'KR' // 기본값 'KR'
+        native_language: 'KR'
     });
 
-    // 비밀번호 보이기/숨기기 토글 상태
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-    // UI 상태
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -41,7 +32,7 @@ const Signup = () => {
         setError(null);
 
         // 유효성 검사
-        if (!formData.email || !formData.nickname || !formData.password || !formData.sex) {
+        if (!formData.email || !formData.nickname || !formData.password) {
             setError('모든 필수 항목을 입력해주세요.');
             return;
         }
@@ -63,7 +54,7 @@ const Signup = () => {
                 email: formData.email,
                 password: formData.password,
                 nickname: formData.nickname,
-                sex: formData.sex,
+                sex: 'M', // 성별 필드 제거로 인해 임시 기본값 설정 (API 요구사항에 따라 조정 필요)
                 native_language: formData.native_language
             });
 
@@ -78,120 +69,188 @@ const Signup = () => {
         }
     };
 
+    const labelClass = 'text-sm font-medium text-[#001C27]';
+
+    const inputClass =
+        'h-12 w-full rounded-lg border border-[#e5e5e5] bg-white ' +
+        'px-4 text-sm text-[#001C27] ' +
+        'placeholder:text-[#bebebe] ' +
+        'focus:outline-none focus:ring-2 focus:ring-[#001C27]/20';
+
+    const checkButtonClass =
+        'text-[10px] bg-[#e5e5e5] text-[#666] px-2 py-1 rounded font-pretendard transition ' +
+        'hover:bg-[#d5d5d5] shadow-[0_1px_1px_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-[1px]';
+
     return (
-        <div>
-            <h2>회원가입</h2>
-            <form onSubmit={handleSubmit}>
-                {/* 이메일 */}
-                <div>
-                    <label>이메일:</label>
-                    <br />
-                    <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        placeholder="이메일을 입력해주세요."
-                    />
+        <div className="min-h-screen bg-white flex">
+            <div className="mx-auto w-full max-w-[1280px] px-6 lg:px-10 min-h-screen flex flex-col">
+
+                {/* Header Logo */}
+                <div className="w-[200px] h-[80px] p-[10px] flex items-center justify-center">
+                    <img src={logoDark} alt="MEARI Logo" className="w-full h-full object-contain" />
                 </div>
-                <br />
 
-                {/* 닉네임 */}
-                <div>
-                    <label>닉네임:</label>
-                    <br />
-                    <input
-                        type="text"
-                        name="nickname"
-                        value={formData.nickname}
-                        onChange={handleChange}
-                        placeholder="닉네임을 입력해주세요."
-                    />
+                {/* Content Area */}
+                <div className="flex-1 flex flex-col lg:flex-row items-center justify-center">
+
+                    {/* Signup Card */}
+                    <div
+                        className={
+                            'w-full max-w-[450px] rounded-xl border border-[#bebebe] bg-white p-6 sm:p-10 ' +
+                            'shadow-[0_1px_2px_rgba(0,0,0,0.25)]' +
+                            'transition-opacity duration-200'
+                        }
+                    >
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="mb-6 space-y-2">
+                                <h2 className="text-2xl font-bold font-pretendard text-[#001C27]">회원가입</h2>
+                                <p className="text-xs font-pretendard text-[#666]">개인정보는 Meari에서 안전하게 보호됩니다.</p>
+                            </div>
+
+                            {/* Email */}
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label htmlFor="email" className={labelClass}>이메일</label>
+                                    <button type="button" className={checkButtonClass}>중복확인</button>
+                                </div>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    name="email"
+                                    className={inputClass}
+                                    placeholder="이메일을 입력 해주세요."
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                />
+                            </div>
+
+                            {/* 닉네임 */}
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label htmlFor="nickname" className={labelClass}>
+                                        닉네임
+                                    </label>
+                                    <button type="button" className={checkButtonClass}>중복확인</button>
+                                </div>
+                                <input
+                                    id="nickname"
+                                    type="text"
+                                    name="nickname"
+                                    className={inputClass}
+                                    placeholder="닉네임을 입력 해주세요."
+                                    value={formData.nickname}
+                                    onChange={handleChange}
+                                />
+                            </div>
+
+                            {/* Password */}
+                            <div className="space-y-2">
+                                <label htmlFor="password" className={labelClass}>비밀번호 입력</label>
+                                <div className="relative">
+                                    <input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        name="password"
+                                        className={inputClass}
+                                        placeholder="비밀번호를 입력 해주세요."
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#bebebe]"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.644C3.301 8.844 6.533 6.25 10 6.25c3.467 0 6.7 2.594 7.964 5.428a1.012 1.012 0 010 .644C16.699 15.156 13.467 17.75 10 17.75c-3.467 0-6.7-2.594-7.964-5.428z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Confirm Password */}
+                            <div className="space-y-2">
+                                <label htmlFor="confirmPassword" className={labelClass}>비밀번호 확인</label>
+                                <div className="relative">
+                                    <input
+                                        id="confirmPassword"
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        name="confirmPassword"
+                                        className={inputClass}
+                                        placeholder="비밀번호를 입력 해주세요."
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#bebebe]"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.644C3.301 8.844 6.533 6.25 10 6.25c3.467 0 6.7 2.594 7.964 5.428a1.012 1.012 0 010 .644C16.699 15.156 13.467 17.75 10 17.75c-3.467 0-6.7-2.594-7.964-5.428z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Native Language */}
+                            <div className="space-y-2">
+                                <label htmlFor="native_language" className={labelClass}>모국어 선택</label>
+                                <div className="relative">
+                                    <select
+                                        id="native_language"
+                                        name="native_language"
+                                        className={inputClass}
+                                        value={formData.native_language}
+                                        onChange={handleChange}
+                                    >
+                                        <option value="KR">한국어</option>
+                                        <option value="VN">Vietnam</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Submit Button */}
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="mt-8 h-12 w-full rounded-lg bg-[#2D9CDB] text-white font-semibold shadow-sm transition hover:bg-[#1B85C4] disabled:bg-[#ccc]"
+                            >
+                                {isLoading ? '가입 중...' : '회원가입'}
+                            </button>
+
+                            {/* Login Redirect */}
+                            <p className="mt-4 text-center text-[13px] text-[#bebebe]">
+                                이미 계정이 있으신가요?
+                                <button
+                                    type="button"
+                                    className="ml-1 font-bold text-[#2D9CDB] hover:underline"
+                                    onClick={() => navigate('/login')}
+                                >
+                                    로그인하기
+                                </button>
+                            </p>
+
+                            {/* Error Message */}
+                            {error && (
+                                <div className="text-red-500 text-xs text-center mt-2">
+                                    {error}
+                                </div>
+                            )}
+                        </form>
+                    </div>
+
+                    {/* Illustration */}
+                    <div className="hidden lg:flex items-center justify-center">
+                        <img src={signupIllustration} className="w-full max-w-[600px]" alt="Signup Illustration" />
+                    </div>
+
                 </div>
-                <br />
-
-                {/* 비밀번호 */}
-                <div>
-                    <label>비밀번호 입력:</label>
-                    <br />
-                    <input
-                        type={showPassword ? "text" : "password"}
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        placeholder="비밀번호를 입력해주세요."
-                    />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)}>
-                        {showPassword ? "숨기기" : "보기"}
-                    </button>
-                </div>
-                <br />
-
-                {/* 비밀번호 확인 */}
-                <div>
-                    <label>비밀번호 확인:</label>
-                    <br />
-                    <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        placeholder="비밀번호를 다시 입력해주세요."
-                    />
-                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                        {showConfirmPassword ? "숨기기" : "보기"}
-                    </button>
-                </div>
-                <br />
-
-                {/* 성별 (DB Schema Essential) */}
-                <div>
-                    <label>성별:</label>
-                    <label>
-                        <input
-                            type="radio"
-                            name="sex"
-                            value="M"
-                            onChange={handleChange}
-                        /> 남성
-                    </label>
-                    <label>
-                        <input
-                            type="radio"
-                            name="sex"
-                            value="F"
-                            onChange={handleChange}
-                        /> 여성
-                    </label>
-                </div>
-                <br />
-
-                {/* 모국어 (DB Schema Essential) */}
-                <div>
-                    <label>모국어:</label>
-                    <select name="native_language" value={formData.native_language} onChange={handleChange}>
-                        <option value="KR">한국어</option>
-                        <option value="EN">English</option>
-                        <option value="JP">Japanese</option>
-                        <option value="CN">Chinese</option>
-                    </select>
-                </div>
-                <br />
-
-                {/* 에러 메시지 */}
-                {error && <div style={{ color: 'red' }}>{error}</div>}
-
-                <button type="submit" disabled={isLoading}>
-                    {isLoading ? '가입 중...' : '회원가입'}
-                </button>
-            </form>
-
-            <br />
-            <div>
-                이미 계정이 있으신가요? <Link to="/login">로그인하기</Link>
             </div>
         </div>
     );
 };
 
-export default Signup;
+export default Signup; 

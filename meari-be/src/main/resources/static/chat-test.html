@@ -99,7 +99,7 @@
             log('WebSocket 연결 시도...');
 
             // 순수 WebSocket 연결 (STOMP 프로토콜 사용)
-            ws = new WebSocket('ws://localhost:8081/ws');
+            ws = new WebSocket('ws://localhost:8080/ws');
 
             ws.onopen = function() {
                 log('✅ WebSocket 연결 성공!');
