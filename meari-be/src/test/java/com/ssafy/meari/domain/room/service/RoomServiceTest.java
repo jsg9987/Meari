@@ -8,6 +8,7 @@ import com.ssafy.meari.domain.room.dto.response.RoomDetailResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomListResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomResponse;
 import com.ssafy.meari.global.common.CursorPageResponse;
+import com.ssafy.meari.domain.room.entity.GamePhase;
 import com.ssafy.meari.domain.room.entity.MemberRoom;
 import com.ssafy.meari.domain.room.entity.Room;
 import com.ssafy.meari.domain.room.entity.RoomStatus;
@@ -47,6 +48,10 @@ class RoomServiceTest {
     @InjectMocks
     private RoomService roomService;
 
+    // RoomServiceTest.java 상단 Mock 정의 구역에 추가
+    @Mock
+    private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+
     @Mock
     private RoomRepository roomRepository;
 
@@ -61,6 +66,15 @@ class RoomServiceTest {
 
     @Mock
     private RoomSessionService roomSessionService;
+
+    @Mock
+    private com.ssafy.meari.domain.content.repository.ContentRepository contentRepository;
+
+    @Mock
+    private com.ssafy.meari.domain.content.repository.RoleRepository roleRepository;
+
+    @Mock
+    private com.ssafy.meari.domain.report.repository.ShadowingReportRepository shadowingReportRepository;
 
     private Member testMember;
     private Theme testTheme;
@@ -115,7 +129,7 @@ class RoomServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.getRoomId()).isEqualTo(1L);
             assertThat(response.getTitle()).isEqualTo("테스트 방");
-            assertThat(response.isHasPassword()).isFalse();
+            assertThat(response.getHasPassword()).isFalse();
             verify(memberRoomRepository).save(any(MemberRoom.class));
             verify(roomSessionService).addMember(1L, 1L);
         }
@@ -148,7 +162,7 @@ class RoomServiceTest {
 
             // Then
             assertThat(response).isNotNull();
-            assertThat(response.isHasPassword()).isTrue();
+            assertThat(response.getHasPassword()).isTrue();
         }
 
         @Test
@@ -276,7 +290,7 @@ class RoomServiceTest {
             assertThat(response.getRoomId()).isEqualTo(1L);
             assertThat(response.getTitle()).isEqualTo("테스트 방");
             assertThat(response.getMembers()).hasSize(1);
-            assertThat(response.getMembers().get(0).isOwner()).isTrue();
+            assertThat(response.getMembers().get(0).getIsOwner()).isTrue();
         }
 
         @Test
@@ -546,6 +560,411 @@ class RoomServiceTest {
             assertThatThrownBy(() -> roomService.leaveRoom(1L, 999L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_MEMBER_ROOM);
+        }
+    }
+
+    @Nested
+    @DisplayName("역할 확정")
+    class ConfirmRoles {
+
+        @Test
+        @DisplayName("성공 - 모든 참여자가 역할 선택 완료")
+        void confirmRoles_Success() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            Member member2 = Member.builder().email("m2@test.com").password("pw").nickname("M2").build();
+            Member member3 = Member.builder().email("m3@test.com").password("pw").nickname("M3").build();
+            Member member4 = Member.builder().email("m4@test.com").password("pw").nickname("M4").build();
+            ReflectionTestUtils.setField(member2, "memberId", 2L);
+            ReflectionTestUtils.setField(member3, "memberId", 3L);
+            ReflectionTestUtils.setField(member4, "memberId", 4L);
+
+            MemberRoom mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
+            MemberRoom mr2 = MemberRoom.builder().room(testRoom).member(member2).build();
+            MemberRoom mr3 = MemberRoom.builder().room(testRoom).member(member3).build();
+            MemberRoom mr4 = MemberRoom.builder().room(testRoom).member(member4).build();
+
+            // 역할 확정 요청 생성
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(
+                    createRoleAssignment(1L, 1L),
+                    createRoleAssignment(2L, 2L),
+                    createRoleAssignment(3L, 3L),
+                    createRoleAssignment(4L, 4L)
+                );
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2, mr3, mr4));
+            given(roleRepository.existsById(anyLong())).willReturn(true);
+
+            // When
+            roomService.confirmRoles(1L, request, 1L);
+
+            // Then
+            verify(roomSessionService).clearRoles(1L);
+            verify(roomSessionService, times(4)).assignRole(eq(1L), anyLong(), anyLong());
+            verify(roomSessionService).setRolesConfirmed(1L, true);
+        }
+
+        private com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment createRoleAssignment(Long memberId, Long roleId) {
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment assignment =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment();
+            ReflectionTestUtils.setField(assignment, "memberId", memberId);
+            ReflectionTestUtils.setField(assignment, "roleId", roleId);
+            return assignment;
+        }
+
+        @Test
+        @DisplayName("실패 - 방장이 아님")
+        void confirmRoles_Fail_NotOwner() {
+            // Given
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(createRoleAssignment(1L, 1L));
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        @Test
+        @DisplayName("실패 - 진행 중이 아님")
+        void confirmRoles_Fail_NotInProgress() {
+            // Given
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(createRoleAssignment(1L, 1L));
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        @Test
+        @DisplayName("실패 - ROLE_PICK 단계가 아님")
+        void confirmRoles_Fail_InvalidPhase() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(createRoleAssignment(1L, 1L));
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.WATCHING);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
+        }
+
+        @Test
+        @DisplayName("실패 - 역할 개수가 참여자 수와 불일치")
+        void confirmRoles_Fail_RoleCountMismatch() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            Member member2 = Member.builder().email("m2@test.com").password("pw").nickname("M2").build();
+            Member member3 = Member.builder().email("m3@test.com").password("pw").nickname("M3").build();
+            Member member4 = Member.builder().email("m4@test.com").password("pw").nickname("M4").build();
+            ReflectionTestUtils.setField(member2, "memberId", 2L);
+            ReflectionTestUtils.setField(member3, "memberId", 3L);
+            ReflectionTestUtils.setField(member4, "memberId", 4L);
+
+            MemberRoom mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
+            MemberRoom mr2 = MemberRoom.builder().room(testRoom).member(member2).build();
+            MemberRoom mr3 = MemberRoom.builder().room(testRoom).member(member3).build();
+            MemberRoom mr4 = MemberRoom.builder().room(testRoom).member(member4).build();
+
+            // 역할 확정 요청 생성 (2개만 - 불일치)
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(
+                    createRoleAssignment(1L, 1L),
+                    createRoleAssignment(2L, 2L)
+                );
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2, mr3, mr4));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROLE_COUNT_MISMATCH);
+        }
+
+        @Test
+        @DisplayName("실패 - 이미 역할이 확정됨")
+        void confirmRoles_Fail_AlreadyConfirmed() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(createRoleAssignment(1L, 1L));
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROLES_ALREADY_CONFIRMED);
+        }
+
+        @Test
+        @DisplayName("실패 - 참여하지 않은 멤버 포함")
+        void confirmRoles_Fail_NotRoomMember() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            MemberRoom mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
+
+            // 참여하지 않은 멤버 ID (999L) 포함
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(createRoleAssignment(999L, 1L));
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_MEMBER);
+        }
+
+        @Test
+        @DisplayName("실패 - 존재하지 않는 역할 ID")
+        void confirmRoles_Fail_RoleNotFound() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            MemberRoom mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
+
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(createRoleAssignment(1L, 999L));
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1));
+            given(roleRepository.existsById(999L)).willReturn(false);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_ROLE);
+        }
+
+        @Test
+        @DisplayName("실패 - 멤버 중복 할당")
+        void confirmRoles_Fail_DuplicateMemberRole() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            Member member2 = Member.builder().email("m2@test.com").password("pw").nickname("M2").build();
+            ReflectionTestUtils.setField(member2, "memberId", 2L);
+
+            MemberRoom mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
+            MemberRoom mr2 = MemberRoom.builder().room(testRoom).member(member2).build();
+
+            // 같은 멤버에게 두 개의 역할 할당
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(
+                    createRoleAssignment(1L, 1L),
+                    createRoleAssignment(1L, 2L)  // 중복 멤버
+                );
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2));
+            given(roleRepository.existsById(anyLong())).willReturn(true);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_MEMBER_ROLE);
+        }
+
+        @Test
+        @DisplayName("실패 - 역할 중복 할당")
+        void confirmRoles_Fail_DuplicateRoleAssignment() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            Member member2 = Member.builder().email("m2@test.com").password("pw").nickname("M2").build();
+            ReflectionTestUtils.setField(member2, "memberId", 2L);
+
+            MemberRoom mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
+            MemberRoom mr2 = MemberRoom.builder().room(testRoom).member(member2).build();
+
+            // 같은 역할을 두 멤버에게 할당
+            com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request =
+                new com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest();
+            java.util.List<com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest.RoleAssignment> assignments =
+                java.util.Arrays.asList(
+                    createRoleAssignment(1L, 1L),
+                    createRoleAssignment(2L, 1L)  // 중복 역할
+                );
+            ReflectionTestUtils.setField(request, "roles", assignments);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2));
+            given(roleRepository.existsById(anyLong())).willReturn(true);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_ROLE_ASSIGNMENT);
+        }
+    }
+
+    @Nested
+    @DisplayName("라운드 시작")
+    class StartRound {
+
+        private com.ssafy.meari.domain.content.entity.Content testContent;
+
+        @BeforeEach
+        void setUp() {
+            testContent = com.ssafy.meari.domain.content.entity.Content.builder()
+                    .title("Test Video")
+                    .videoUrl("http://test.com/video.mp4")
+                    .build();
+            ReflectionTestUtils.setField(testContent, "contentId", 1L);
+        }
+
+        @Test
+        @DisplayName("성공 - Round1 시작 및 역할 DB 저장")
+        void startRound_Success_Round1() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            Member member2 = Member.builder().email("m2@test.com").password("pw").nickname("M2").build();
+            Member member3 = Member.builder().email("m3@test.com").password("pw").nickname("M3").build();
+            Member member4 = Member.builder().email("m4@test.com").password("pw").nickname("M4").build();
+            ReflectionTestUtils.setField(member2, "memberId", 2L);
+            ReflectionTestUtils.setField(member3, "memberId", 3L);
+            ReflectionTestUtils.setField(member4, "memberId", 4L);
+
+            MemberRoom mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
+            MemberRoom mr2 = MemberRoom.builder().room(testRoom).member(member2).build();
+            MemberRoom mr3 = MemberRoom.builder().room(testRoom).member(member3).build();
+            MemberRoom mr4 = MemberRoom.builder().room(testRoom).member(member4).build();
+
+            com.ssafy.meari.domain.content.entity.Role role1 = com.ssafy.meari.domain.content.entity.Role.builder().name("역할1").build();
+            com.ssafy.meari.domain.content.entity.Role role2 = com.ssafy.meari.domain.content.entity.Role.builder().name("역할2").build();
+            com.ssafy.meari.domain.content.entity.Role role3 = com.ssafy.meari.domain.content.entity.Role.builder().name("역할3").build();
+            com.ssafy.meari.domain.content.entity.Role role4 = com.ssafy.meari.domain.content.entity.Role.builder().name("역할4").build();
+            ReflectionTestUtils.setField(role1, "roleId", 1L);
+            ReflectionTestUtils.setField(role2, "roleId", 2L);
+            ReflectionTestUtils.setField(role3, "roleId", 3L);
+            ReflectionTestUtils.setField(role4, "roleId", 4L);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
+            given(roomSessionService.getContentId(1L)).willReturn(1L);
+            given(contentRepository.findById(1L)).willReturn(Optional.of(testContent));
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2, mr3, mr4));
+            given(roomSessionService.getAllRoles(1L)).willReturn(java.util.Map.of(1L, "1", 2L, "2", 3L, "3", 4L, "4"));
+            given(roleRepository.findById(1L)).willReturn(Optional.of(role1));
+            given(roleRepository.findById(2L)).willReturn(Optional.of(role2));
+            given(roleRepository.findById(3L)).willReturn(Optional.of(role3));
+            given(roleRepository.findById(4L)).willReturn(Optional.of(role4));
+
+            // When
+            roomService.startRound(1L, 1, 1L);
+
+            // Then
+            verify(shadowingReportRepository, times(4)).save(any());
+            verify(roomSessionService).setPhase(1L, GamePhase.ROUND_1);
+        }
+
+        @Test
+        @DisplayName("성공 - Round2 시작")
+        void startRound_Success_Round2() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROUND_1);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
+            given(roomSessionService.getContentId(1L)).willReturn(1L);
+            given(contentRepository.findById(1L)).willReturn(Optional.of(testContent));
+
+            // When
+            roomService.startRound(1L, 2, 1L);
+
+            // Then
+            verify(shadowingReportRepository, never()).save(any());
+            verify(roomSessionService).setPhase(1L, GamePhase.ROUND_2);
+        }
+
+        @Test
+        @DisplayName("실패 - 방장이 아님")
+        void startRound_Fail_NotOwner() {
+            // Given
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.startRound(1L, 1, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        @Test
+        @DisplayName("실패 - 역할이 확정되지 않음")
+        void startRound_Fail_RolesNotConfirmed() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.startRound(1L, 1, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROLES_NOT_CONFIRMED);
         }
     }
 }
