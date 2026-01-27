@@ -76,6 +76,12 @@ public enum ErrorCode {
     CONTENT_NOT_SELECTED(HttpStatus.CONFLICT, "동영상이 선택되지 않았습니다."),
     CONTENT_MISMATCH(HttpStatus.CONFLICT, "선택된 동영상과 일치하지 않습니다."),
     CONTENT_SELECT_ONLY_WAITING(HttpStatus.CONFLICT, "동영상은 대기 중일 때만 선택할 수 있습니다."),
+    ROLE_NOT_SELECTED(HttpStatus.CONFLICT, "모든 참여자가 역할을 선택하지 않았습니다."),
+    ROLES_NOT_CONFIRMED(HttpStatus.CONFLICT, "역할이 확정되지 않았습니다."),
+    ROLES_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "역할이 이미 확정되었습니다."),
+    ROLE_COUNT_MISMATCH(HttpStatus.BAD_REQUEST, "역할 개수가 참여자 수와 일치하지 않습니다."),
+    DUPLICATE_MEMBER_ROLE(HttpStatus.BAD_REQUEST, "한 멤버에게 여러 역할을 할당할 수 없습니다."),
+    DUPLICATE_ROLE_ASSIGNMENT(HttpStatus.CONFLICT, "같은 역할을 여러 멤버에게 할당할 수 없습니다."),
     
 	
 	// Unsupported Media Type: 415
