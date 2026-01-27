@@ -34,16 +34,16 @@ pipeline {
                                         string(credentialsId: 'OPENVIDU_URL', variable: 'OV_URL'),
                                         string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET')
                                     ]) {
-                                        sh """
+                                        sh '''
                                         docker build \
-                                          --build-arg DB_PASSWORD='${DB_PW}' \
-                                          --build-arg JWT_SECRET_KEY='${JWT_KEY}' \
-                                          --build-arg REDIS_PASSWORD='${REDIS_PW}' \
-                                          --build-arg FRONTEND_URL='${FE_URL}' \
-                                          --build-arg OPENVIDU_URL='${OV_URL}' \
-                                          --build-arg OPENVIDU_SECRET='${OV_SECRET}' \
+                                          --build-arg DB_PASSWORD="${DB_PW}" \
+                                          --build-arg JWT_SECRET_KEY="${JWT_KEY}" \
+                                          --build-arg REDIS_PASSWORD="${REDIS_PW}" \
+                                          --build-arg FRONTEND_URL="${FE_URL}" \
+                                          --build-arg OPENVIDU_URL="${OV_URL}" \
+                                          --build-arg OPENVIDU_SECRET="${OV_SECRET}" \
                                           -t backend-image:latest .
-                                        """
+                                        '''
                                     }
                                 } else {
                                     // 다른 브랜치: 기본값 사용
@@ -66,12 +66,12 @@ pipeline {
                                     withCredentials([
                                         string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
                                     ]) {
-                                        sh """
+                                        sh '''
                                         docker build \
-                                          --build-arg VITE_BASE_SERVER_URL='${BE_URL}' \
+                                          --build-arg VITE_BASE_SERVER_URL="${BE_URL}" \
                                           --build-arg VITE_USE_MOCK_API=false \
                                           -t frontend-image:latest .
-                                        """
+                                        '''
                                     }
                                 } else {
                                     // 다른 브랜치: 기본값 사용
