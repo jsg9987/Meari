@@ -76,11 +76,14 @@ public enum ErrorCode {
     CONTENT_NOT_SELECTED(HttpStatus.CONFLICT, "동영상이 선택되지 않았습니다."),
     CONTENT_MISMATCH(HttpStatus.CONFLICT, "선택된 동영상과 일치하지 않습니다."),
     CONTENT_SELECT_ONLY_WAITING(HttpStatus.CONFLICT, "동영상은 대기 중일 때만 선택할 수 있습니다."),
-    
-	
+
+    // Chat Error: 500
+    CHAT_SAVE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 저장에 실패했습니다."),
+    CHAT_BROADCAST_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 브로드캐스트에 실패했습니다."),
+
 	// Unsupported Media Type: 415
-	
-	
+
+
     // Internal Server Error: 500
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 에러입니다."),
     FILE_READ_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "파일을 읽어들이다 에러 발생"),
