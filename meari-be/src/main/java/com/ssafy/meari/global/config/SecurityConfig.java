@@ -75,6 +75,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()
+                .requestMatchers("/api/v1/nlp/**").permitAll()
 
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
