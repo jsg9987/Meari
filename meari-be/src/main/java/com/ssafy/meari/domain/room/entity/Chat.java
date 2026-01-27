@@ -16,7 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@RedisHash("chat")
+@RedisHash(value = "chat", timeToLive = 43200)
 @Schema(description = "실시간 채팅 메시지 (Redis)")
 public class Chat implements Serializable {
 
