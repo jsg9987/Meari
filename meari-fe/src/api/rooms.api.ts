@@ -45,6 +45,10 @@ export const createRoomMock = async (
 export const createRoom = async (
   payload: CreateRoomRequest
 ): Promise<CreateRoomResponse> => {
+  const useMock = import.meta.env.VITE_USE_MOCK_ROOMS === 'true';
+  if (useMock) {
+    return createRoomMock(payload);
+  }
   const response = await axiosInstance.post('/api/v1/rooms', payload);
   const responseData = (response as { data?: CreateRoomResponse }).data ?? response;
   return responseData as CreateRoomResponse;

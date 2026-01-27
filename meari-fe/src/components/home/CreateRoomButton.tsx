@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-// import { createRoom } from '../../api/rooms.api';
-import { createRoomMock as createRoom } from '../../api/rooms.api';
-import { getThemesMock as getThemes, type Theme } from '../../api/contents.api';
+import { createRoom } from '../../api/rooms.api';
+import { getThemes, type Theme } from '../../api/contents.api';
 
 const CreateRoomButton = () => {
   const navigate = useNavigate();

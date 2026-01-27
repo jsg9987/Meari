@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Mic, FileText, Calendar, Settings, ChevronDown, User, LogOut } from 'lucide-react'
 import logoWhite from '../../assets/images/common/logo-white.svg'
 
@@ -24,6 +25,7 @@ const languages = [
 
 const Header = ({ activeTab, onTabChange }: HeaderProps) => {
   const activeIndex = tabs.findIndex((tab) => tab.id === activeTab)
+  const navigate = useNavigate()
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('ko')
   const [isLanguageOpen, setIsLanguageOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -58,8 +60,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
 
   const handleMyPageClick = () => {
     setIsProfileOpen(false)
-    // TODO: 마이페이지로 이동
-    console.log('Navigate to My Page')
+    navigate('/mypage')
   }
 
   const handleLogoutClick = () => {

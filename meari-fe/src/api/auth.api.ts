@@ -113,7 +113,7 @@ const signupReal = async (credentials: SignupCredentials): Promise<SignupRespons
     return response.data;
 };
 
-const useMock = import.meta.env.VITE_USE_MOCK_API === 'true';
+const useMock = import.meta.env.VITE_USE_MOCK_AUTH === 'true';
 
 export const login = useMock ? loginMock : loginReal;
 export const signup = useMock ? signupMock : signupReal;
