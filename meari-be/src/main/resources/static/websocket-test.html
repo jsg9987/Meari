@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 테스트</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            font-size: 1.2em;
+            margin-top: 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #666;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        button.danger {
+            background-color: #f44336;
+        }
+        button.danger:hover {
+            background-color: #da190b;
+        }
+        .log-container {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .log-entry.info {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        .log-entry.success {
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
+        .log-entry.error {
+            background-color: #ffebee;
+            color: #d32f2f;
+        }
+        .log-entry.message {
+            background-color: #fff3e0;
+            color: #f57c00;
+        }
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .timestamp {
+            font-size: 0.85em;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 WebSocket 테스트 페이지</h1>
+
+    <!-- 연결 설정 -->
+    <div class="container">
+        <h2>연결 설정</h2>
+        <div class="input-group">
+            <label for="serverUrl">서버 URL:</label>
+            <input type="text" id="serverUrl" value="http://localhost:8080" placeholder="http://localhost:8080">
+        </div>
+        <div class="input-group">
+            <label for="roomId">Room ID:</label>
+            <input type="number" id="roomId" value="1" placeholder="방 ID를 입력하세요">
+        </div>
+        <div class="input-group">
+            <label for="memberId">Member ID:</label>
+            <input type="number" id="memberId" value="1" placeholder="회원 ID를 입력하세요">
+        </div>
+        <div class="input-group">
+            <label for="nickname">Nickname:</label>
+            <input type="text" id="nickname" value="테스터" placeholder="닉네임을 입력하세요">
+        </div>
+        <button id="connectBtn" onclick="connect()">🔗 연결</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled class="danger">❌ 연결 해제</button>
+        <div id="status" class="status disconnected">⚠️ 연결되지 않음</div>
+    </div>
+
+    <!-- 메시지 전송 -->
+    <div class="container">
+        <h2>메시지 전송</h2>
+        <div class="actions">
+            <button onclick="sendReady()" id="readyBtn" disabled>✅ 준비 상태 토글</button>
+            <button onclick="sendRoleSelect()" id="roleSelectBtn" disabled>🎭 역할 선택</button>
+            <button onclick="sendRoleRelease()" id="roleReleaseBtn" disabled>🔓 역할 해제</button>
+        </div>
+
+        <div class="input-group" style="margin-top: 15px;">
+            <label for="roleId">Role ID (역할 선택용):</label>
+            <input type="number" id="roleId" value="1" placeholder="역할 ID">
+        </div>
+
+        <div class="input-group">
+            <label for="chatMessage">채팅 메시지:</label>
+            <textarea id="chatMessage" rows="2" placeholder="채팅 메시지를 입력하세요"></textarea>
+            <button onclick="sendChat()" id="chatBtn" disabled style="margin-top: 5px;">💬 채팅 전송</button>
+        </div>
+    </div>
+
+    <!-- 로그 -->
+    <div class="container">
+        <h2>로그</h2>
+        <button onclick="clearLog()">🗑️ 로그 지우기</button>
+        <div id="log" class="log-container"></div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let currentRoomId = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString('ko-KR');
+            entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            log('로그가 초기화되었습니다.', 'info');
+        }
+
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const buttons = ['readyBtn', 'roleSelectBtn', 'roleReleaseBtn', 'chatBtn'];
+
+            if (connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = '✅ 연결됨 (Room ' + currentRoomId + ')';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                buttons.forEach(id => document.getElementById(id).disabled = false);
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = '⚠️ 연결되지 않음';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                buttons.forEach(id => document.getElementById(id).disabled = true);
+            }
+        }
+
+        function connect() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const roomId = document.getElementById('roomId').value;
+            const memberId = document.getElementById('memberId').value;
+
+            if (!serverUrl || !roomId || !memberId) {
+                alert('서버 URL, Room ID, Member ID를 모두 입력해주세요.');
+                return;
+            }
+
+            currentRoomId = roomId;
+
+            // 절대 URL로 WebSocket 연결
+            const wsUrl = serverUrl + '/ws';
+            log(`WebSocket 연결 시도... (서버: ${wsUrl}, roomId: ${roomId}, memberId: ${memberId})`, 'info');
+
+            const socket = new SockJS(wsUrl);
+            stompClient = Stomp.over(socket);
+
+            stompClient.connect({}, function(frame) {
+                log('WebSocket 연결 성공!', 'success');
+                updateStatus(true);
+
+                // 방 상태 구독
+                stompClient.subscribe(`/topic/room/${roomId}/state`, function(message) {
+                    const data = JSON.parse(message.body);
+                    log(`📢 [STATE] ${JSON.stringify(data, null, 2)}`, 'message');
+                });
+
+                // 채팅 구독
+                stompClient.subscribe(`/topic/room/${roomId}/chat`, function(message) {
+                    const data = JSON.parse(message.body);
+                    log(`💬 [CHAT] ${data.nickname}: ${data.content}`, 'message');
+                });
+
+                log(`구독 완료: /topic/room/${roomId}/state`, 'success');
+                log(`구독 완료: /topic/room/${roomId}/chat`, 'success');
+            }, function(error) {
+                log('WebSocket 연결 실패: ' + error, 'error');
+                updateStatus(false);
+            });
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+                log('WebSocket 연결 해제됨', 'info');
+            }
+            updateStatus(false);
+            currentRoomId = null;
+        }
+
+        function sendReady() {
+            const memberId = parseInt(document.getElementById('memberId').value);
+            const payload = {
+                member_id: memberId
+            };
+
+            stompClient.send(`/app/room/${currentRoomId}/ready`, {}, JSON.stringify(payload));
+            log(`✅ 준비 상태 토글 전송: ${JSON.stringify(payload)}`, 'success');
+        }
+
+        function sendRoleSelect() {
+            const memberId = parseInt(document.getElementById('memberId').value);
+            const roleId = parseInt(document.getElementById('roleId').value);
+            const payload = {
+                member_id: memberId,
+                role_id: roleId
+            };
+
+            stompClient.send(`/app/room/${currentRoomId}/role`, {}, JSON.stringify(payload));
+            log(`🎭 역할 선택 전송: ${JSON.stringify(payload)}`, 'success');
+        }
+
+        function sendRoleRelease() {
+            const memberId = parseInt(document.getElementById('memberId').value);
+            const payload = {
+                member_id: memberId
+            };
+
+            stompClient.send(`/app/room/${currentRoomId}/role/release`, {}, JSON.stringify(payload));
+            log(`🔓 역할 해제 전송: ${JSON.stringify(payload)}`, 'success');
+        }
+
+        function sendChat() {
+            const memberId = parseInt(document.getElementById('memberId').value);
+            const nickname = document.getElementById('nickname').value;
+            const content = document.getElementById('chatMessage').value;
+
+            if (!content.trim()) {
+                alert('메시지를 입력해주세요.');
+                return;
+            }
+
+            const payload = {
+                member_id: memberId,
+                nickname: nickname,
+                content: content,
+                timestamp: Date.now()
+            };
+
+            stompClient.send(`/app/room/${currentRoomId}/chat`, {}, JSON.stringify(payload));
+            log(`💬 채팅 전송: ${content}`, 'success');
+            document.getElementById('chatMessage').value = '';
+        }
+
+        // 페이지 로드 시 초기 로그
+        window.onload = function() {
+            log('WebSocket 테스트 페이지가 로드되었습니다.', 'info');
+            log('서버 URL, Room ID, Member ID를 설정한 후 연결 버튼을 클릭하세요.', 'info');
+            log('💡 팁: IntelliJ에서 직접 실행한 경우 서버 URL을 반드시 확인하세요!', 'info');
+        };
+
+        // 페이지 나갈 때 연결 해제
+        window.onbeforeunload = function() {
+            disconnect();
+        };
+    </script>
+</body>
+</html>
