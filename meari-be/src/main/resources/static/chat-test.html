@@ -180,8 +180,8 @@
             const chatMessage = {
                 sender_id: parseInt(senderId),
                 nickname: nickname,
-                message: messageText,
-                timestamp: new Date().toISOString().split('.')[0]
+                message: messageText
+                // timestamp는 서버에서 자동 설정됨
             };
 
             const body = JSON.stringify(chatMessage);
