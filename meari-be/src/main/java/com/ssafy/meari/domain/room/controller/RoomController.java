@@ -2,13 +2,14 @@ package com.ssafy.meari.domain.room.controller;
 
 import com.ssafy.meari.domain.room.dto.request.ContentSelectRequest;
 import com.ssafy.meari.domain.room.dto.request.GameStartRequest;
-import com.ssafy.meari.domain.room.dto.request.RoleSelectRequest;
+import com.ssafy.meari.domain.room.dto.request.RoundStartRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomCreateRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomEnterRequest;
 import com.ssafy.meari.domain.room.dto.response.RoomDetailResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomListResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomResponse;
 import com.ssafy.meari.domain.room.service.RoomService;
+import com.ssafy.meari.global.auth.UserDetailsImpl;
 import com.ssafy.meari.global.common.ApiResponse;
 import com.ssafy.meari.global.common.CursorPageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Room", description = "쉐도잉 방 관리 API")
@@ -30,17 +32,13 @@ public class RoomController {
 
     private final RoomService roomService;
 
-    // TODO: JWT 인증 구현 후 @AuthenticationPrincipal로 변경
-    // 현재는 임시로 헤더에서 memberId를 받음
-    private static final String TEMP_MEMBER_ID_HEADER = "X-Member-Id";
-
     @Operation(summary = "방 생성", description = "새로운 쉐도잉 방을 생성합니다. 생성자는 자동으로 방장이 됩니다.")
     @PostMapping
     public ResponseEntity<ApiResponse<RoomResponse>> createRoom(
-            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
             @Valid @RequestBody RoomCreateRequest request
     ) {
-        log.info("방 생성 요청: memberId={}, title={}", memberId, request.getTitle());
+        Long memberId = userDetails.getMember().getMemberId();
         RoomResponse response = roomService.createRoom(request, memberId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
@@ -74,14 +72,13 @@ public class RoomController {
     @PostMapping("/{roomId}/enter")
     public ResponseEntity<ApiResponse<Void>> enterRoom(
             @Parameter(description = "방 ID") @PathVariable Long roomId,
-            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
             @RequestBody(required = false) RoomEnterRequest request
     ) {
-        log.info("방 입장 요청: roomId={}, memberId={}", roomId, memberId);
-        if (request == null) {
-            request = new RoomEnterRequest();
-        }
-        roomService.enterRoom(roomId, request, memberId);
+        // 방 입장 시 비밀번호가 없는 경우
+        if (request == null) request = new RoomEnterRequest();
+
+        roomService.enterRoom(roomId, request, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -89,33 +86,20 @@ public class RoomController {
     @DeleteMapping("/{roomId}/leave")
     public ResponseEntity<ApiResponse<Void>> leaveRoom(
             @Parameter(description = "방 ID") @PathVariable Long roomId,
-            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId
+            @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        log.info("방 퇴장 요청: roomId={}, memberId={}", roomId, memberId);
-        roomService.leaveRoom(roomId, memberId);
+        roomService.leaveRoom(roomId, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
-    }
-
-    @Operation(summary = "준비 상태 토글", description = "준비 상태를 토글합니다. 방장은 사용할 수 없습니다.")
-    @PostMapping("/{roomId}/ready")
-    public ResponseEntity<ApiResponse<Boolean>> toggleReady(
-            @Parameter(description = "방 ID") @PathVariable Long roomId,
-            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId
-    ) {
-        log.info("준비 상태 토글 요청: roomId={}, memberId={}", roomId, memberId);
-        boolean ready = roomService.toggleReady(roomId, memberId);
-        return ResponseEntity.ok(ApiResponse.success(ready));
     }
 
     @Operation(summary = "동영상 선택", description = "학습할 동영상을 선택합니다. 방장만 가능하며, WAITING 단계에서만 가능합니다.")
     @PostMapping("/{roomId}/content")
     public ResponseEntity<ApiResponse<Void>> selectContent(
             @Parameter(description = "방 ID") @PathVariable Long roomId,
-            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
             @Valid @RequestBody ContentSelectRequest request
     ) {
-        log.info("동영상 선택 요청: roomId={}, contentId={}, memberId={}", roomId, request.getContentId(), memberId);
-        roomService.selectContent(roomId, request.getContentId(), memberId);
+        roomService.selectContent(roomId, request.getContentId(), userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -123,23 +107,32 @@ public class RoomController {
     @PostMapping("/{roomId}/start")
     public ResponseEntity<ApiResponse<Void>> startGame(
             @Parameter(description = "방 ID") @PathVariable Long roomId,
-            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
             @Valid @RequestBody GameStartRequest request
     ) {
-        log.info("게임 시작 요청: roomId={}, contentId={}, memberId={}", roomId, request.getContentId(), memberId);
-        roomService.startGame(roomId, request.getContentId(), memberId);
+        roomService.startGame(roomId, request.getContentId(), userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
-    @Operation(summary = "역할 선점", description = "역할을 선점합니다. ROLE_PICK 단계에서만 가능합니다.")
-    @PostMapping("/{roomId}/role")
-    public ResponseEntity<ApiResponse<Void>> selectRole(
+    @Operation(summary = "역할 선택 완료", description = "모든 참여자의 역할 선택을 확정합니다. 방장만 가능하며, ROLE_PICK 단계에서만 가능합니다. 확정 후에는 역할 변경이 불가능합니다.")
+    @PostMapping("/{roomId}/roles/confirm")
+    public ResponseEntity<ApiResponse<Void>> confirmRoles(
             @Parameter(description = "방 ID") @PathVariable Long roomId,
-            @RequestHeader(TEMP_MEMBER_ID_HEADER) Long memberId,
-            @Valid @RequestBody RoleSelectRequest request
+            @Valid @RequestBody com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        log.info("역할 선점 요청: roomId={}, roleId={}, memberId={}", roomId, request.getRoleId(), memberId);
-        roomService.selectRole(roomId, request.getRoleId(), memberId);
+        roomService.confirmRoles(roomId, request, userDetails.getMember().getMemberId());
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
+    @Operation(summary = "Round 시작", description = "Round를 시작합니다. 방장만 가능하며, 역할 선택 완료 후 가능합니다. Round1 시작 시 역할 정보가 DB에 저장됩니다.")
+    @PostMapping("/{roomId}/rounds/start")
+    public ResponseEntity<ApiResponse<Void>> startRound(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @Valid @RequestBody RoundStartRequest request
+    ) {
+        roomService.startRound(roomId, request.getRound(), userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 }
