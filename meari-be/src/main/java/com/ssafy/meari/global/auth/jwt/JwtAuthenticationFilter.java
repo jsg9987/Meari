@@ -39,8 +39,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/v1/auth/signup".equals(requestURI) ||
             "/api/v1/auth/email/check".equals(requestURI) ||
             "/api/v1/auth/nickname/check".equals(requestURI) ||
-            "/api/v1/auth/refresh".equals(requestURI)) {
-            log.debug("JwtAuthentication 스킵");
+            "/api/v1/auth/refresh".equals(requestURI)
+
+            ////////////////// chat-test.html 테스트를 위한 접근제한 해제 /////////////
+//            || requestURI.startsWith("/api/v1/auth") ||
+//            requestURI.startsWith("/ws") ||
+//            requestURI.endsWith(".html") ||
+//            requestURI.endsWith(".js") ||
+//            requestURI.endsWith(".css") ||
+//            requestURI.endsWith(".ico") ||
+//            requestURI.endsWith(".png") ||
+//            requestURI.endsWith(".jpg")
+
+        ) {
+            log.debug("JwtAuthentication 스킵: {}", requestURI);
             filterChain.doFilter(request, response);
             return;
         }

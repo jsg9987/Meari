@@ -76,6 +76,14 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()
 
+                ////////////////// chat-test.html 테스트를 위한 접근제한 해제 /////////////
+//                .requestMatchers("/**/*.html").permitAll()
+//                .requestMatchers("/**/*.js").permitAll()
+//                .requestMatchers("/**/*.css").permitAll()
+//                .requestMatchers("/**/*.ico").permitAll()
+//                .requestMatchers("/**/*.png").permitAll()
+//                .requestMatchers("/**/*.jpg").permitAll()
+
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
             );
