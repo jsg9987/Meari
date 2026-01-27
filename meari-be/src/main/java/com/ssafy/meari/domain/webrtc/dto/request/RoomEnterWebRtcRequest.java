@@ -17,9 +17,6 @@ public class RoomEnterWebRtcRequest {
     @Size(max = 20, message = "비밀번호는 20자 이내여야 합니다.")
     private String password;
 
-    @Schema(description = "사용자 ID", example = "1")
-    private Long memberId;
-
     @Schema(description = "사용자 닉네임", example = "김철수")
     private String nickname;
 }
