@@ -1,18 +1,24 @@
 package com.ssafy.meari.domain.room.controller;
 
-import com.ssafy.meari.domain.room.dto.websocket.*;
-import com.ssafy.meari.domain.room.entity.Chat;
-import com.ssafy.meari.domain.room.repository.ChatRepository;
-import com.ssafy.meari.domain.room.service.RoomSessionService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
+
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
-import java.time.LocalDateTime;
+import com.ssafy.meari.domain.room.dto.websocket.ChatMessage;
+import com.ssafy.meari.domain.room.dto.websocket.ReadyMessage;
+import com.ssafy.meari.domain.room.dto.websocket.RoleReleaseMessage;
+import com.ssafy.meari.domain.room.dto.websocket.RoleSelectMessage;
+import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
+import com.ssafy.meari.domain.room.entity.Chat;
+import com.ssafy.meari.domain.room.repository.ChatRepository;
+import com.ssafy.meari.domain.room.service.RoomSessionService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Room WebSocket 메시지 핸들러
@@ -106,7 +112,7 @@ public class RoomWebSocketController {
             @DestinationVariable Long roomId,
             @Payload ChatMessage message
     ) {
-        log.info("[Chat] 채팅 메시지 서버수신: roomId={}, senderId={}, nickname={}, message={}",
+        log.info("채팅 메시지 서버수신: roomId={}, senderId={}, nickname={}, message={}",
                 roomId, message.getSenderId(), message.getNickname(), message.getMessage());
 
         try {
@@ -123,13 +129,11 @@ public class RoomWebSocketController {
             // 전체 참여자에게 브로드캐스트
             broadcast(roomId, TOPIC_CHAT, message);
 
-            log.debug("[Chat] 채팅 메시지 브로드캐스트 완료: roomId={}", roomId);
+            log.debug("채팅 메시지 브로드캐스트 완료: roomId={}", roomId);
 
         } catch (Exception e) {
-            log.error("[Chat] 채팅 메시지 저장/브로드캐스트 실패: roomId={}, senderId={}", roomId, message.getSenderId(), e);
-            // 에러 메시지를 모든 참여자에게 전송
-            ErrorMessage errorMessage = ErrorMessage.chatSaveError();
-            broadcast(roomId, TOPIC_CHAT, errorMessage);
+            log.error("채팅 메시지 저장/브로드캐스트 실패: roomId={}, senderId={}", roomId, message.getSenderId(), e);
+            // 추후 채팅 전송 실패 시 에러 메시지를 발신자에게만 전송하는 기능 추가를 고려할 수 있다.
         }
     }
 
