@@ -39,7 +39,7 @@ const PasswordModal = ({ isOpen, onClose, onSubmit }: PasswordModalProps) => {
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder=''
-                    className='w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent mb-4'
+                    className='w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#2D9CDB] focus:border-transparent mb-4'
                     autoFocus
                 />
                 <button

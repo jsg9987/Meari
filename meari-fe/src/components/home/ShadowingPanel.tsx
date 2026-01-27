@@ -90,8 +90,8 @@ const ShadowingPanel = () => {
               type='button'
               onClick={() => setSelectedTheme(theme)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${selectedTheme === theme
-                  ? 'border-2 border-[#2563EB] text-[#2563EB] bg-white'
-                  : 'border border-gray-300 text-gray-600 bg-white hover:border-gray-400'
+                ? 'border-2 border-[#2D9CDB] text-[#2D9CDB] bg-white'
+                : 'border border-gray-300 text-gray-600 bg-white hover:border-[#2D9CDB] hover:text-[#2D9CDB]'
                 }`}
             >
               {theme}
@@ -106,7 +106,7 @@ const ShadowingPanel = () => {
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
             placeholder='search'
-            className='w-48 px-4 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent'
+            className='w-48 px-4 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2D9CDB] focus:border-transparent'
           />
           <svg
             className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400'
