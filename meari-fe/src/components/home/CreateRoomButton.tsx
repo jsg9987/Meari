@@ -75,7 +75,7 @@ const CreateRoomButton = () => {
 
   return (
     <div>
-      <button type="button" onClick={handleOpen}>
+      <button className='bg-[var(--color-bg-button)] rounded-[var(--radius-button)] px-8 py-3 text-white font-medium cursor-pointer' type="button" onClick={handleOpen}>
         방 생성
       </button>
 
