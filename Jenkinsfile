@@ -128,7 +128,7 @@ pipeline {
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
                         '''
 
-                        // 배포 실행!
+                        // 배포 실행!!
                         sh 'docker-compose down frontend spring-api || true'
                         sh 'docker-compose up -d frontend spring-api'
                         sh 'docker image prune -f'
