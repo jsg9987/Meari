@@ -12,6 +12,8 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
+import java.time.LocalDateTime;
+
 /**
  * Room WebSocket 메시지 핸들러
  *
@@ -107,23 +109,28 @@ public class RoomWebSocketController {
         log.info("[Chat] 채팅 메시지 서버수신: roomId={}, senderId={}, nickname={}, message={}",
                 roomId, message.getSenderId(), message.getNickname(), message.getMessage());
 
-        // 타임스탬프 자동 설정
-        message.setTimestampNow();
+        try {
+            // Redis에 채팅 메시지 저장
+            Chat chat = Chat.builder()
+                    .roomId(roomId)
+                    .senderId(message.getSenderId())
+                    .nickname(message.getNickname())
+                    .message(message.getMessage())
+                    .timestamp(LocalDateTime.now())
+                    .build();
+            chatRepository.save(chat);
 
-        // Redis에 채팅 메시지 저장
-        Chat chat = Chat.builder()
-                .roomId(roomId)
-                .senderId(message.getSenderId())
-                .nickname(message.getNickname())
-                .message(message.getMessage())
-                .timestamp(message.getTimestamp())
-                .build();
-        chatRepository.save(chat);
+            // 전체 참여자에게 브로드캐스트
+            broadcast(roomId, TOPIC_CHAT, message);
 
-        // 전체 참여자에게 브로드캐스트
-        broadcast(roomId, TOPIC_CHAT, message);
+            log.debug("[Chat] 채팅 메시지 브로드캐스트 완료: roomId={}", roomId);
 
-        log.debug("[Chat] 채팅 메시지 브로드캐스트 완료: roomId={}", roomId);
+        } catch (Exception e) {
+            log.error("[Chat] 채팅 메시지 저장/브로드캐스트 실패: roomId={}, senderId={}", roomId, message.getSenderId(), e);
+            // 에러 메시지를 모든 참여자에게 전송
+            ErrorMessage errorMessage = ErrorMessage.chatSaveError();
+            broadcast(roomId, TOPIC_CHAT, errorMessage);
+        }
     }
 
     /**

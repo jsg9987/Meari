@@ -26,8 +26,4 @@ public class ChatMessage {
 
     private LocalDateTime timestamp;
 
-
-    public void setTimestampNow() {
-        this.timestamp = LocalDateTime.now();
-    }
 }
