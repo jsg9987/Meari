@@ -21,7 +21,10 @@ pipeline {
                     steps {
                         dir('meari-be') {
                             script {
-                                if (env.GIT_BRANCH == 'release') {
+                                // release 또는 origin/release 체크
+                                def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
+
+                                if (isReleaseBranch) {
                                     // release 브랜치: Jenkins Credentials 사용
                                     withCredentials([
                                         string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
@@ -55,7 +58,10 @@ pipeline {
                     steps {
                         dir('meari-fe') {
                             script {
-                                if (env.GIT_BRANCH == 'release') {
+                                // release 또는 origin/release 체크
+                                def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
+
+                                if (isReleaseBranch) {
                                     // release 브랜치: Jenkins Credentials 사용
                                     withCredentials([
                                         string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
@@ -81,6 +87,7 @@ pipeline {
         stage('Deploy') {
             when {
                 expression {
+                    // release 또는 origin/release 브랜치일 때 배포
                     return env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
                 }
             }
@@ -96,32 +103,30 @@ pipeline {
                     string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
                 ]) {
                     script {
-                        // .env 파일 생성
-                        sh """
-                        cat > .env << EOF
-# --- Database 설정 ---
-DB_PASSWORD=${DB_PW}
-
-# --- JWT 설정 ---
-JWT_SECRET_KEY=${JWT_KEY}
-
-# --- Redis 설정 ---
-REDIS_PASSWORD=${REDIS_PW}
-
-# --- RabbitMQ 설정 ---
-RABBITMQ_PASSWORD=${RABBITMQ_PW}
-
-# --- Frontend 설정 ---
-FRONTEND_URL=${FE_URL}
-
-# --- OpenVidu 설정 ---
-OPENVIDU_URL=${OV_URL}
-OPENVIDU_SECRET=${OV_SECRET}
-
-# --- Backend URL (for frontend) ---
-VITE_BASE_SERVER_URL=${BE_URL}
-EOF
-                        """
+                        // .env 파일 생성 - 각 라인을 echo로 추가
+                        sh '''
+                            echo "# --- Database 설정 ---" > .env
+                            echo "DB_PASSWORD=${DB_PW}" >> .env
+                            echo "" >> .env
+                            echo "# --- JWT 설정 ---" >> .env
+                            echo "JWT_SECRET_KEY=${JWT_KEY}" >> .env
+                            echo "" >> .env
+                            echo "# --- Redis 설정 ---" >> .env
+                            echo "REDIS_PASSWORD=${REDIS_PW}" >> .env
+                            echo "" >> .env
+                            echo "# --- RabbitMQ 설정 ---" >> .env
+                            echo "RABBITMQ_PASSWORD=${RABBITMQ_PW}" >> .env
+                            echo "" >> .env
+                            echo "# --- Frontend 설정 ---" >> .env
+                            echo "FRONTEND_URL=${FE_URL}" >> .env
+                            echo "" >> .env
+                            echo "# --- OpenVidu 설정 ---" >> .env
+                            echo "OPENVIDU_URL=${OV_URL}" >> .env
+                            echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
+                            echo "" >> .env
+                            echo "# --- Backend URL (for frontend) ---" >> .env
+                            echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
+                        '''
 
                         // 배포 실행
                         sh 'docker compose down frontend spring-api || true'
@@ -138,7 +143,10 @@ EOF
             script {
                 def message = "✅ 빌드 성공! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
 
-                if (env.GIT_BRANCH == 'release') {
+                // release 또는 origin/release 체크
+                def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
+
+                if (isReleaseBranch) {
                     message = "✅ 배포 성공!: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                 }
 
@@ -159,7 +167,10 @@ EOF
             script {
                 def message = "🚨 빌드 실패! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
 
-                if (env.GIT_BRANCH == 'release') {
+                // release 또는 origin/release 체크
+                def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
+
+                if (isReleaseBranch) {
                     message = "🚨 배포 실패(확인요망): ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                 }
 
