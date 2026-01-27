@@ -3,7 +3,8 @@ import Login from "../pages/Login";
 import Signup from "../pages/Signup";
 import ShadowingRoom from "../pages/ShadowingRoom";
 import Home from "../pages/Home";
-import { ProtectedRoute, PublicRoute } from './guards'
+import { PublicRoute } from './guards'
+// import {ProtectedRoute} from './guards'
 
 export default function AppRoutes() {
   return (

@@ -5,6 +5,7 @@ interface ChatPanelProps {
 // TODO: 민혁님 채팅 여기서 구현하심 됩니다.
 
 export default function ChatPanel({ roomId }: ChatPanelProps) {
+  console.log(roomId)
   return (
     <div className="flex flex-col h-full bg-white">
       <div className="flex-1 overflow-y-auto p-4">

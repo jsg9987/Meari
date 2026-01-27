@@ -39,7 +39,7 @@ export default function ShadowingRoom() {
   // MOCK DATA - UI 개발용 (실제 배포시 주석 제거하고 아래 useVideoRoom 주석 해제)
   // ============================================================================
   const [status, setStatus] = useState<ConnectionStatus>("connected");
-  const [error, setError] = useState<string | null>(null);
+  const [error, ] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [volume, setVolume] = useState(100);
