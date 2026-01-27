@@ -35,9 +35,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                   type='button'
                   role='tab'
                   aria-selected={tab.id === activeTab}
-                  className={`py-2 transition-colors ${
-                    tab.id === activeTab ? 'text-slate-900' : 'text-white/80'
-                  }`}
+                  className={`py-2 transition-colors ${tab.id === activeTab ? 'text-slate-900' : 'text-white/80'
+                    }`}
                   onClick={() => onTabChange(tab.id)}
                 >
                   {tab.label}
