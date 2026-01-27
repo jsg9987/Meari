@@ -225,9 +225,7 @@ services:
 networks:
   meari-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
+    # ipam 설정 제거 - Docker가 자동으로 충돌 없는 IP 할당
 
 # ============================================================
 # 볼륨 설정
