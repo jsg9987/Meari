@@ -80,7 +80,7 @@ pipeline {
 
         stage('Deploy') {
             when {
-                branch 'release'  // release 브랜치만 배포
+                branch 'release'  // release 브랜치만 배포!
             }
             steps {
                 withCredentials([
