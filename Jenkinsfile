@@ -129,8 +129,8 @@ pipeline {
                         '''
 
                         // 배포 실행
-                        sh 'docker compose down frontend spring-api || true'
-                        sh 'docker compose up -d frontend spring-api'
+                        sh 'docker-compose down || true'
+                        sh 'docker-compose up -d'
                         sh 'docker image prune -f'
                     }
                 }
