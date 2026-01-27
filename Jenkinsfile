@@ -134,9 +134,9 @@ pipeline {
                         // 홈 디렉토리에서 배포 실행
                         sh '''
                             cd /home/ubuntu
-                            docker-compose stop frontend spring-api || true
-                            docker-compose rm -f frontend spring-api || true
-                            docker-compose up -d frontend spring-api
+                            docker compose stop frontend spring-api || true
+                            docker compose rm -f frontend spring-api || true
+                            docker compose up -d frontend spring-api
                         '''
                         sh 'docker image prune -f'
                     }
