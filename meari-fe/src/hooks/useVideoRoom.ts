@@ -10,6 +10,7 @@ export interface VideoTileData {
   muted?: boolean;
   label?: string;
   isSpeaker?: boolean;
+  isReady?: boolean;
 }
 
 interface UseVideoRoomOptions {
