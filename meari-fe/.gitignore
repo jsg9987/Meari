@@ -23,5 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
+# build
+dist/
+
 # AI Agent
 .claude/
