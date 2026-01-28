@@ -59,7 +59,6 @@ public enum ErrorCode {
     NOT_FOUND_CONTENT(HttpStatus.NOT_FOUND, "존재하지 않는 콘텐츠입니다."),
     NOT_FOUND_ROLE(HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."),
     NOT_FOUND_MEMBER_ROOM(HttpStatus.NOT_FOUND, "방에 참여하지 않은 사용자입니다."),
-    OPENVIDU_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "OpenVidu 세션을 찾을 수 없습니다."),
 
 	// Method Not Allowed Error: 405
 	METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메소드입니다."),
@@ -79,7 +78,13 @@ public enum ErrorCode {
     CONTENT_SELECT_ONLY_WAITING(HttpStatus.CONFLICT, "동영상은 대기 중일 때만 선택할 수 있습니다."),
     ROOM_ALREADY_STARTED(HttpStatus.CONFLICT, "이미 학습이 시작된 방입니다."),
     ROOM_ALREADY_CLOSED(HttpStatus.CONFLICT, "이미 종료된 방입니다."),
-    
+    ROLE_NOT_SELECTED(HttpStatus.CONFLICT, "모든 참여자가 역할을 선택하지 않았습니다."),
+    ROLES_NOT_CONFIRMED(HttpStatus.CONFLICT, "역할이 확정되지 않았습니다."),
+    ROLES_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "역할이 이미 확정되었습니다."),
+    ROLE_COUNT_MISMATCH(HttpStatus.BAD_REQUEST, "역할 개수가 참여자 수와 일치하지 않습니다."),
+    DUPLICATE_MEMBER_ROLE(HttpStatus.BAD_REQUEST, "한 멤버에게 여러 역할을 할당할 수 없습니다."),
+    DUPLICATE_ROLE_ASSIGNMENT(HttpStatus.CONFLICT, "같은 역할을 여러 멤버에게 할당할 수 없습니다."),
+
 	
 	// Unsupported Media Type: 415
 	
