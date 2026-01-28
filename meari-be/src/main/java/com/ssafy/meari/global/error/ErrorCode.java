@@ -59,6 +59,7 @@ public enum ErrorCode {
     NOT_FOUND_CONTENT(HttpStatus.NOT_FOUND, "존재하지 않는 콘텐츠입니다."),
     NOT_FOUND_ROLE(HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."),
     NOT_FOUND_MEMBER_ROOM(HttpStatus.NOT_FOUND, "방에 참여하지 않은 사용자입니다."),
+    OPENVIDU_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "OpenVidu 세션을 찾을 수 없습니다."),
 
 	// Method Not Allowed Error: 405
 	METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메소드입니다."),
