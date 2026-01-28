@@ -70,6 +70,21 @@
             cursor: pointer;
             margin-right: 10px;
             margin-bottom: 10px;
+            text-align: left;
+        }
+        button .endpoint-path {
+            font-size: 0.75em;
+            opacity: 0.8;
+            font-family: 'Courier New', monospace;
+            display: block;
+            margin-top: 3px;
+        }
+        code {
+            background-color: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
         }
         button:hover {
             background-color: #45a049;
@@ -148,6 +163,10 @@
             <label for="nickname">Nickname:</label>
             <input type="text" id="nickname" value="테스터" placeholder="닉네임을 입력하세요">
         </div>
+        <div class="input-group">
+            <label for="accessToken">Access Token (JWT):</label>
+            <input type="text" id="accessToken" placeholder="Bearer 토큰을 입력하세요 (예: eyJhbGci...)">
+        </div>
         <button id="connectBtn" onclick="connect()">🔗 연결</button>
         <button id="disconnectBtn" onclick="disconnect()" disabled class="danger">❌ 연결 해제</button>
         <div id="status" class="status disconnected">⚠️ 연결되지 않음</div>
@@ -157,9 +176,18 @@
     <div class="container">
         <h2>메시지 전송</h2>
         <div class="actions">
-            <button onclick="sendReady()" id="readyBtn" disabled>✅ 준비 상태 토글</button>
-            <button onclick="sendRoleSelect()" id="roleSelectBtn" disabled>🎭 역할 선택</button>
-            <button onclick="sendRoleRelease()" id="roleReleaseBtn" disabled>🔓 역할 해제</button>
+            <button onclick="sendReady()" id="readyBtn" disabled title="/app/room/{roomId}/ready">
+                ✅ 준비 상태 토글
+                <span class="endpoint-path">/app/room/{roomId}/ready</span>
+            </button>
+            <button onclick="sendRoleSelect()" id="roleSelectBtn" disabled title="/app/room/{roomId}/role">
+                🎭 역할 선택
+                <span class="endpoint-path">/app/room/{roomId}/role</span>
+            </button>
+            <button onclick="sendRoleRelease()" id="roleReleaseBtn" disabled title="/app/room/{roomId}/role/release">
+                🔓 역할 해제
+                <span class="endpoint-path">/app/room/{roomId}/role/release</span>
+            </button>
         </div>
 
         <div class="input-group" style="margin-top: 15px;">
@@ -170,7 +198,30 @@
         <div class="input-group">
             <label for="chatMessage">채팅 메시지:</label>
             <textarea id="chatMessage" rows="2" placeholder="채팅 메시지를 입력하세요"></textarea>
-            <button onclick="sendChat()" id="chatBtn" disabled style="margin-top: 5px;">💬 채팅 전송</button>
+            <button onclick="sendChat()" id="chatBtn" disabled style="margin-top: 5px;" title="/app/room/{roomId}/chat">
+                💬 채팅 전송
+                <span class="endpoint-path">/app/room/{roomId}/chat</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- API 엔드포인트 정보 -->
+    <div class="container">
+        <h2>📡 WebSocket API 엔드포인트</h2>
+        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; border: 1px solid #ddd;">
+            <h3 style="margin-top: 0; color: #666; font-size: 1em;">📤 클라이언트 → 서버 (Send)</h3>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+                <li><code>/app/room/{roomId}/ready</code> - 준비 상태 토글</li>
+                <li><code>/app/room/{roomId}/role</code> - 역할 선택</li>
+                <li><code>/app/room/{roomId}/role/release</code> - 역할 해제</li>
+                <li><code>/app/room/{roomId}/chat</code> - 채팅 메시지 전송</li>
+            </ul>
+
+            <h3 style="margin-top: 15px; color: #666; font-size: 1em;">📥 서버 → 클라이언트 (Subscribe)</h3>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+                <li><code>/topic/room/{roomId}/state</code> - 방 상태 변경 알림</li>
+                <li><code>/topic/room/{roomId}/chat</code> - 채팅 메시지 수신</li>
+            </ul>
         </div>
     </div>
 
@@ -224,9 +275,15 @@
             const serverUrl = document.getElementById('serverUrl').value;
             const roomId = document.getElementById('roomId').value;
             const memberId = document.getElementById('memberId').value;
+            const accessToken = document.getElementById('accessToken').value;
 
             if (!serverUrl || !roomId || !memberId) {
                 alert('서버 URL, Room ID, Member ID를 모두 입력해주세요.');
+                return;
+            }
+
+            if (!accessToken) {
+                alert('Access Token을 입력해주세요.');
                 return;
             }
 
@@ -239,7 +296,12 @@
             const socket = new SockJS(wsUrl);
             stompClient = Stomp.over(socket);
 
-            stompClient.connect({}, function(frame) {
+            // JWT 토큰을 헤더에 포함
+            const connectHeaders = {
+                'Authorization': 'Bearer ' + accessToken
+            };
+
+            stompClient.connect(connectHeaders, function(frame) {
                 log('WebSocket 연결 성공!', 'success');
                 updateStatus(true);
 
@@ -329,8 +391,8 @@
         // 페이지 로드 시 초기 로그
         window.onload = function() {
             log('WebSocket 테스트 페이지가 로드되었습니다.', 'info');
-            log('서버 URL, Room ID, Member ID를 설정한 후 연결 버튼을 클릭하세요.', 'info');
-            log('💡 팁: IntelliJ에서 직접 실행한 경우 서버 URL을 반드시 확인하세요!', 'info');
+            log('서버 URL, Room ID, Member ID, Access Token을 설정한 후 연결 버튼을 클릭하세요.', 'info');
+            log('💡 팁: Access Token은 /api/v1/auth/login으로 로그인 후 받은 JWT 토큰입니다.', 'info');
         };
 
         // 페이지 나갈 때 연결 해제
