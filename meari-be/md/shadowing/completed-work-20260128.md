@@ -179,14 +179,65 @@ room:{roomId}:phase = "WATCHING" | "ROLE_PICK" | "ROUND_1" | "ROUND_2"
 
 # 연결 끊김 추적 (Grace Period)
 room:{roomId}:disconnected = Hash { memberId -> timestamp }
+
+# 멤버→방 매핑 (Grace Period 자동 퇴장용) ← 신규 추가
+member:{memberId}:roomId = roomId
 ```
 
 ---
 
-## 8. 다음 작업 (필요시)
+## 8. Grace Period 자동 퇴장 구현 ✅ (신규)
+
+### 구현 내용
+WebSocket 연결 해제 시 즉시 퇴장하지 않고, Grace Period(30초) 동안 재연결 대기 후 자동 퇴장 처리.
+
+### 플로우
+```
+WebSocket 연결 해제
+  ↓
+Redis에 disconnected 마킹 (timestamp 저장)
+  ↓
+30초 스케줄링 시작
+  ↓
+┌─── 재연결 (WebSocket 메시지 수신) ───┐
+│  disconnected 마킹 해제              │
+│  스케줄된 퇴장 무효화                │
+└──────────────────────────────────────┘
+  ↓ (재연결 없이 30초 경과)
+자동 퇴장 실행 (roomService.leaveRoom)
+  ↓
+방장 퇴장 시 위임, 마지막 멤버 시 방 종료
+```
+
+### 수정된 파일
+- `WebSocketEventListener.java` - Grace Period 로직 구현 (ScheduledExecutorService)
+- `RoomSessionService.java` - `member:{memberId}:roomId` 매핑 메서드 추가 (setMemberRoom, getMemberRoom, clearMemberRoom)
+- `RoomService.java` - enterRoom/createRoom/leaveRoom에 멤버→방 매핑 연동
+- `RoomWebSocketController.java` - 각 메시지 핸들러에 재연결 감지 및 disconnected 마킹 해제
+
+### 설계 결정
+- **ScheduledExecutorService** 사용: Grace Period 만료 시 일시적 스케줄링으로 자동 퇴장
+- **멤버→방 매핑 (Redis)**: 연결 해제 시 roomId를 조회할 수 있도록 별도 키 관리
+- **재연결 감지**: WebSocket 핸들러에서 메시지 수신 시 disconnected 마킹 해제
+- **이미 퇴장된 경우**: `NOT_FOUND_MEMBER_ROOM` 예외는 정상으로 처리 (debug 로그만)
+
+---
+
+## 9. 테스트 코드 작성 (부분 완료)
+
+### 완료된 테스트
+- `RoomServiceTest.java` - FinishWatching (성공 1, 실패 3), FinishGame (성공 1, 실패 3)
+- `RoomServiceWebSocketTest.java` - FinishWatchingBroadcast, FinishGameBroadcast
+
+### 미완료 테스트
+- `JwtChannelInterceptorTest.java` - 단위 테스트로 `MessageHeaderAccessor.getAccessor()` (정적 메서드) 모킹 불가. 통합 테스트로 변경 필요.
+
+---
+
+## 10. 다음 작업
 
 ### 미완성 기능
-- [ ] Grace Period 기반 자동 퇴장 처리 (WebSocketEventListener에 TODO)
+- [x] Grace Period 기반 자동 퇴장 처리 ✅
 - [ ] 영상 동기화 WebSocket (/topic/room/{roomId}/video-sync)
 - [ ] 쉐도잉 턴 관리 (/topic/room/{roomId}/turn)
 - [ ] 음성 녹음 S3 업로드
@@ -194,15 +245,18 @@ room:{roomId}:disconnected = Hash { memberId -> timestamp }
 - [ ] 분석 결과 Redis 저장
 - [ ] PostgreSQL 최종 리포트 저장
 
-### 테스트 필요
-- [ ] finishWatching API 테스트
-- [ ] finishGame API 테스트
-- [ ] WebSocket JWT 인증 테스트
-- [ ] Phase 전환 통합 테스트
+### 우선순위 정리 (플로우별)
+| 우선순위 | 항목 | 플로우 단계 |
+|---------|------|------------|
+| 1 | 영상 동기화 WebSocket | 6. 영상 시청 |
+| 2 | 쉐도잉 턴 관리 | 8-9. Round 진행 |
+| 3 | 음성 녹음 S3 업로드 | 8-9. Round 진행 |
+| 4 | RabbitMQ 분석 요청 | Round 종료 후 |
+| 5 | 분석 결과 저장 | 10. 준비로 회귀 |
 
 ---
 
-## 9. 참고 문서
+## 11. 참고 문서
 - `work.md` - 전체 설계 문서
 - `CLAUDE.md` - 프로젝트 컨벤션
 - `websocket-api.md` - WebSocket API 명세
@@ -210,4 +264,4 @@ room:{roomId}:disconnected = Hash { memberId -> timestamp }
 
 ---
 
-*작업 완료 시각: 2026-01-28*
+*마지막 갱신: 2026-01-28*
