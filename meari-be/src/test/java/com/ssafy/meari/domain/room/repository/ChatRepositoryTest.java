@@ -186,6 +186,4 @@ class ChatRepositoryTest {
             assertThat(chats).isEmpty();
         }
     }
-
-    }
 }
