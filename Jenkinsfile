@@ -20,8 +20,33 @@ pipeline {
                 stage('Backend Build') {
                     steps {
                         dir('meari-be') {
-                            // Dockerfile이 Gradle로 빌드하므로 gradlew 제거
-                            sh 'docker build -t backend-image:latest .'
+                            script {
+                                if (env.GIT_BRANCH == 'release') {
+                                    // release 브랜치: Jenkins Credentials 사용
+                                    withCredentials([
+                                        string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
+                                        string(credentialsId: 'JWT_SECRET_KEY', variable: 'JWT_KEY'),
+                                        string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PW'),
+                                        string(credentialsId: 'FRONTEND_URL', variable: 'FE_URL'),
+                                        string(credentialsId: 'OPENVIDU_URL', variable: 'OV_URL'),
+                                        string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET')
+                                    ]) {
+                                        sh """
+                                        docker build \
+                                          --build-arg DB_PASSWORD='${DB_PW}' \
+                                          --build-arg JWT_SECRET_KEY='${JWT_KEY}' \
+                                          --build-arg REDIS_PASSWORD='${REDIS_PW}' \
+                                          --build-arg FRONTEND_URL='${FE_URL}' \
+                                          --build-arg OPENVIDU_URL='${OV_URL}' \
+                                          --build-arg OPENVIDU_SECRET='${OV_SECRET}' \
+                                          -t backend-image:latest .
+                                        """
+                                    }
+                                } else {
+                                    // 다른 브랜치: 기본값 사용
+                                    sh 'docker build -t backend-image:latest .'
+                                }
+                            }
                         }
                     }
                 }
@@ -29,7 +54,24 @@ pipeline {
                 stage('Frontend Build') {
                     steps {
                         dir('meari-fe') {
-                            sh 'docker build -t frontend-image:latest .'
+                            script {
+                                if (env.GIT_BRANCH == 'release') {
+                                    // release 브랜치: Jenkins Credentials 사용
+                                    withCredentials([
+                                        string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
+                                    ]) {
+                                        sh """
+                                        docker build \
+                                          --build-arg VITE_BASE_SERVER_URL='${BE_URL}' \
+                                          --build-arg VITE_USE_MOCK_API=false \
+                                          -t frontend-image:latest .
+                                        """
+                                    }
+                                } else {
+                                    // 다른 브랜치: 기본값 사용
+                                    sh 'docker build -t frontend-image:latest .'
+                                }
+                            }
                         }
                     }
                 }
@@ -43,29 +85,43 @@ pipeline {
             steps {
                 withCredentials([
                     string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
+                    string(credentialsId: 'JWT_SECRET_KEY', variable: 'JWT_KEY'),
                     string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PW'),
                     string(credentialsId: 'RABBITMQ_PASSWORD', variable: 'RABBITMQ_PW'),
+                    string(credentialsId: 'FRONTEND_URL', variable: 'FE_URL'),
+                    string(credentialsId: 'OPENVIDU_URL', variable: 'OV_URL'),
                     string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET'),
-                    string(credentialsId: 'OPENVIDU_DOMAIN', variable: 'OV_DOMAIN')
+                    string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
                 ]) {
                     script {
-                        // 1. .env 파일 생성
+                        // .env 파일 생성
                         sh """
-                        # --- Database 설정 ---
-                        echo "DB_PASSWORD=${DB_PW}" > .env
+                        cat > .env << EOF
+# --- Database 설정 ---
+DB_PASSWORD=${DB_PW}
 
-                        # --- Redis 설정 ---
-                        echo "REDIS_PASSWORD=${REDIS_PW}" >> .env
+# --- JWT 설정 ---
+JWT_SECRET_KEY=${JWT_KEY}
 
-                        # --- RabbitMQ 설정 ---
-                        echo "RABBITMQ_PASSWORD=${RABBITMQ_PW}" >> .env
+# --- Redis 설정 ---
+REDIS_PASSWORD=${REDIS_PW}
 
-                        # --- OpenVidu 설정 ---
-                        echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
-                        echo "OPENVIDU_DOMAIN=${OV_DOMAIN}" >> .env
+# --- RabbitMQ 설정 ---
+RABBITMQ_PASSWORD=${RABBITMQ_PW}
+
+# --- Frontend 설정 ---
+FRONTEND_URL=${FE_URL}
+
+# --- OpenVidu 설정 ---
+OPENVIDU_URL=${OV_URL}
+OPENVIDU_SECRET=${OV_SECRET}
+
+# --- Backend URL (for frontend) ---
+VITE_BASE_SERVER_URL=${BE_URL}
+EOF
                         """
 
-                        // 2. 배포 실행
+                        // 배포 실행
                         sh 'docker compose down frontend spring-api || true'
                         sh 'docker compose up -d frontend spring-api'
                         sh 'docker image prune -f'

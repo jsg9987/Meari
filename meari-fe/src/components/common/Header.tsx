@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Mic, FileText, Calendar, Settings, ChevronDown, User, LogOut } from 'lucide-react'
 import logoWhite from '../../assets/images/common/logo-white.svg'
+import { useAuthStore } from '../../store/auth.store'
 
 export type HomeTab = 'shadowing' | 'copik' | 'daily'
 export type Language = 'ko' | 'vi' | 'en'
@@ -32,12 +33,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
   const languageRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
 
-  // Mock 사용자 정보
-  const userInfo = {
-    nickname: 'User',
-    email: 'user@example.com',
-    profileImage: null // null이면 이니셜 표시
-  }
+  // Zustand store에서 사용자 정보 가져오기 (App.tsx에서 초기화됨)
+  const userInfo = useAuthStore((state) => state.userInfo)
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -55,6 +52,13 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
+
+  // 표시용 사용자 정보 (로딩 중 기본값 처리)
+  const displayInfo = {
+    nickname: userInfo?.nickname || 'User',
+    email: userInfo?.email || 'user@example.com',
+    profileImage: userInfo?.profile_url && userInfo.profile_url !== 'http://' ? userInfo.profile_url : null
+  }
 
   const currentLanguage = languages.find((lang) => lang.code === selectedLanguage)
 
@@ -161,10 +165,10 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
               className='flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors cursor-pointer'
               title='프로필'
             >
-              {userInfo.profileImage ? (
-                <img src={userInfo.profileImage} alt='Profile' className='w-full h-full rounded-full object-cover' />
+              {displayInfo.profileImage ? (
+                <img src={displayInfo.profileImage} alt='Profile' className='w-full h-full rounded-full object-cover' />
               ) : (
-                userInfo.nickname.charAt(0).toUpperCase()
+                displayInfo.nickname.charAt(0).toUpperCase()
               )}
             </button>
 
@@ -175,15 +179,15 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                 <div className='px-3 py-2.5 border-b border-gray-200 mb-1'>
                   <div className='flex items-center gap-3'>
                     <div className='flex items-center justify-center w-12 h-12 rounded-full bg-blue-500 text-white font-semibold text-lg'>
-                      {userInfo.profileImage ? (
-                        <img src={userInfo.profileImage} alt='Profile' className='w-full h-full rounded-full object-cover' />
+                      {displayInfo.profileImage ? (
+                        <img src={displayInfo.profileImage} alt='Profile' className='w-full h-full rounded-full object-cover' />
                       ) : (
-                        userInfo.nickname.charAt(0).toUpperCase()
+                        displayInfo.nickname.charAt(0).toUpperCase()
                       )}
                     </div>
                     <div className='flex-1'>
-                      <p className='font-semibold text-gray-900'>{userInfo.nickname}</p>
-                      <p className='text-sm text-gray-500'>{userInfo.email}</p>
+                      <p className='font-semibold text-gray-900'>{displayInfo.nickname}</p>
+                      <p className='text-sm text-gray-500'>{displayInfo.email}</p>
                     </div>
                   </div>
                 </div>

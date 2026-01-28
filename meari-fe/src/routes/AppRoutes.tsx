@@ -5,26 +5,26 @@ import ShadowingRoom from "../pages/ShadowingRoom";
 import Home from "../pages/Home";
 import MyPage from "../pages/MyPage";
 import { PublicRoute } from './guards'
-// import ProtectedRoute from './guards'
+import { ProtectedRoute } from './guards'
 
 export default function AppRoutes() {
   return (
     <Routes>
       {/* 테스트 목적으로 잠시 protect 해제 */}
-      {/* <Route
+      <Route
         path="/"
         element={
           <ProtectedRoute>
             <Home />
           </ProtectedRoute>
         }
-      /> */}
-      <Route
+      />
+      {/* <Route
         path="/"
         element={
             <Home />
         }
-      />
+      /> */}
       <Route
         path="/login"
         element={

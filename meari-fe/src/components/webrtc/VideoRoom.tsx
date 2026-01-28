@@ -9,6 +9,9 @@ interface VideoRoomProps {
 }
 
 export default function VideoRoom({ sessionName, nickname, autoJoin = true }: VideoRoomProps) {
+  // sessionName에서 roomId 추출 (예: "room_123" -> 123)
+  const roomId = parseInt(sessionName.replace('room_', ''), 10);
+
   const {
     status,
     error,
@@ -19,7 +22,7 @@ export default function VideoRoom({ sessionName, nickname, autoJoin = true }: Vi
     leave,
     toggleAudio,
     toggleVideo,
-  } = useVideoRoom({ sessionName, nickname, autoJoin });
+  } = useVideoRoom({ roomId, nickname, autoJoin });
 
   if (status === "idle") {
     return (

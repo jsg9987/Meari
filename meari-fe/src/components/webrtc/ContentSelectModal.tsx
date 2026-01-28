@@ -19,10 +19,10 @@ export default function ContentSelectModal({ themeId, onClose, onSelect }: Conte
       setError(null);
       try {
         const response = await getThemeContents(themeId);
-        if (response.success) {
-          setContents(response.data);
+        if (response.data.success) {
+          setContents(response.data.data);
         } else {
-          setError(response.error?.message || '컨텐츠를 불러오는데 실패했습니다.');
+          setError(response.data.error?.message || '컨텐츠를 불러오는데 실패했습니다.');
         }
       } catch (err) {
         console.error('Failed to load contents:', err);
