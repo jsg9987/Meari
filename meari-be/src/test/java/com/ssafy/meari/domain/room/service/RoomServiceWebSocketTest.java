@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,6 +56,18 @@ class RoomServiceWebSocketTest {
 
     @Mock
     private ContentRepository contentRepository;
+
+    @Mock
+    private com.ssafy.meari.domain.content.repository.RoleRepository roleRepository;
+
+    @Mock
+    private com.ssafy.meari.domain.content.repository.SentenceRepository sentenceRepository;
+
+    @Mock
+    private com.ssafy.meari.domain.report.repository.ShadowingReportRepository shadowingReportRepository;
+
+    @Mock
+    private com.ssafy.meari.domain.theme.repository.ThemeRepository themeRepository;
 
     @Mock
     private RoomSessionService roomSessionService;
@@ -351,6 +364,138 @@ class RoomServiceWebSocketTest {
             assertThat(sentMessage.getType()).isEqualTo("GAME_START");
             assertThat(sentMessage.getContentId()).isEqualTo(contentId);
             assertThat(sentMessage.getPhase()).isEqualTo(GamePhase.WATCHING);
+        }
+    }
+
+    @Nested
+    @DisplayName("Round 시작 WebSocket 브로드캐스트")
+    class StartRoundBroadcast {
+
+        @Test
+        @DisplayName("성공 - Round1 시작 시 ROUND_START 메시지 브로드캐스트 (segments 포함)")
+        void startRound_Success_BroadcastRoundStart() {
+            // Given
+            Long roomId = 1L;
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            Member member2 = Member.builder().email("m2@test.com").password("pw").nickname("M2").build();
+            ReflectionTestUtils.setField(member2, "memberId", 2L);
+
+            MemberRoom mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
+            MemberRoom mr2 = MemberRoom.builder().room(testRoom).member(member2).build();
+
+            com.ssafy.meari.domain.content.entity.Role role1 = com.ssafy.meari.domain.content.entity.Role.builder()
+                    .content(testContent).name("화자A").build();
+            com.ssafy.meari.domain.content.entity.Role role2 = com.ssafy.meari.domain.content.entity.Role.builder()
+                    .content(testContent).name("화자B").build();
+            ReflectionTestUtils.setField(role1, "roleId", 1L);
+            ReflectionTestUtils.setField(role2, "roleId", 2L);
+
+            com.ssafy.meari.domain.content.entity.Sentence sentence1 = com.ssafy.meari.domain.content.entity.Sentence.builder()
+                    .role(role1).content(testContent).sequence(1)
+                    .startTime(java.math.BigDecimal.valueOf(0.0)).endTime(java.math.BigDecimal.valueOf(3.5))
+                    .textKo("안녕하세요").textVn("Xin chào").build();
+            ReflectionTestUtils.setField(sentence1, "sentenceId", 10L);
+
+            com.ssafy.meari.domain.content.entity.Sentence sentence2 = com.ssafy.meari.domain.content.entity.Sentence.builder()
+                    .role(role2).content(testContent).sequence(2)
+                    .startTime(java.math.BigDecimal.valueOf(3.5)).endTime(java.math.BigDecimal.valueOf(7.0))
+                    .textKo("반갑습니다").textVn("Rất vui").build();
+            ReflectionTestUtils.setField(sentence2, "sentenceId", 11L);
+
+            given(roomRepository.findById(roomId)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(roomId)).willReturn(true);
+            given(roomSessionService.getContentId(roomId)).willReturn(1L);
+            given(contentRepository.findById(1L)).willReturn(Optional.of(testContent));
+            given(memberRoomRepository.findByRoomIdWithMember(roomId)).willReturn(List.of(mr1, mr2));
+            given(roomSessionService.getAllRoles(roomId)).willReturn(java.util.Map.of(1L, "1", 2L, "2"));
+            given(roleRepository.findById(1L)).willReturn(Optional.of(role1));
+            given(roleRepository.findById(2L)).willReturn(Optional.of(role2));
+            given(sentenceRepository.findByContent_ContentId(1L)).willReturn(List.of(sentence1, sentence2));
+
+            // When
+            roomService.startRound(roomId, 1, 1L);
+
+            // Then
+            ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/" + roomId + "/state"),
+                    messageCaptor.capture()
+            );
+
+            RoomStateMessage sentMessage = messageCaptor.getValue();
+            assertThat(sentMessage.getType()).isEqualTo("ROUND_START");
+            assertThat(sentMessage.getPhase()).isEqualTo(GamePhase.ROUND_1);
+            assertThat(sentMessage.getRound()).isEqualTo(1);
+            assertThat(sentMessage.getServerTime()).isNotNull();
+            assertThat(sentMessage.getSegments()).hasSize(2);
+
+            // 멤버1의 세그먼트 확인
+            com.ssafy.meari.domain.room.dto.websocket.MemberSegmentInfo segment1 = sentMessage.getSegments().stream()
+                    .filter(s -> s.getMemberId().equals(1L)).findFirst().orElseThrow();
+            assertThat(segment1.getRoleId()).isEqualTo(1L);
+            assertThat(segment1.getRoleName()).isEqualTo("화자A");
+            assertThat(segment1.getSentences()).hasSize(1);
+            assertThat(segment1.getSentences().get(0).getSentenceId()).isEqualTo(10L);
+            assertThat(segment1.getSentences().get(0).getTextKo()).isEqualTo("안녕하세요");
+        }
+    }
+
+    @Nested
+    @DisplayName("녹음 완료 WebSocket 브로드캐스트")
+    class RecordingCompleteBroadcast {
+
+        @Test
+        @DisplayName("성공 - 모든 멤버 완료 시 RECORDINGS_COMPLETE 메시지 브로드캐스트")
+        void recordingComplete_Success_BroadcastRecordingsComplete() {
+            // Given
+            Long roomId = 1L;
+            com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage message =
+                    new com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage();
+            message.setMemberId(2L);
+            message.setSentenceId(11L);
+
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_1);
+            given(roomSessionService.isMember(roomId, 2L)).willReturn(true);
+            given(roomSessionService.isAllRecordingsComplete(roomId, 1)).willReturn(true);
+
+            // When
+            roomService.recordingComplete(roomId, message);
+
+            // Then
+            ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/" + roomId + "/state"),
+                    messageCaptor.capture()
+            );
+
+            RoomStateMessage sentMessage = messageCaptor.getValue();
+            assertThat(sentMessage.getType()).isEqualTo("RECORDINGS_COMPLETE");
+            assertThat(sentMessage.getPhase()).isEqualTo(GamePhase.ROUND_1);
+            assertThat(sentMessage.getRound()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("성공 - 미완료 상태이면 브로드캐스트 없음")
+        void recordingComplete_Success_NotComplete_NoBroadcast() {
+            // Given
+            Long roomId = 1L;
+            com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage message =
+                    new com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage();
+            message.setMemberId(1L);
+            message.setSentenceId(10L);
+
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_2);
+            given(roomSessionService.isMember(roomId, 1L)).willReturn(true);
+            given(roomSessionService.isAllRecordingsComplete(roomId, 2)).willReturn(false);
+
+            // When
+            roomService.recordingComplete(roomId, message);
+
+            // Then
+            verify(roomSessionService).markRecordingComplete(roomId, 2, 1L, 10L);
+            verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
         }
     }
 }
