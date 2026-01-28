@@ -161,7 +161,7 @@ EOF
                     message = "🚨 배포 실패(확인요망): ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                 }
 
-                // Mattermost 알림
+                // Mattermost 알림!
                 try {
                     mattermostSend (
                         color: 'danger',
