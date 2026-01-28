@@ -80,22 +80,23 @@ const CreateRoomButton = () => {
         max_people: maxPeople,
         theme_id: selectedThemeId
       });
+      
+      console.log(response)
 
       if (!response.success) {
         setErrorMessage(response.error?.message ?? '방 생성에 실패했습니다.');
         return;
       }
 
-      const roomId =
-        response.data?.room_id ??
-        (response as { data?: { data?: { room_id?: string } } }).data?.data?.room_id;
+      const roomId = response.data?.room_id;
       if (!roomId) {
+        setErrorMessage('방 ID를 가져올 수 없습니다.');
         return;
       }
 
       handleClose();
       resetForm();
-      navigate(`/shadowing/${roomId}`);
+      navigate(`/shadowing/${roomId}`, { state: { isOwner: true } });
     } catch (error) {
       setErrorMessage('방 생성에 실패했습니다.');
     } finally {

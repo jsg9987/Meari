@@ -1,8 +1,70 @@
 import axiosInstance from "./axiosInstance";
 
-export async function getToken(sessionName: string): Promise<string> {
-  const res = await axiosInstance.post<{ token: string }>("/api/video/token", {
-    sessionName,
-  });
-  return res.data.token;
+// 세션 생성
+export interface CreateSessionRequest {
+  custom_session_id: string;
+  room_id: number;
 }
+
+export interface CreateSessionResponse {
+  success: boolean;
+  data: {
+    session_id: string;
+  } | null;
+  error: {
+    code: string;
+    message: string;
+  } | null;
+}
+
+export const createSession = async (payload: CreateSessionRequest): Promise<CreateSessionResponse> => {
+  const response = await axiosInstance.post('/openvidu/sessions', payload);
+  if (response.data.success !== undefined) {
+    return response.data;
+  }
+  return {
+    success: true,
+    data: response.data,
+    error: null
+  };
+};
+
+// 연결 토큰 생성
+export interface CreateConnectionRequest {
+  member_id: number;
+  nickname: string;
+  role_id: number | null;
+}
+
+export interface CreateConnectionResponse {
+  success: boolean;
+  data: {
+    session_id: string;
+    token: string;
+    connection_id: string;
+  } | null;
+  error: {
+    code: string;
+    message: string;
+  } | null;
+}
+
+export const createConnection = async (
+  sessionId: string,
+  payload: CreateConnectionRequest
+): Promise<CreateConnectionResponse> => {
+  const response = await axiosInstance.post(`/openvidu/sessions/${sessionId}/connections`, payload);
+  if (response.data.success !== undefined) {
+    return response.data;
+  }
+  return {
+    success: true,
+    data: response.data,
+    error: null
+  };
+};
+
+// 세션 종료
+export const deleteSession = async (sessionId: string): Promise<void> => {
+  await axiosInstance.delete(`/openvidu/sessions/${sessionId}`);
+};

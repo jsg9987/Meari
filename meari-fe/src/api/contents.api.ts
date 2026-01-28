@@ -77,9 +77,8 @@ export const getThemes = async (): Promise<GetThemesResponse> => {
   if (useMock) {
     return getThemesMock();
   }
-  const response = await axiosInstance.get('/contents/themes');
-  const responseData = (response as { data?: GetThemesResponse }).data ?? response;
-  return responseData as GetThemesResponse;
+  const response = await axiosInstance.get<GetThemesResponse>('/contents/themes');
+  return response.data;
 };
 
 export const getThemeContentsMock = async (themeId: number): Promise<GetThemeContentsResponse> => {
@@ -191,7 +190,6 @@ export const getThemeContents = async (themeId: number): Promise<GetThemeContent
   if (useMock) {
     return getThemeContentsMock(themeId);
   }
-  const response = await axiosInstance.get(`/themes/${themeId}/contents`);
-  const responseData = (response as { data?: GetThemeContentsResponse }).data ?? response;
-  return responseData as GetThemeContentsResponse;
+  const response = await axiosInstance.get<GetThemeContentsResponse>(`/themes/${themeId}/contents`);
+  return response.data;
 };

@@ -10,11 +10,17 @@ export interface CreateRoomRequest {
 export interface CreateRoomResponse {
   success: boolean;
   data: {
-    room_id: string;
-    title: string;
+    room_id: number;
     owner_id: number;
-    content_id: number;
-    is_active: string;
+    owner_nickname: string;
+    theme_id: number;
+    theme_name: string;
+    title: string;
+    max_people: number;
+    current_people: number;
+    status: string;
+    has_password: boolean;
+    created_at: string;
   } | null;
   error: {
     code: string;
@@ -30,11 +36,17 @@ export const createRoomMock = async (
       resolve({
         success: true,
         data: {
-          room_id: 'room_uuid_1234',
-          title: payload.title,
+          room_id: 1,
           owner_id: 1,
-          content_id: payload.theme_id,
-          is_active: 'ACTIVE',
+          owner_nickname: '김싸피',
+          theme_id: payload.theme_id,
+          theme_name: '일상회화',
+          title: payload.title,
+          max_people: payload.max_people,
+          current_people: 1,
+          status: 'WAITING',
+          has_password: payload.password !== null,
+          created_at: new Date().toISOString(),
         },
         error: null,
       });
@@ -49,7 +61,125 @@ export const createRoom = async (
   if (useMock) {
     return createRoomMock(payload);
   }
-  const response = await axiosInstance.post('/api/v1/rooms', payload);
-  const responseData = (response as { data?: CreateRoomResponse }).data ?? response;
-  return responseData as CreateRoomResponse;
+  const response = await axiosInstance.post('/rooms', payload);
+  return {
+    success: true,
+    data: response.data,
+    error: null
+  };
+};
+
+export interface RoomMember {
+  member_id: number;
+  nickname: string;
+  profile_url: string | null;
+  is_owner: boolean;
+  is_ready: boolean;
+  role_id: number | null;
+}
+
+export interface RoomDetailData {
+  room_id: number;
+  owner_id: number;
+  theme_id: number;
+  theme_name: string;
+  title: string;
+  max_people: number;
+  status: string;
+  has_password: boolean;
+  created_at: string;
+  members: RoomMember[];
+}
+
+export interface RoomDetailResponse {
+  success: boolean;
+  data: RoomDetailData | null;
+  error: {
+    code: string;
+    message: string;
+  } | null;
+}
+
+export const getRoomDetail = async (roomId: number): Promise<RoomDetailResponse> => {
+  const response = await axiosInstance.get(`/rooms/${roomId}`);
+  // 백엔드에서 success 필드 없이 데이터만 오는 경우 처리
+  if (response.data.success !== undefined) {
+    return response.data;
+  }
+  return {
+    success: true,
+    data: response.data,
+    error: null
+  };
+};
+
+export interface EnterRoomRequest {
+  password?: string;
+}
+
+export interface EnterRoomResponse {
+  success: boolean;
+  data: {
+    message: string;
+  } | null;
+  error: {
+    code: string;
+    message: string;
+  } | null;
+}
+
+// TODO: 방 꽉차면 처리
+export const enterRoom = async (
+  roomId: number,
+  payload: EnterRoomRequest
+): Promise<EnterRoomResponse> => {
+  const response = await axiosInstance.post(`/rooms/${roomId}/enter`, payload);
+  // 백엔드에서 success 필드 없이 데이터만 오는 경우 처리
+  if (response.data.success !== undefined) {
+    return response.data;
+  }
+  return {
+    success: true,
+    data: response.data,
+    error: null
+  };
+};
+
+export const leaveRoom = async (roomId: number): Promise<void> => {
+  await axiosInstance.delete(`/rooms/${roomId}/leave`);
+};
+
+export interface WebRTCEnterRequest {
+  password?: string;
+}
+
+export interface WebRTCEnterResponse {
+  success: boolean;
+  data: {
+    token: string;
+    sessionId: string;
+  } | null;
+  error: {
+    code: string;
+    message: string;
+  } | null;
+}
+
+export const enterWebRTC = async (
+  roomId: number,
+  payload: WebRTCEnterRequest
+): Promise<WebRTCEnterResponse> => {
+  const response = await axiosInstance.post(`/rooms/${roomId}/webrtc/enter`, payload);
+  if (response.data.success !== undefined) {
+    return response.data;
+  }
+  return {
+    success: true,
+    data: response.data,
+    error: null
+  };
+};
+
+export const leaveWebRTC = async (roomId: number): Promise<void> => {
+  await axiosInstance.post(`/rooms/${roomId}/webrtc/leave`);
 };
