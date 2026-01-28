@@ -114,6 +114,16 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
+    @Operation(summary = "영상 시청 완료", description = "영상 시청이 완료되어 역할 선택 단계로 전환합니다. 방장만 가능하며, WATCHING 단계에서만 가능합니다.")
+    @PostMapping("/{roomId}/watching/finish")
+    public ResponseEntity<ApiResponse<Void>> finishWatching(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        roomService.finishWatching(roomId, userDetails.getMember().getMemberId());
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
     @Operation(summary = "역할 선택 완료", description = "모든 참여자의 역할 선택을 확정합니다. 방장만 가능하며, ROLE_PICK 단계에서만 가능합니다. 확정 후에는 역할 변경이 불가능합니다.")
     @PostMapping("/{roomId}/roles/confirm")
     public ResponseEntity<ApiResponse<Void>> confirmRoles(
@@ -133,6 +143,16 @@ public class RoomController {
             @Valid @RequestBody RoundStartRequest request
     ) {
         roomService.startRound(roomId, request.getRound(), userDetails.getMember().getMemberId());
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
+    @Operation(summary = "게임 종료 (준비 단계로 복귀)", description = "게임을 종료하고 준비 단계로 복귀합니다. 방장만 가능하며, Round2 종료 시에만 사용합니다.")
+    @PostMapping("/{roomId}/finish")
+    public ResponseEntity<ApiResponse<Void>> finishGame(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        roomService.finishGame(roomId, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 }
