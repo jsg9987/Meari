@@ -122,9 +122,9 @@
 
                     // 채팅 토픽 구독
                     subscriptionId = 'sub-0';
-                    const subscribeFrame = `SUBSCRIBE\nid:${subscriptionId}\ndestination:/topic/room/${roomId}/chat\n\n` + NULL;
+                    const subscribeFrame = `SUBSCRIBE\nid:${subscriptionId}\ndestination:/topic/room.${roomId}.chat\n\n` + NULL;
                     ws.send(subscribeFrame);
-                    log('📢 /topic/room/' + roomId + '/chat 구독');
+                    log('📢 /topic/room.' + roomId + '.chat 구독');
                     addMessage('시스템', '방 ' + roomId + '에 연결되었습니다.');
                 }
 

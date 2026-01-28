@@ -35,8 +35,8 @@ public class RoomWebSocketController {
     private final RoomSessionService roomSessionService;
     private final ChatRepository chatRepository;
 
-    private static final String TOPIC_STATE = "/topic/room/%d/state";
-    private static final String TOPIC_CHAT = "/topic/room/%d/chat";
+    private static final String TOPIC_STATE = "/topic/room.%d.state";
+    private static final String TOPIC_CHAT = "/topic/room.%d.chat";
 
     /**
      * 준비 상태 토글
