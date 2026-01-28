@@ -385,6 +385,20 @@ public class RoomSessionService {
         log.info("방 {} 세션 전체 삭제", roomId);
     }
 
+    /**
+     * 게임 상태만 초기화 (참여자 목록은 유지)
+     * Round 종료 후 준비 단계로 복귀할 때 사용
+     */
+    public void resetGameState(Long roomId) {
+        redisTemplate.delete(String.format(KEY_READY, roomId));
+        redisTemplate.delete(String.format(KEY_ROLES, roomId));
+        redisTemplate.delete(String.format(KEY_ROLES_CONFIRMED, roomId));
+        redisTemplate.delete(String.format(KEY_CONTENT, roomId));
+        redisTemplate.delete(String.format(KEY_PHASE, roomId));
+        redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
+        log.info("방 {} 게임 상태 초기화 (준비 단계로 복귀)", roomId);
+    }
+
     // === 유틸리티 ===
 
     // key의 만료 시간 설정
