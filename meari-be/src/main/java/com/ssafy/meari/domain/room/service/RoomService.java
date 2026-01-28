@@ -371,6 +371,43 @@ public class RoomService {
     }
 
     /**
+     * 영상 시청 완료 (방장 전용)
+     * WATCHING → ROLE_PICK phase 전환
+     */
+    @Transactional
+    public void finishWatching(Long roomId, Long memberId) {
+        log.info("영상 시청 완료 요청: roomId={}, memberId={}", roomId, memberId);
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
+
+        // 방장 권한 확인
+        if (!room.getOwner().getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        // 진행 중인 방인지 확인
+        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        // 현재 phase가 WATCHING인지 확인
+        GamePhase currentPhase = roomSessionService.getPhase(roomId);
+        if (currentPhase != GamePhase.WATCHING) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
+        }
+
+        // phase를 ROLE_PICK으로 전환
+        roomSessionService.setPhase(roomId, GamePhase.ROLE_PICK);
+
+        // 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.phaseChange(GamePhase.ROLE_PICK);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
+        log.info("영상 시청 완료, 역할 선택 단계 전환: roomId={}", roomId);
+    }
+
+    /**
      * 역할 선택 완료 (방장 전용)
      * 프론트엔드에서 최종 확정된 역할 데이터를 받아 검증 후 Redis에 저장
      */
@@ -531,5 +568,45 @@ public class RoomService {
             }
         }
         return null;
+    }
+
+    /**
+     * 게임 종료 및 준비 단계로 복귀 (방장 전용)
+     * Round2 종료 후 호출
+     */
+    @Transactional
+    public void finishGame(Long roomId, Long memberId) {
+        log.info("게임 종료 요청: roomId={}, memberId={}", roomId, memberId);
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
+
+        // 방장 권한 확인
+        if (!room.getOwner().getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        // 진행 중인 방인지 확인
+        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        // Round2 단계에서만 종료 가능
+        GamePhase currentPhase = roomSessionService.getPhase(roomId);
+        if (currentPhase != GamePhase.ROUND_2) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
+        }
+
+        // 방 상태를 WAITING으로 변경
+        room.updateStatus(RoomStatus.WAITING);
+
+        // Redis 게임 상태 초기화
+        roomSessionService.resetGameState(roomId);
+
+        // 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.phaseChange(null); // phase null = WAITING
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
+        log.info("게임 종료 완료, 준비 단계로 복귀: roomId={}", roomId);
     }
 }
