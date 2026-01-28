@@ -1,43 +1,87 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import RoomCard from './RoomCard'
 import PasswordModal from './PasswordModal'
 import { getRooms, joinRoom, type RoomItem } from '../../api/rooms.api'
 
-const themes = ['전체', '생활', '비즈니스', '뉴스', '공공행정'] as const
+const themes = ['전체', '일상회화', '비즈니스', '뉴스', '여행'] as const
 
 const ShadowingPanel = () => {
   const navigate = useNavigate()
   const [selectedTheme, setSelectedTheme] = useState<string>('전체')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [rooms, setRooms] = useState<RoomItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false)
+  const [nextCursor, setNextCursor] = useState<number | null>(null)
+  const [hasNext, setHasNext] = useState(true)
+
+  const observerTarget = useRef<HTMLDivElement>(null)
 
   // 비밀번호 모달 상태
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [selectedRoomId, setSelectedRoomId] = useState<number | string | null>(null)
 
-  // 방 목록 불러오기
-  useEffect(() => {
-    const fetchRooms = async () => {
-      setIsLoading(true)
-      try {
-        const response = await getRooms({
-          theme: selectedTheme,
-          keyword: searchKeyword,
-        })
-        if (response.success && response.data) {
-          setRooms(response.data.rooms)
-        }
-      } catch (error) {
-        console.error('Failed to fetch rooms:', error)
-      } finally {
-        setIsLoading(false)
-      }
+  // 방 목록 불러오기 함수
+  const fetchRooms = useCallback(async (isFirstPage: boolean = false) => {
+    if (isFirstPage) {
+      setIsInitialLoading(true)
+    } else {
+      if (!hasNext || isFetchingNextPage) return
+      setIsFetchingNextPage(true)
     }
 
-    fetchRooms()
+    try {
+      const themeMap: Record<string, number> = { '일상회화': 1, '비즈니스': 2, '뉴스': 3, '여행': 4 };
+      const themeId = selectedTheme === '전체' ? undefined : themeMap[selectedTheme];
+
+      const response = await getRooms({
+        themeId: themeId,
+        cursor: isFirstPage ? undefined : (nextCursor ?? undefined),
+        size: 16
+      });
+
+      if (response.success && response.data) {
+        const newRooms = response.data.contents;
+        if (isFirstPage) {
+          setRooms(newRooms);
+        } else {
+          setRooms(prev => [...prev, ...newRooms]);
+        }
+        setNextCursor(response.data.next_cursor);
+        setHasNext(response.data.has_next);
+      }
+    } catch (error) {
+      console.error('Failed to fetch rooms:', error)
+    } finally {
+      setIsInitialLoading(false)
+      setIsFetchingNextPage(false)
+    }
+  }, [selectedTheme, nextCursor, hasNext, isFetchingNextPage])
+
+  // 테마/검색어 변경 시 초기화
+  useEffect(() => {
+    setNextCursor(null)
+    setHasNext(true)
+    fetchRooms(true)
   }, [selectedTheme, searchKeyword])
+
+  // 무한 스크롤 Observer 설정
+  useEffect(() => {
+    if (!observerTarget.current || !hasNext || isFetchingNextPage || isInitialLoading) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchRooms()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    observer.observe(observerTarget.current)
+    return () => observer.disconnect()
+  }, [fetchRooms, hasNext, isFetchingNextPage, isInitialLoading])
 
   // 방 클릭 핸들러
   const handleRoomClick = (room: RoomItem) => {
@@ -55,7 +99,7 @@ const ShadowingPanel = () => {
 
     try {
       const response = await joinRoom({
-        room_id: selectedRoomId,
+        room_id: selectedRoomId as number,
         password,
       })
       if (response.success) {
@@ -124,22 +168,27 @@ const ShadowingPanel = () => {
       </div>
 
       {/* 방 목록 그리드 */}
-      {isLoading ? (
-        <div className='text-center py-10 text-gray-500'>로딩 중...</div>
+      {isInitialLoading ? (
+        <div className='text-center py-20 text-gray-500'>로딩 중...</div>
       ) : rooms.length === 0 ? (
-        <div className='text-center py-10 text-gray-500'>방이 없습니다.</div>
+        <div className='text-center py-20 text-gray-500'>방이 없습니다.</div>
       ) : (
         <div className='grid grid-cols-4 gap-4'>
-          {rooms.map((room) => (
+          {rooms.map((room, index) => (
             <RoomCard
-              key={room.room_id}
+              key={`${room.room_id}-${index}`}
               roomId={room.room_id}
               title={room.title}
+              contentTitle={room.content_title}
               currentPeople={room.current_people}
               hasPassword={room.has_password}
               onClick={() => handleRoomClick(room)}
             />
           ))}
+          {/* 무한 스크롤 타겟 및 하단 로딩 표시 */}
+          <div ref={observerTarget} className="h-10 w-full col-span-4 flex items-center justify-center">
+            {isFetchingNextPage && <div className="text-gray-400 text-sm">추가 방 불러오는 중...</div>}
+          </div>
         </div>
       )}
 

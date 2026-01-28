@@ -1,12 +1,13 @@
 type RoomCardProps = {
-    roomId: string
+    roomId: number | string
     title: string
     currentPeople: number
     hasPassword: boolean
+    contentTitle?: string
     onClick: () => void
 }
 
-const RoomCard = ({ title, currentPeople, hasPassword, onClick }: RoomCardProps) => {
+const RoomCard = ({ title, currentPeople, hasPassword, contentTitle, onClick }: RoomCardProps) => {
     return (
         <div
             className='rounded-lg overflow-hidden bg-white cursor-pointer shadow-lg hover:shadow-xl hover:scale-[1.02] hover:ring-2 hover:ring-[#2D9CDB] transition-all duration-300'
@@ -17,7 +18,7 @@ const RoomCard = ({ title, currentPeople, hasPassword, onClick }: RoomCardProps)
                 {/* 상단 라벨 영역 */}
                 <div className='absolute top-3 left-3 right-3'>
                     <div className='inline-block bg-[#2D9CDB] text-white text-xs px-2 py-1 rounded'>
-                        Lorem Ipsum
+                        {contentTitle || '쉐도잉'}
                     </div>
                     <div className='mt-1 bg-[#1a2332]/80 text-white text-xs px-2 py-1 rounded inline-block'>
                         Lõrem Ipsüm mit de paro madrid
