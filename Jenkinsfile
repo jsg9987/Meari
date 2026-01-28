@@ -88,7 +88,7 @@ pipeline {
                 }
             }
         }
-                // --- 개발 된다면 FastAPI 빌드 스테이지 추가 ---
+                // --- 개발 된다면 FastAPI 빌드 스테이지 추가!! ---
 //                 stage('FastAPI Build') {
 //                     steps {
 //                         dir('meari-ai') { // FastAPI 소스 코드가 있는 디렉토리 이름으로 수정하세요
