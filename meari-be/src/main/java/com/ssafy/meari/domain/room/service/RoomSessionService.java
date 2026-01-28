@@ -1,5 +1,6 @@
 package com.ssafy.meari.domain.room.service;
 
+import com.ssafy.meari.domain.room.entity.GamePhase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -321,7 +322,7 @@ public class RoomSessionService {
     /**
      * 진행 단계 설정
      */
-    public void setPhase(Long roomId, com.ssafy.meari.domain.room.entity.GamePhase phase) {
+    public void setPhase(Long roomId, GamePhase phase) {
         String key = String.format(KEY_PHASE, roomId);
         redisTemplate.opsForValue().set(key, phase.name());
         setExpire(key);
@@ -331,7 +332,7 @@ public class RoomSessionService {
     /**
      * 진행 단계 조회
      */
-    public com.ssafy.meari.domain.room.entity.GamePhase getPhase(Long roomId) {
+    public GamePhase getPhase(Long roomId) {
         String key = String.format(KEY_PHASE, roomId);
         String value = redisTemplate.opsForValue().get(key);
         if (value == null) {
