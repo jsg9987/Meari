@@ -85,15 +85,15 @@ const KopicPanel = () => {
       </div>
 
       {/* 설명 카드 영역 - 높이 고정 및 이미지 절대 배치 */}
-      <div className='grid grid-cols-4 gap-4 mb-10'>
+      <div className='grid grid-cols-4 gap-4 mb-9'>
         {stepCards.map((card) => (
           <div
             key={card.id}
-            className='bg-white rounded-lg p-2.5 shadow-sm border border-gray-100 relative overflow-hidden h-40'
+            className='bg-white rounded-lg p-2 shadow-sm border border-gray-100 relative overflow-hidden h-40'
           >
             {/* 배지 (시안 스타일: 어두운 배경 + 전구 아이콘) */}
-            <div className='inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded bg-[#1e293b] relative z-10'>
-              <span className='text-[11px] font-bold text-[#38bdf8]'>
+            <div className='inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded bg-[#001C27] relative z-10'>
+              <span className='text-[14px] font-bold text-[#38bdf8]'>
                 {card.badge}
               </span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -105,8 +105,8 @@ const KopicPanel = () => {
 
             {/* 텍스트 */}
             <div className='relative z-10 max-w-[60%]'>
-              <p className='text-sm text-gray-500 leading-tight'>{card.title}</p>
-              <p className='text-sm font-semibold text-gray-900 leading-tight'>{card.subtitle}</p>
+              <p className='text-[15px] text-gray-500 leading-tight'>{card.title}</p>
+              <p className='text-[15px] font-semibold text-gray-900 leading-tight'>{card.subtitle}</p>
             </div>
 
             {/* 이미지 영역 - 절대 배치로 우측 하단 고정 및 확대 */}
