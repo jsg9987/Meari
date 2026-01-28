@@ -1,7 +1,6 @@
 pipeline {
     agent any
 
-    // GitLab 웹훅 트리거 (1분마다 폴링)
     triggers {
         pollSCM('* * * * *')
     }
@@ -20,9 +19,7 @@ pipeline {
                         dir('meari-be') {
                             script {
                                 def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
-
                                 if (isReleaseBranch) {
-                                    // release 브랜치: Jenkins Credentials 사용
                                     withCredentials([
                                         string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
                                         string(credentialsId: 'JWT_SECRET_KEY', variable: 'JWT_KEY'),
@@ -43,7 +40,6 @@ pipeline {
                                         '''
                                     }
                                 } else {
-                                    // 다른 브랜치: 기본값 사용
                                     sh 'docker build -t backend-image:latest .'
                                 }
                             }
@@ -56,9 +52,7 @@ pipeline {
                         dir('meari-fe') {
                             script {
                                 def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
-
                                 if (isReleaseBranch) {
-                                    // release 브랜치: Jenkins Credentials 사용
                                     withCredentials([
                                         string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
                                     ]) {
@@ -70,9 +64,20 @@ pipeline {
                                         '''
                                     }
                                 } else {
-                                    // 다른 브랜치: 기본값 사용
                                     sh 'docker build -t frontend-image:latest .'
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // --- FastAPI 빌드 스테이지 추가 ---
+                stage('FastAPI Build') {
+                    steps {
+                        dir('meari-ai') { // FastAPI 소스 코드가 있는 디렉토리 이름으로 수정하세요
+                            script {
+                                // FastAPI는 별도의 build-arg가 없다면 간단히 빌드합니다.
+                                sh 'docker build -t meari-fastapi:latest .'
                             }
                         }
                     }
@@ -83,7 +88,6 @@ pipeline {
         stage('Deploy') {
             when {
                 expression {
-                    // release 또는 origin/release 브랜치일 때만 배포 실행
                     return env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
                 }
             }
@@ -99,40 +103,20 @@ pipeline {
                     string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
                 ]) {
                     script {
-                        // 1. .env 파일 생성
                         sh '''
                             cd /home/ubuntu
-
-                            echo "# --- Database 설정 ---" > .env
-                            echo "DB_PASSWORD=${DB_PW}" >> .env
-                            echo "" >> .env
-                            echo "# --- JWT 설정 ---" >> .env
+                            echo "DB_PASSWORD=${DB_PW}" > .env
                             echo "JWT_SECRET_KEY=${JWT_KEY}" >> .env
-                            echo "" >> .env
-                            echo "# --- Redis 설정 ---" >> .env
                             echo "REDIS_PASSWORD=${REDIS_PW}" >> .env
-                            echo "" >> .env
-                            echo "# --- RabbitMQ 설정 ---" >> .env
                             echo "RABBITMQ_PASSWORD=${RABBITMQ_PW}" >> .env
-                            echo "" >> .env
-                            echo "# --- Frontend 설정 ---" >> .env
                             echo "FRONTEND_URL=${FE_URL}" >> .env
-                            echo "" >> .env
-                            echo "# --- OpenVidu 설정 ---" >> .env
                             echo "OPENVIDU_URL=${OV_URL}" >> .env
                             echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
                             echo "OPENVIDU_DOMAIN=localhost" >> .env
-                            echo "" >> .env
-                            echo "# --- Backend URL (for frontend) ---" >> .env
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
-                        '''
 
-                        // 2. 배포 실행 (Nginx 에러 방지를 위해 fastapi 반드시 포함)
-                        sh '''
-                            cd /home/ubuntu
                             docker-compose up -d --force-recreate frontend spring-api fastapi
                         '''
-
                         sh 'docker image prune -f'
                     }
                 }
@@ -143,46 +127,24 @@ pipeline {
     post {
         success {
             script {
-                // 기본 메시지: 빌드 성공
                 def message = "✅ 빌드 성공! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
-                def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
-
-                // release 브랜치일 경우 메시지 교체
-                if (isReleaseBranch) {
+                if (env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release') {
                     message = "✅ 배포 성공!: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                 }
-
                 try {
-                    mattermostSend (
-                        color: 'good',
-                        message: message + " (<${env.BUILD_URL}|상세보기>)"
-                    )
-                } catch (Exception e) {
-                    echo "Mattermost 알림 실패: ${e.message}"
-                }
-                echo message
+                    mattermostSend(color: 'good', message: message + " (<${env.BUILD_URL}|상세보기>)")
+                } catch (e) { echo "Mattermost 알림 실패" }
             }
         }
         failure {
             script {
-                // 기본 메시지: 빌드 실패
                 def message = "🚨 빌드 실패! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
-                def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
-
-                // release 브랜치일 경우 메시지 교체
-                if (isReleaseBranch) {
+                if (env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release') {
                     message = "🚨 배포 실패(확인요망): ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                 }
-
                 try {
-                    mattermostSend (
-                        color: 'danger',
-                        message: message + " (<${env.BUILD_URL}|상세보기>)"
-                    )
-                } catch (Exception e) {
-                    echo "Mattermost 알림 실패: ${e.message}"
-                }
-                echo message
+                    mattermostSend(color: 'danger', message: message + " (<${env.BUILD_URL}|상세보기>)")
+                } catch (e) { echo "Mattermost 알림 실패" }
             }
         }
     }
