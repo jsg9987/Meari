@@ -9,6 +9,7 @@ export interface VideoTileData {
   streamManager: Publisher | Subscriber;
   muted?: boolean;
   label?: string;
+  isSpeaker?: boolean;
 }
 
 interface UseVideoRoomOptions {

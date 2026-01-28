@@ -7,6 +7,7 @@ import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -76,6 +77,28 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()
 
+
+                // Swagger UI 접근 허용
+                .requestMatchers("/swagger", "/swagger-ui.html", "/swagger-ui/**", "/api-docs", "/api-docs/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/swagger-ui/index.html").permitAll()
+                .requestMatchers("/", "/error", "/favicon.ico", "/**/*.png", "/**/*.gif", "/**/*.svg", "/**/*.jpg", "/**/*.html", "/**/*.css", "/**/*.js").permitAll()
+                .requestMatchers("/swagger-resources/**").permitAll()
+                .requestMatchers("/webjars/**").permitAll()
+
+                // Static 파일 (테스트 페이지)
+                .requestMatchers("/", "/index.html", "/*.html", "/*.js", "/*.css").permitAll()
+                .requestMatchers("/webrtc-test.html").permitAll()
+
+                // OpenVidu API (테스트용, 운영 시 인증 필요로 변경 권장)
+                .requestMatchers("/api/v1/openvidu/**").permitAll()
+
+                // WebRTC 방 입장/퇴장 API (테스트용)
+                .requestMatchers("/api/v1/rooms/*/webrtc/**").permitAll()
+
+                // 기존 방 관련 API (테스트용)
+                .requestMatchers("/api/v1/rooms/**").permitAll()
+
+
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
             );
@@ -100,5 +123,15 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public WebSecurityCustomizer webSecurityCustomizer() {
+        return (web) -> web.ignoring()
+                // Static 리소스 (필터 체인 완전 무시)
+                .requestMatchers("/", "/*.html", "/*.js", "/*.css", "/*.ico")
+                .requestMatchers("/static/**")
+                // Swagger
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**");
     }
 }

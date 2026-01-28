@@ -39,6 +39,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-websocket' // STOMP 통신용
 
+    // 3-1. OpenVidu (WebRTC)
+    implementation 'io.openvidu:openvidu-java-client:2.30.0'
+
     // 4. Security & JWT
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
@@ -58,7 +61,10 @@ dependencies {
 
     // 8. RabbitMQ
 
-    // 9. Test
+    // 9. Swagger (SpringDoc OpenAPI UI)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4'
+
+    // 10. Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
