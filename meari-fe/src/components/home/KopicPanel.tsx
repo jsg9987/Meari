@@ -45,10 +45,38 @@ const stepCards = [
 
 // 테마 데이터 (더미)
 const themes = [
-  { id: 1, name: '생활', description: '테마 설명', duration: '2 minute', sections: 16, thumbnail: dummyThemeImg },
-  { id: 2, name: '생활', description: '테마 설명', duration: '2 minute', sections: 16, thumbnail: dummyThemeImg },
-  { id: 3, name: '생활', description: '테마 설명', duration: '2 minute', sections: 16, thumbnail: dummyThemeImg },
-  { id: 4, name: '생활', description: '테마 설명', duration: '2 minute', sections: 16, thumbnail: dummyThemeImg },
+  {
+    theme_id: 1,
+    name: '일상회화',
+    description: '한국인들이 일상에서 자주 사용하는 표현을 중심으로 다양한 상황의 회화 연습을 진행합니다.',
+    duration: '2 minute',
+    sections: 16,
+    theme_url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
+  },
+  {
+    theme_id: 2,
+    name: '비즈니스',
+    description: '회사와 업무 환경에서 자주 쓰이는 전문 표현을 통해 실무 중심의 대화 능력을 향상시킵니다.',
+    duration: '2 minute',
+    sections: 16,
+    theme_url: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
+  },
+  {
+    theme_id: 3,
+    name: '뉴스',
+    description: '시사 뉴스와 다양한 사회 이슈를 따라 말하며 정확한 발음과 표현력을 함께 연습합니다.',
+    duration: '2 minute',
+    sections: 16,
+    theme_url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
+  },
+  {
+    theme_id: 4,
+    name: '여행',
+    description: '여행지에서 자주 마주치는 상황을 바탕으로 실전에서 바로 쓰는 회화 표현을 익힙니다.',
+    duration: '2 minute',
+    sections: 16,
+    theme_url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
+  },
 ]
 
 const KopicPanel = () => {
@@ -66,37 +94,37 @@ const KopicPanel = () => {
   return (
     <section>
       {/* 타이틀 및 시작 버튼 */}
-      <div className='flex items-start justify-between mb-8'>
+      <div className='flex items-end justify-between mb-10'>
         <div>
-          <h1 className='text-2xl font-bold text-gray-900 mb-2'>
+          <h1 className='text-[1.65rem] font-bold text-gray-900 mb-2'>
             코픽 (K-OPIC)
           </h1>
-          <p className='text-sm text-gray-600'>
+          <p className='text-[16px] text-gray-600'>
             보다 정확한 검증을 통해 현재의 실력을 평가 받아보세요.
           </p>
         </div>
         <button
           type='button'
           onClick={handleStartEvaluation}
-          className='px-8 py-3 bg-[#2D9CDB] text-white font-medium rounded-lg hover:bg-[#2789c2] transition-colors cursor-pointer'
+          className='px-9 py-[10px] bg-[#2D9CDB] text-white font-medium rounded-full hover:bg-[#2789c2] transition-colors cursor-pointer'
         >
           평가 시작하기
         </button>
       </div>
 
       {/* 설명 카드 영역 - 높이 고정 및 이미지 절대 배치 */}
-      <div className='grid grid-cols-4 gap-4 mb-9'>
+      <div className='grid grid-cols-4 gap-[18px] mb-10'>
         {stepCards.map((card) => (
           <div
             key={card.id}
-            className='bg-white rounded-lg p-2 shadow-sm border border-gray-100 relative overflow-hidden h-40'
+            className='bg-white rounded-lg p-[9px] shadow-sm border border-gray-100 relative overflow-hidden h-48'
           >
             {/* 배지 (시안 스타일: 어두운 배경 + 전구 아이콘) */}
-            <div className='inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded bg-[#001C27] relative z-10'>
+            <div className='inline-flex items-center gap-1.5 mb-3 px-[9px] py-[4px] rounded bg-[#001C27] relative z-10'>
               <span className='text-[14px] font-bold text-[#38bdf8]'>
                 {card.badge}
               </span>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2a6 6 0 0 1 6 6c0 2.97-1 3.5-2.5 4.5-.37.26-1.5.5-1.5 2.5a2 2 0 0 1-4 0c0-2-1.13-2.25-1.5-2.5A6 6 0 0 1 12 2z"></path>
                 <path d="M9 18h6"></path>
                 <path d="M10 22h4"></path>
@@ -114,7 +142,7 @@ const KopicPanel = () => {
               <img
                 src={card.image}
                 alt={card.badge}
-                className='object-contain transition-transform w-36 h-36 translate-x-4 translate-y-4'
+                className='object-contain transition-transform w-40 h-40 translate-x-4 translate-y-4'
               />
             </div>
           </div>
@@ -123,33 +151,31 @@ const KopicPanel = () => {
 
       {/* 테마 선택 영역 */}
       <div>
-        <h2 className='text-lg font-bold text-gray-900 mb-4'>테마 선택</h2>
-        <div className='grid grid-cols-4 gap-4'>
+        <h2 className='text-xl font-bold text-gray-900 mb-[18px]'>테마 선택</h2>
+        <div className='grid grid-cols-4 gap-[18px]'>
           {themes.map((theme) => (
             <div
-              key={theme.id}
-              onClick={() => setSelectedTheme(theme.id)}
-              className={`bg-white rounded-lg overflow-hidden shadow-md cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${selectedTheme === theme.id
-                ? 'ring-2 ring-[#2D9CDB] ring-offset-2'
-                : ''
+              key={theme.theme_id}
+              onClick={() => setSelectedTheme(theme.theme_id)}
+              className={`bg-white rounded-lg overflow-hidden shadow-md cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${selectedTheme === theme.theme_id ? 'ring-2 ring-[#2D9CDB] ring-offset-2' : ''
                 }`}
             >
               {/* 썸네일 */}
-              <div className='aspect-square bg-gray-100'>
+              <div className='aspect-4/3 bg-gray-100'>
                 <img
-                  src={theme.thumbnail}
+                  src={theme.theme_url}
                   alt={theme.name}
                   className='w-full h-full object-cover'
                 />
               </div>
 
               {/* 정보 */}
-              <div className='p-4'>
-                <h3 className='text-base font-semibold text-gray-900 mb-1'>
+              <div className='px-3 py-4'>
+                <h3 className='text-[18px] font-semibold text-gray-900 mb-3'>
                   {theme.name}
                 </h3>
-                <p className='text-sm text-gray-500 mb-2'>{theme.description}</p>
-                <p className='text-xs text-gray-400'>
+                <p className='text-[13px] text-gray-500 mb-3'>{theme.description}</p>
+                <p className='text-[13px] text-gray-400'>
                   {theme.duration} · {theme.sections} section
                 </p>
               </div>
