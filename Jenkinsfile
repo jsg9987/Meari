@@ -7,7 +7,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
@@ -16,7 +15,6 @@ pipeline {
 
         stage('Build & Docker Image') {
             parallel {
-
                 stage('Backend Build') {
                     steps {
                         dir('meari-be') {
@@ -87,7 +85,7 @@ pipeline {
         stage('Deploy') {
             when {
                 expression {
-                    // release 또는 origin/release 브랜치일 때 배포
+                    // release 또는 origin/release 브랜치일 때만 배포 실행
                     return env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
                 }
             }
@@ -103,7 +101,7 @@ pipeline {
                     string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
                 ]) {
                     script {
-                        // 홈 디렉토리에 .env 파일 생성
+                        // 1. /home/ubuntu 경로에 .env 파일 생성
                         sh '''
                             cd /home/ubuntu
 
@@ -131,13 +129,13 @@ pipeline {
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
                         '''
 
-                        // 홈 디렉토리에서 배포 실행
+                        // 2. 배포 실행 (docker-compose 사용 및 강제 재생성 옵션 적용)
                         sh '''
                             cd /home/ubuntu
-                            docker compose stop frontend spring-api || true
-                            docker compose rm -f frontend spring-api || true
-                            docker compose up -d frontend spring-api
+                            docker-compose up -d --force-recreate frontend spring-api
                         '''
+
+                        // 3. 사용하지 않는 구형 이미지 정리
                         sh 'docker image prune -f'
                     }
                 }
@@ -149,15 +147,12 @@ pipeline {
         success {
             script {
                 def message = "✅ 빌드 성공! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
-
-                // release 또는 origin/release 체크
                 def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
 
                 if (isReleaseBranch) {
                     message = "✅ 배포 성공!: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                 }
 
-                // Mattermost 알림
                 try {
                     mattermostSend (
                         color: 'good',
@@ -166,22 +161,17 @@ pipeline {
                 } catch (Exception e) {
                     echo "Mattermost 알림 실패: ${e.message}"
                 }
-
-                echo message
             }
         }
         failure {
             script {
                 def message = "🚨 빌드 실패! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
-
-                // release 또는 origin/release 체크
                 def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
 
                 if (isReleaseBranch) {
                     message = "🚨 배포 실패(확인요망): ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                 }
 
-                // Mattermost 알림
                 try {
                     mattermostSend (
                         color: 'danger',
@@ -190,8 +180,6 @@ pipeline {
                 } catch (Exception e) {
                     echo "Mattermost 알림 실패: ${e.message}"
                 }
-
-                echo message
             }
         }
     }
