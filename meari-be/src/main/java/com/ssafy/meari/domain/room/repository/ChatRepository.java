@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface ChatRepository extends CrudRepository<Chat, String> {
     List<Chat> findByRoomIdOrderByTimestampDesc(Long roomId);
+
+    List<Chat> findByRoomIdOrderByTimestampAsc(Long roomId);
 }
