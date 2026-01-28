@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { OpenVidu, Publisher, Session, Subscriber } from "openvidu-browser";
-import { getToken } from "../api/webrtc.api";
+import { enterWebRTC, leaveWebRTC } from "../api/rooms.api";
+import { createSession, createConnection } from "../api/webrtc.api";
 
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
 
@@ -14,12 +15,24 @@ export interface VideoTileData {
 }
 
 interface UseVideoRoomOptions {
-  sessionName: string;
+  roomId: number;
   nickname: string;
+  password?: string;
   autoJoin?: boolean;
+  isOwner?: boolean;
+  memberId?: number;
+  roleId?: number | null;
 }
 
-export function useVideoRoom({ sessionName, nickname, autoJoin = false }: UseVideoRoomOptions) {
+export function useVideoRoom({
+  roomId,
+  nickname,
+  password,
+  autoJoin = false,
+  isOwner = false,
+  memberId = 1, // TODO: 실제 사용자 ID로 변경 필요
+  roleId = null
+}: UseVideoRoomOptions) {
   const [session, setSession] = useState<Session | null>(null);
   const [publisher, setPublisher] = useState<Publisher | null>(null);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -29,6 +42,7 @@ export function useVideoRoom({ sessionName, nickname, autoJoin = false }: UseVid
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
 
   const ovRef = useRef<OpenVidu | null>(null);
+  const statusRef = useRef<ConnectionStatus>("idle");
 
   const tiles = useMemo<VideoTileData[]>(() => {
     const arr: VideoTileData[] = [];
@@ -46,12 +60,17 @@ export function useVideoRoom({ sessionName, nickname, autoJoin = false }: UseVid
       }
       arr.push({ id: s.stream.streamId, streamManager: s, label: name });
     });
+    console.log(arr)
     return arr;
   }, [publisher, subscribers, nickname]);
 
   const join = useCallback(async () => {
-    if (status === "connecting" || status === "connected") return;
+    if (statusRef.current === "connecting" || statusRef.current === "connected") {
+      console.log("Already connecting or connected, skipping join");
+      return;
+    }
 
+    statusRef.current = "connecting";
     setStatus("connecting");
     setError(null);
 
@@ -74,7 +93,43 @@ export function useVideoRoom({ sessionName, nickname, autoJoin = false }: UseVid
     });
 
     try {
-      const token = await getToken(sessionName);
+      let token: string;
+
+      if (isOwner) {
+        // 방장: 세션 생성 -> 연결 토큰 생성
+        const sessionResponse = await createSession({
+          custom_session_id: `room_${roomId}`,
+          room_id: roomId
+        });
+
+        if (!sessionResponse.data.success || !sessionResponse.data.data) {
+          throw new Error(sessionResponse.data.error?.message || "세션 생성에 실패했습니다");
+        }
+
+        const { session_id } = sessionResponse.data.data;
+
+        const connectionResponse = await createConnection(session_id, {
+          member_id: memberId,
+          nickname,
+          role_id: roleId
+        });
+
+        if (!connectionResponse.data.success || !connectionResponse.data.data) {
+          throw new Error(connectionResponse.data.error?.message || "연결 토큰 생성에 실패했습니다");
+        }
+
+        token = connectionResponse.data.data.token;
+      } else {
+        // 일반 사용자: enterWebRTC 사용
+        const webrtcResponse = await enterWebRTC(roomId, { password });
+
+        if (!webrtcResponse.data.success || !webrtcResponse.data.data) {
+          throw new Error(webrtcResponse.data.error?.message || "WebRTC 입장에 실패했습니다");
+        }
+
+        token = webrtcResponse.data.data.token;
+      }
+
       await mySession.connect(token, { clientData: nickname });
 
       const pub = await OV.initPublisherAsync(undefined, {
@@ -91,32 +146,38 @@ export function useVideoRoom({ sessionName, nickname, autoJoin = false }: UseVid
 
       setSession(mySession);
       setPublisher(pub);
+      statusRef.current = "connected";
       setStatus("connected");
     } catch (e) {
       console.error(e);
       const message = e instanceof Error ? e.message : "연결에 실패했습니다";
       setError(message);
+      statusRef.current = "error";
       setStatus("error");
       try {
         mySession.disconnect();
       } catch {}
     }
-  }, [sessionName, nickname, status]);
+  }, [roomId, nickname, password, isOwner, memberId, roleId]);
 
-  const leave = useCallback(() => {
+  const leave = useCallback(async () => {
     try {
       session?.disconnect();
+      await leaveWebRTC(roomId);
+    } catch (error) {
+      console.error('Failed to leave WebRTC:', error);
     } finally {
       ovRef.current = null;
       setSession(null);
       setPublisher(null);
       setSubscribers([]);
+      statusRef.current = "idle";
       setStatus("idle");
       setError(null);
       setIsAudioEnabled(true);
       setIsVideoEnabled(true);
     }
-  }, [session]);
+  }, [session, roomId]);
 
   const toggleAudio = useCallback(() => {
     if (!publisher) return;

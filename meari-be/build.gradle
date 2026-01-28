@@ -39,6 +39,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-websocket' // STOMP 통신용
 
+    // 3-1. OpenVidu (WebRTC)
+    implementation 'io.openvidu:openvidu-java-client:2.30.0'
+
     // 4. Security & JWT
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'

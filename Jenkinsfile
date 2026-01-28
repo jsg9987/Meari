@@ -60,6 +60,10 @@ pipeline {
                                         docker build \
                                           --build-arg VITE_BASE_SERVER_URL="${BE_URL}" \
                                           --build-arg VITE_USE_MOCK_API=false \
+                                          --build-arg VITE_USE_MOCK_AUTH=false \
+                                          --build-arg VITE_USE_MOCK_ROOMS=false \
+                                          --build-arg VITE_USE_MOCK_WEBRTC=false \
+                                          --build-arg VITE_USE_MOCK_CONTENTS=true \
                                           -t frontend-image:latest .
                                         '''
                                     }

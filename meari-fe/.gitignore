@@ -24,13 +24,10 @@ dist-ssr
 *.sln
 *.sw?
 
-<<<<<<< HEAD
 # video
 src/assets/video/*
-=======
 # build
 dist/
->>>>>>> develop-fe
 
 # AI Agent
 .claude/

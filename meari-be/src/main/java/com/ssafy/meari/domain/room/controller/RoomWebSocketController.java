@@ -59,6 +59,13 @@ public class RoomWebSocketController {
         log.info("역할 선점 요청: roomId={}, memberId={}, roleId={}",
                 roomId, message.getMemberId(), message.getRoleId());
 
+        // 역할이 이미 확정되었는지 확인
+        if (roomSessionService.isRolesConfirmed(roomId)) {
+            log.warn("역할 선택 실패: roomId={}, 이미 역할이 확정됨", roomId);
+            // TODO: 개인 에러 메시지 전송 (추후 /queue/errors 구현)
+            return;
+        }
+
         boolean success = roomSessionService.tryAssignRole(roomId, message.getRoleId(), message.getMemberId());
 
         if (success) {
@@ -82,6 +89,13 @@ public class RoomWebSocketController {
             @Payload RoleReleaseMessage message
     ) {
         log.info("역할 해제 요청: roomId={}, memberId={}", roomId, message.getMemberId());
+
+        // 역할이 이미 확정되었는지 확인
+        if (roomSessionService.isRolesConfirmed(roomId)) {
+            log.warn("역할 해제 실패: roomId={}, 이미 역할이 확정됨", roomId);
+            // TODO: 개인 에러 메시지 전송 (추후 /queue/errors 구현)
+            return;
+        }
 
         Long roleId = roomSessionService.getMemberRole(roomId, message.getMemberId());
         if (roleId != null) {
