@@ -24,10 +24,17 @@
 8. 역할 확정
    ↓
 9. Round1 시작 (ROUND_1)
+   - 방장은 /rounds/start API 호출
+   - 서버는 멤버별 문장 목록(segments)을 담아 ROUND_START 메시지 브로드캐스팅
    ↓
 10. Round1 진행
+    - 클라이언트는 자기 턴에 문장 녹음 후 S3 업로드
+    - 업로드 완료 후 /recording/complete 메시지 전송
+    - 서버는 모든 멤버의 녹음 완료 시 RECORDINGS_COMPLETE 메시지 브로드캐스팅
    ↓
 11. Round2 시작 (ROUND_2)
+    - 방장은 /rounds/start API 호출
+    - (이하 Round1과 동일)
    ↓
 12. Round2 진행
    ↓
@@ -78,7 +85,7 @@ WAITING (다시 대기)
 | POST | /api/v1/rooms/{roomId}/start | 게임 시작 | 방장 | WAITING |
 | POST | /api/v1/rooms/{roomId}/watching/finish | 영상 시청 완료 | 방장 | WATCHING |
 | POST | /api/v1/rooms/{roomId}/roles/confirm | 역할 확정 | 방장 | ROLE_PICK |
-| POST | /api/v1/rooms/{roomId}/rounds/start | Round 시작 | 방장 | ROLE_PICK/ROUND_1 |
+| POST | /api/v1/rooms/{roomId}/rounds/start | Round 시작. ROUND_START 메시지 브로드캐스팅 트리거 | 방장 | ROLE_PICK/ROUND_1 |
 | POST | /api/v1/rooms/{roomId}/finish | 게임 종료 (준비로 복귀)| 방장 | ROUND_2 |
 | POST | /api/v1/rooms/{roomId}/role | 역할 선점 | 방 참여자 | ROLE_PICK |
 | POST | /api/v1/s3/presigned-url | S3 업로드 URL 요청 | 인증된 사용자 | - |
@@ -92,10 +99,19 @@ WAITING (다시 대기)
 - STOMP `CONNECT` 프레임의 `Authorization` 헤더를 `JwtChannelInterceptor`에서 검증.
 - 인증 정보는 WebSocket 세션에 저장.
 
-#### Topics
-| Topic | 설명 | 페이로드 예시 |
+#### Server-bound (Client -> Server)
+| Destination | 설명 | 페이로드 예시 |
+|-------------|------|---------------|
+| /app/room/{roomId}/ready | 준비/준비해제 | `{ "memberId": 1 }` |
+| /app/room/{roomId}/role/assign | 역할 선점 | `{ "memberId": 1, "roleId": 2 }` |
+| /app/room/{roomId}/role/release | 역할 해제 | `{ "memberId": 1 }` |
+| /app/room/{roomId}/chat | 채팅 메시지 전송 | `{ "memberId": 1, "content": "hello" }` |
+| /app/room/{roomId}/recording/complete | 문장 녹음 완료 | `{ "memberId": 1, "sentenceId": 123, "audioUrl": "..." }` |
+
+#### Client-bound (Server -> Client)
+| Topic | 설명 | 페이로드 타입 / 예시 |
 |-------|------|----------|
-| /topic/room/{roomId}/state | 참여자 변경, 준비 상태, 역할 선점 등 방의 전반적인 상태 변경 | `{ "type": "USER_ENTER", "data": { ... } }` |
+| /topic/room/{roomId}/state | 참여자 변경, 준비 상태, 역할 선점, **라운드 시작/종료** 등 방의 전반적인 상태 변경 | `MEMBER_JOIN`, `READY`, `ROLE_ASSIGNED`, `PHASE_CHANGE`, `ROUND_START`, `RECORDINGS_COMPLETE` |
 | /topic/room/{roomId}/video-sync | 영상 동기화 (재생, 정지, 시간 이동) | `{ "action": "PLAY", "currentTime": 15.2 }` |
 | /topic/room/{roomId}/turn | 현재 발화해야 할 쉐도잉 턴 알림 | `{ "sentenceId": 123, "memberId": 45 }` |
 | /topic/room/{roomId}/chat | 인게임 채팅 | `{ "sender": "nickname", "message": "hello" }` |
@@ -120,6 +136,11 @@ WAITING (다시 대기)
 - Redis `HSETNX` 명령어로 원자성 보장 (`room:{roomId}:roles`).
 - 이미 역할을 선점한 유저가 다른 역할을 선택하면 기존 역할 해제 후 새 역할 선점.
 - 선점되지 않은 역할은 시스템(AI)이 자동 담당.
+
+### 3.3. 라운드 진행 및 녹음
+- **라운드 시작**: `startRound` 시, DB에서 `Sentence` 목록을 조회하고 역할에 맞게 분배하여 `MemberSegmentInfo` 리스트를 구성. 이를 `ROUND_START` 메시지에 담아 브로드캐스팅.
+- **녹음 완료**: 클라이언트가 `/recording/complete` 메시지 전송. 서버는 Redis Set에 녹음 완료된 문장 ID를 저장.
+- **전체 녹음 완료 감지**: 한 멤버의 녹음 완료 메시지 수신 시, 모든 멤버가 자신의 모든 문장을 녹음했는지 `isAllRecordingsComplete`를 통해 확인. 모두 완료 시 `RECORDINGS_COMPLETE` 메시지 브로드캐스팅.
 
 ---
 
@@ -149,6 +170,18 @@ room:{roomId}:disconnected = Hash { memberId -> timestamp }
 # 멤버 ID로 방 ID를 찾기 위한 매핑 (String) - Grace Period 자동 퇴장 시 사용
 member:{memberId}:roomId = roomId
 
+# --- 라운드 진행 관련 ---
+
+# 라운드 시작 시간 (String: epoch millis)
+room:{roomId}:round_start_time = 1675132800000
+
+# 멤버별 녹음 완료 문장 ID 목록 (Set)
+room:{roomId}:round:{round}:member:{memberId}:recordings = Set<sentenceId>
+
+# 멤버별 할당된 총 문장 수 (String)
+room:{roomId}:round:{round}:member:{memberId}:total_sentences = 5
+
+
 # 모든 방 관련 키는 24시간 후 자동 만료 (EXPIRE)
 ```
 
@@ -157,11 +190,9 @@ member:{memberId}:roomId = roomId
 ## 5. 분석 처리 플로우
 ```
 1. 클라이언트: 문장 발화 후 S3 Presigned URL로 음성 파일 업로드.
-2. 클라이언트: S3 업로드 완료 후, 백엔드에 분석 요청 (`/api/v1/shadowing/analyze` with audio_url).
-3. 백엔드: `shadowing_report` 레코드 생성 (상태: PROCESSING).
-4. 백엔드: RabbitMQ를 통해 AI 서버로 분석 작업 요청.
-5. AI 서버: 분석 후 결과 반환.
-6. 백엔드: 콜백 수신 후 `shadowing_report` 레코드 업데이트 (상태: COMPLETED, 결과 JSON 저장).
+2. 클라이언트: S3 업로드 완료 후, 백엔드에 녹음 완료 메시지 전송 (`/app/room/{roomId}/recording/complete` with audio_url).
+3. 백엔드: 모든 참여자 녹음 완료 시, 리포트 생성 및 AI 분석 요청을 위한 로직 실행 준비.
+...
 ```
 
 ### 5.1. 분석 결과 JSON 구조 예시
@@ -190,31 +221,33 @@ member:{memberId}:roomId = roomId
 - ◻️: 예정
 
 ### Phase 1: 기본 인프라
-- ✅ Issue1: Room CRUD (생성, 조회, 입장, 퇴장)
-- ✅ Issue2: Redis + WebSocket 기본 설정
-- ✅ Issue3: 입장/퇴장 권한 및 상태 동기화
-- ✅ Issue4: 역할 선점 시스템 (`/role` API, `HSETNX` 로직)
+- ✅ Room CRUD (생성, 조회, 입장, 퇴장)
+- ✅ Redis + WebSocket 기본 설정
+- ✅ 입장/퇴장 권한 및 상태 동기화
+- ✅ 역할 선점 시스템 (`/role` API, `HSETNX` 로직)
 - ✅ WebSocket JWT 인증 구현 (`JwtChannelInterceptor`)
 
 ### Phase 2: 학습 준비
-- ✅ Issue5: 참여자 Ready 시스템 (`/ready` API, 상태 브로드캐스팅)
-- ✅ Issue6: 게임 시작 기능 (`/start` API, 상태 검증, `IN_PROGRESS`로 변경)
+- ✅ 참여자 Ready 시스템 (`/ready` API, 상태 브로드캐스팅)
+- ✅ 게임 시작 기능 (`/start` API, 상태 검증, `IN_PROGRESS`로 변경)
 - ✅ 동영상 선택 기능 (`/content` API)
 - ✅ 영상 시청 완료 기능 (`/watching/finish` API)
 
 ### Phase 3: 실시간 학습 진행
+- ✅ **라운드 시작 및 문장 분배 로직**
+- ✅ **라운드별 녹음 완료 상태 관리 및 감지**
 - ◻️ Issue7: 영상 동기화 (WebSocket `/video-sync`)
 - ◻️ Issue8: 턴 알림 시스템 (WebSocket `/turn`)
 - ◻️ Issue9: 실시간 채팅 (WebSocket `/chat`)
 
 ### Phase 4: 녹음 및 분석
-- ◻️ Issue10: S3 Presigned URL 발급 API
-- ◻️ Issue11: 쉐도잉 리포트 생성 API (`/analyze`)
+- 🔄 Issue10: S3 Presigned URL 발급 API
+- 🔄 Issue11: 쉐도잉 리포트 생성 API (`/analyze`)
 - ◻️ Issue12: AI 분석 연동 (RabbitMQ)
 - ◻️ Issue13: 리포트 조회 API
 
 ### Phase 5: 세션 종료
-- ✅ Issue14: 학습 종료 및 방 상태 초기화 (`/finish` API)
+- ✅ 학습 종료 및 방 상태 초기화 (`/finish` API)
 
 ### Phase 6: 고급 기능
 - ✅ Grace Period 기반 재접속 및 자동 퇴장 처리
