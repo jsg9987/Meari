@@ -43,7 +43,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/websocket-test.html".equals(requestURI) ||
             requestURI.startsWith("/swagger-ui") ||    // swagger-ui 관련 모든 리소스
             requestURI.startsWith("/v3/api-docs") ||   // OpenAPI3 스펙 경로
-            requestURI.startsWith("/api-docs")         // 기존 api-docs 경로
+            requestURI.startsWith("/api-docs") ||      // 기존 api-docs 경로
+            requestURI.startsWith("/ws")               // WebSocket 경로 추가
         ) {
             log.debug("JwtAuthentication 스킵: {}", requestURI);
             filterChain.doFilter(request, response);
