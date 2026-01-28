@@ -86,10 +86,9 @@ const CreateRoomButton = () => {
         return;
       }
 
-      const roomId =
-        response.data?.room_id ??
-        (response as { data?: { data?: { room_id?: string } } }).data?.data?.room_id;
-      if (!roomId) {
+      const roomId = response.data?.room_id;
+      if (roomId === undefined || roomId === null) {
+        setErrorMessage('방 생성 응답에 ID가 누락되었습니다.');
         return;
       }
 
@@ -149,11 +148,10 @@ const CreateRoomButton = () => {
                     key={theme.theme_id}
                     type="button"
                     onClick={() => setSelectedThemeId(theme.theme_id)}
-                    className={`border-2 rounded-lg p-0 cursor-pointer bg-white transition-all overflow-hidden text-left ${
-                      selectedThemeId === theme.theme_id
+                    className={`border-2 rounded-lg p-0 cursor-pointer bg-white transition-all overflow-hidden text-left ${selectedThemeId === theme.theme_id
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-300 hover:border-gray-400'
-                    }`}
+                      }`}
                   >
                     <img
                       src={theme.theme_url}
@@ -195,9 +193,8 @@ const CreateRoomButton = () => {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="비밀번호 입력"
-              className={`px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 ${
-                !usePassword ? 'bg-gray-100' : ''
-              }`}
+              className={`px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 ${!usePassword ? 'bg-gray-100' : ''
+                }`}
               disabled={!usePassword}
             />
 

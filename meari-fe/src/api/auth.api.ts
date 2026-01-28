@@ -1,4 +1,5 @@
 import axiosInstance from './axiosInstance';
+import { apiConfig } from './apiConfig';
 
 export interface LoginCredentials {
     email: string;
@@ -113,7 +114,7 @@ const signupReal = async (credentials: SignupCredentials): Promise<SignupRespons
     return response.data;
 };
 
-const useMock = import.meta.env.VITE_USE_MOCK_AUTH === 'true';
+const useMock = apiConfig.shouldMock('AUTH');
 
 export const login = useMock ? loginMock : loginReal;
 export const signup = useMock ? signupMock : signupReal;
