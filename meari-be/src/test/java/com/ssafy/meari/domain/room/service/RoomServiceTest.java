@@ -115,7 +115,7 @@ class RoomServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.getRoomId()).isEqualTo(1L);
             assertThat(response.getTitle()).isEqualTo("테스트 방");
-            assertThat(response.isHasPassword()).isFalse();
+            assertThat(response.getHasPassword()).isFalse();
             verify(memberRoomRepository).save(any(MemberRoom.class));
             verify(roomSessionService).addMember(1L, 1L);
         }
@@ -148,7 +148,7 @@ class RoomServiceTest {
 
             // Then
             assertThat(response).isNotNull();
-            assertThat(response.isHasPassword()).isTrue();
+            assertThat(response.getHasPassword()).isTrue();
         }
 
         @Test
@@ -276,7 +276,7 @@ class RoomServiceTest {
             assertThat(response.getRoomId()).isEqualTo(1L);
             assertThat(response.getTitle()).isEqualTo("테스트 방");
             assertThat(response.getMembers()).hasSize(1);
-            assertThat(response.getMembers().get(0).isOwner()).isTrue();
+            assertThat(response.getMembers().get(0).getIsOwner()).isTrue();
         }
 
         @Test
