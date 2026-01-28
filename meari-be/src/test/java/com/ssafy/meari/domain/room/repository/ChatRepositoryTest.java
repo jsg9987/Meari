@@ -185,5 +185,227 @@ class ChatRepositoryTest {
             // Then
             assertThat(chats).isEmpty();
         }
+
+        @Test
+        @DisplayName("성공 - 방별 채팅 메시지 조회 (오래된순)")
+        void findByRoomIdOrderByTimestampAsc_Success() {
+            // Given
+            LocalDateTime now = LocalDateTime.now();
+
+            Chat chat1 = Chat.builder()
+                    .roomId(testRoomId)
+                    .senderId(testSenderId)
+                    .nickname("테스터1")
+                    .message("첫 번째 메시지")
+                    .timestamp(now.minusMinutes(2))
+                    .build();
+
+            Chat chat2 = Chat.builder()
+                    .roomId(testRoomId)
+                    .senderId(testSenderId)
+                    .nickname("테스터2")
+                    .message("두 번째 메시지")
+                    .timestamp(now.minusMinutes(1))
+                    .build();
+
+            Chat chat3 = Chat.builder()
+                    .roomId(testRoomId)
+                    .senderId(testSenderId)
+                    .nickname("테스터3")
+                    .message("세 번째 메시지")
+                    .timestamp(now)
+                    .build();
+
+            chatRepository.save(chat1);
+            chatRepository.save(chat2);
+            chatRepository.save(chat3);
+
+            // When
+            List<Chat> chats = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+
+            // Then
+            assertThat(chats).hasSize(3);
+            assertThat(chats.get(0).getMessage()).isEqualTo("첫 번째 메시지");
+            assertThat(chats.get(1).getMessage()).isEqualTo("두 번째 메시지");
+            assertThat(chats.get(2).getMessage()).isEqualTo("세 번째 메시지");
+        }
+    }
+
+    @Nested
+    @DisplayName("채팅 메시지 삭제 (100개 초과 시)")
+    class TrimOldMessages {
+
+        private static final int MAX_CHAT_COUNT = 100;
+
+        @Test
+        @DisplayName("성공 - 100개 이하일 때 삭제되지 않음")
+        void trimOldMessages_NoDeleteWhenUnderLimit() {
+            // Given: 50개 메시지 저장
+            LocalDateTime now = LocalDateTime.now();
+            for (int i = 0; i < 50; i++) {
+                Chat chat = Chat.builder()
+                        .roomId(testRoomId)
+                        .senderId(testSenderId)
+                        .nickname("테스터")
+                        .message("메시지 " + i)
+                        .timestamp(now.plusSeconds(i))
+                        .build();
+                chatRepository.save(chat);
+            }
+
+            // When: trimOldMessages 로직 시뮬레이션
+            List<Chat> chats = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            if (chats.size() > MAX_CHAT_COUNT) {
+                int deleteCount = chats.size() - MAX_CHAT_COUNT;
+                List<Chat> oldChats = chats.subList(0, deleteCount);
+                chatRepository.deleteAll(oldChats);
+            }
+
+            // Then: 50개 그대로 유지
+            List<Chat> remainingChats = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            assertThat(remainingChats).hasSize(50);
+        }
+
+        @Test
+        @DisplayName("성공 - 정확히 100개일 때 삭제되지 않음")
+        void trimOldMessages_NoDeleteWhenExactlyAtLimit() {
+            // Given: 100개 메시지 저장
+            LocalDateTime now = LocalDateTime.now();
+            for (int i = 0; i < 100; i++) {
+                Chat chat = Chat.builder()
+                        .roomId(testRoomId)
+                        .senderId(testSenderId)
+                        .nickname("테스터")
+                        .message("메시지 " + i)
+                        .timestamp(now.plusSeconds(i))
+                        .build();
+                chatRepository.save(chat);
+            }
+
+            // When: trimOldMessages 로직 시뮬레이션
+            List<Chat> chats = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            if (chats.size() > MAX_CHAT_COUNT) {
+                int deleteCount = chats.size() - MAX_CHAT_COUNT;
+                List<Chat> oldChats = chats.subList(0, deleteCount);
+                chatRepository.deleteAll(oldChats);
+            }
+
+            // Then: 100개 그대로 유지
+            List<Chat> remainingChats = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            assertThat(remainingChats).hasSize(100);
+        }
+
+        @Test
+        @DisplayName("성공 - 105개일 때 오래된 5개 삭제되어 100개 유지")
+        void trimOldMessages_DeleteOldestWhenOverLimit() {
+            // Given: 105개 메시지 저장
+            LocalDateTime now = LocalDateTime.now();
+            for (int i = 0; i < 105; i++) {
+                Chat chat = Chat.builder()
+                        .roomId(testRoomId)
+                        .senderId(testSenderId)
+                        .nickname("테스터")
+                        .message("메시지 " + i)
+                        .timestamp(now.plusSeconds(i))
+                        .build();
+                chatRepository.save(chat);
+            }
+
+            // When: trimOldMessages 로직 시뮬레이션
+            List<Chat> chats = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            if (chats.size() > MAX_CHAT_COUNT) {
+                int deleteCount = chats.size() - MAX_CHAT_COUNT;
+                List<Chat> oldChats = chats.subList(0, deleteCount);
+                chatRepository.deleteAll(oldChats);
+            }
+
+            // Then: 100개만 남음
+            List<Chat> remainingChats = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            assertThat(remainingChats).hasSize(100);
+
+            // 가장 오래된 메시지가 "메시지 5"인지 확인 (0~4는 삭제됨)
+            assertThat(remainingChats.get(0).getMessage()).isEqualTo("메시지 5");
+            // 가장 최신 메시지가 "메시지 104"인지 확인
+            assertThat(remainingChats.get(99).getMessage()).isEqualTo("메시지 104");
+        }
+
+        @Test
+        @DisplayName("성공 - 150개일 때 오래된 50개 삭제되어 100개 유지")
+        void trimOldMessages_DeleteManyOldestWhenWayOverLimit() {
+            // Given: 150개 메시지 저장
+            LocalDateTime now = LocalDateTime.now();
+            for (int i = 0; i < 150; i++) {
+                Chat chat = Chat.builder()
+                        .roomId(testRoomId)
+                        .senderId(testSenderId)
+                        .nickname("테스터")
+                        .message("메시지 " + i)
+                        .timestamp(now.plusSeconds(i))
+                        .build();
+                chatRepository.save(chat);
+            }
+
+            // When: trimOldMessages 로직 시뮬레이션
+            List<Chat> chats = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            if (chats.size() > MAX_CHAT_COUNT) {
+                int deleteCount = chats.size() - MAX_CHAT_COUNT;
+                List<Chat> oldChats = chats.subList(0, deleteCount);
+                chatRepository.deleteAll(oldChats);
+            }
+
+            // Then: 100개만 남음
+            List<Chat> remainingChats = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            assertThat(remainingChats).hasSize(100);
+
+            // 가장 오래된 메시지가 "메시지 50"인지 확인 (0~49는 삭제됨)
+            assertThat(remainingChats.get(0).getMessage()).isEqualTo("메시지 50");
+            // 가장 최신 메시지가 "메시지 149"인지 확인
+            assertThat(remainingChats.get(99).getMessage()).isEqualTo("메시지 149");
+        }
+
+        @Test
+        @DisplayName("성공 - 다른 방의 메시지는 영향받지 않음")
+        void trimOldMessages_OnlyAffectsTargetRoom() {
+            // Given: 방1에 105개, 방2에 10개 메시지 저장
+            Long anotherRoomId = 2L;
+            LocalDateTime now = LocalDateTime.now();
+
+            for (int i = 0; i < 105; i++) {
+                Chat chat = Chat.builder()
+                        .roomId(testRoomId)
+                        .senderId(testSenderId)
+                        .nickname("테스터")
+                        .message("방1 메시지 " + i)
+                        .timestamp(now.plusSeconds(i))
+                        .build();
+                chatRepository.save(chat);
+            }
+
+            for (int i = 0; i < 10; i++) {
+                Chat chat = Chat.builder()
+                        .roomId(anotherRoomId)
+                        .senderId(testSenderId)
+                        .nickname("테스터")
+                        .message("방2 메시지 " + i)
+                        .timestamp(now.plusSeconds(i))
+                        .build();
+                chatRepository.save(chat);
+            }
+
+            // When: 방1에 대해서만 trimOldMessages 로직 시뮬레이션
+            List<Chat> chatsRoom1 = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            if (chatsRoom1.size() > MAX_CHAT_COUNT) {
+                int deleteCount = chatsRoom1.size() - MAX_CHAT_COUNT;
+                List<Chat> oldChats = chatsRoom1.subList(0, deleteCount);
+                chatRepository.deleteAll(oldChats);
+            }
+
+            // Then: 방1은 100개, 방2는 10개 그대로 유지
+            List<Chat> remainingChatsRoom1 = chatRepository.findByRoomIdOrderByTimestampAsc(testRoomId);
+            List<Chat> remainingChatsRoom2 = chatRepository.findByRoomIdOrderByTimestampAsc(anotherRoomId);
+
+            assertThat(remainingChatsRoom1).hasSize(100);
+            assertThat(remainingChatsRoom2).hasSize(10);
+        }
     }
 }
