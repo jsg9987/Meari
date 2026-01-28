@@ -860,6 +860,129 @@ class RoomServiceTest {
     }
 
     @Nested
+    @DisplayName("영상 시청 완료")
+    class FinishWatching {
+
+        @Test
+        @DisplayName("성공 - WATCHING → ROLE_PICK phase 전환")
+        void finishWatching_Success() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.WATCHING);
+
+            // When
+            roomService.finishWatching(1L, 1L);
+
+            // Then
+            verify(roomSessionService).setPhase(1L, GamePhase.ROLE_PICK);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/1/state"), any(com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 방장이 아님")
+        void finishWatching_Fail_NotOwner() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishWatching(1L, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        @Test
+        @DisplayName("실패 - 진행 중인 방이 아님")
+        void finishWatching_Fail_NotInProgress() {
+            // Given
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishWatching(1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        @Test
+        @DisplayName("실패 - WATCHING 단계가 아님")
+        void finishWatching_Fail_InvalidPhase() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishWatching(1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
+        }
+    }
+
+    @Nested
+    @DisplayName("게임 종료")
+    class FinishGame {
+
+        @Test
+        @DisplayName("성공 - ROUND_2에서 WAITING으로 복귀")
+        void finishGame_Success() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROUND_2);
+
+            // When
+            roomService.finishGame(1L, 1L);
+
+            // Then
+            assertThat(testRoom.getStatus()).isEqualTo(RoomStatus.WAITING);
+            verify(roomSessionService).resetGameState(1L);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/1/state"), any(com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 방장이 아님")
+        void finishGame_Fail_NotOwner() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishGame(1L, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        @Test
+        @DisplayName("실패 - 진행 중인 방이 아님")
+        void finishGame_Fail_NotInProgress() {
+            // Given
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishGame(1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        @Test
+        @DisplayName("실패 - ROUND_2 단계가 아님")
+        void finishGame_Fail_InvalidPhase() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROUND_1);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishGame(1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
+        }
+    }
+
+    @Nested
     @DisplayName("라운드 시작")
     class StartRound {
 

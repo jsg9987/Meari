@@ -262,6 +262,66 @@ class RoomServiceWebSocketTest {
     }
 
     @Nested
+    @DisplayName("영상 시청 완료 WebSocket 브로드캐스트")
+    class FinishWatchingBroadcast {
+
+        @Test
+        @DisplayName("성공 - PHASE_CHANGE(ROLE_PICK) 메시지 브로드캐스트")
+        void finishWatching_Success_BroadcastPhaseChange() {
+            // Given
+            Long roomId = 1L;
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            given(roomRepository.findById(roomId)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.WATCHING);
+
+            // When
+            roomService.finishWatching(roomId, 1L);
+
+            // Then
+            ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/" + roomId + "/state"),
+                    messageCaptor.capture()
+            );
+
+            RoomStateMessage sentMessage = messageCaptor.getValue();
+            assertThat(sentMessage.getType()).isEqualTo("PHASE_CHANGE");
+            assertThat(sentMessage.getPhase()).isEqualTo(GamePhase.ROLE_PICK);
+        }
+    }
+
+    @Nested
+    @DisplayName("게임 종료 WebSocket 브로드캐스트")
+    class FinishGameBroadcast {
+
+        @Test
+        @DisplayName("성공 - PHASE_CHANGE(null) 메시지 브로드캐스트 (WAITING 복귀)")
+        void finishGame_Success_BroadcastPhaseChange() {
+            // Given
+            Long roomId = 1L;
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            given(roomRepository.findById(roomId)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_2);
+
+            // When
+            roomService.finishGame(roomId, 1L);
+
+            // Then
+            ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/" + roomId + "/state"),
+                    messageCaptor.capture()
+            );
+
+            RoomStateMessage sentMessage = messageCaptor.getValue();
+            assertThat(sentMessage.getType()).isEqualTo("PHASE_CHANGE");
+            assertThat(sentMessage.getPhase()).isNull();
+        }
+    }
+
+    @Nested
     @DisplayName("게임 시작 WebSocket 브로드캐스트")
     class StartGameBroadcast {
 
