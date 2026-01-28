@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/S14P11C207.iml" filepath="$PROJECT_DIR$/.idea/S14P11C207.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/com.ssafy.meari.main.iml" filepath="$PROJECT_DIR$/.idea/modules/com.ssafy.meari.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/meari.main.iml" filepath="$PROJECT_DIR$/.idea/modules/meari.main.iml" />
     </modules>
   </component>
