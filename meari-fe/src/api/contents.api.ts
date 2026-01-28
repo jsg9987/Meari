@@ -72,13 +72,13 @@ export const getThemesMock = async (): Promise<GetThemesResponse> => {
   });
 };
 
-export const getThemes = async (): Promise<GetThemesResponse> => {
+export const getThemes = async () => {
   const useMock = import.meta.env.VITE_USE_MOCK_CONTENTS === 'true';
   if (useMock) {
-    return getThemesMock();
+    return { data: await getThemesMock() };
   }
   const response = await axiosInstance.get<GetThemesResponse>('/contents/themes');
-  return response.data;
+  return response;
 };
 
 export const getThemeContentsMock = async (themeId: number): Promise<GetThemeContentsResponse> => {
@@ -185,11 +185,11 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
   });
 };
 
-export const getThemeContents = async (themeId: number): Promise<GetThemeContentsResponse> => {
+export const getThemeContents = async (themeId: number) => {
   const useMock = import.meta.env.VITE_USE_MOCK_CONTENTS === 'true';
   if (useMock) {
-    return getThemeContentsMock(themeId);
+    return { data: await getThemeContentsMock(themeId) };
   }
   const response = await axiosInstance.get<GetThemeContentsResponse>(`/themes/${themeId}/contents`);
-  return response.data;
+  return response;
 };

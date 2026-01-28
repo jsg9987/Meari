@@ -66,27 +66,27 @@ export default function ShadowingRoom() {
       try {
         setIsRoomLoading(true);
         const response = await getRoomDetail(Number(roomId));
-        
-        if (!response.success || !response.data) {
+
+        if (!response.data.success || !response.data.data) {
           alert('방 정보를 가져올 수 없습니다.');
           navigate('/');
           return;
         }
 
-        setRoomData(response.data);
+        setRoomData(response.data.data);
 
         // 방장이면 enterRoom API 호출 없이 바로 입장
         if (isOwner) {
           setIsEntered(true);
         } else {
           // 비밀번호가 있는 방이면 비밀번호 모달 표시
-          if (response.data.has_password) {
+          if (response.data.data.has_password) {
             setIsPasswordModalOpen(true);
           } else {
             // 비밀번호 없는 방은 enterRoom 호출
             try {
               const enterResponse = await enterRoom(Number(roomId), {});
-              if (enterResponse.success) {
+              if (enterResponse.data.success) {
                 setIsEntered(true);
               } else {
                 alert('방 입장에 실패했습니다.');
@@ -218,13 +218,13 @@ export default function ShadowingRoom() {
     try {
       const response = await enterRoom(Number(roomId), { password });
 
-      if (response.success) {
+      if (response.data.success) {
         setRoomPassword(password);
         setIsPasswordModalOpen(false);
         setIsEntered(true);
         setPasswordError('');
       } else {
-        setPasswordError(response.error?.message || '비밀번호가 일치하지 않습니다.');
+        setPasswordError(response.data.error?.message || '비밀번호가 일치하지 않습니다.');
         throw new Error('Invalid password');
       }
     } catch (error) {

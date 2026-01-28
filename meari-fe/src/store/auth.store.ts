@@ -24,10 +24,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await login(credentials);
+            const response = await login(credentials) as { data: { access_token: string } };
             console.log(response);
 
-            const token = response.access_token;
+            const token = response.data.access_token;
             localStorage.setItem('accessToken', token);
 
             set({
@@ -67,9 +67,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     fetchUserInfo: async () => {
         try {
-            const response = await getUserInfo();
-            if (response.success && response.data) {
-                set({ userInfo: response.data });
+            const response = await getUserInfo() as { data: { success: boolean; data: UserInfo | null; error: { code: string; message: string } | null } };
+            if (response.data.success && response.data.data) {
+                set({ userInfo: response.data.data });
             }
         } catch (error) {
             console.error('[AuthStore] Failed to fetch user info:', error);

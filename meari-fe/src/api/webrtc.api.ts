@@ -17,16 +17,9 @@ export interface CreateSessionResponse {
   } | null;
 }
 
-export const createSession = async (payload: CreateSessionRequest): Promise<CreateSessionResponse> => {
+export const createSession = async (payload: CreateSessionRequest) => {
   const response = await axiosInstance.post('/openvidu/sessions', payload);
-  if (response.data.success !== undefined) {
-    return response.data;
-  }
-  return {
-    success: true,
-    data: response.data,
-    error: null
-  };
+  return response;
 };
 
 // 연결 토큰 생성
@@ -52,16 +45,9 @@ export interface CreateConnectionResponse {
 export const createConnection = async (
   sessionId: string,
   payload: CreateConnectionRequest
-): Promise<CreateConnectionResponse> => {
+) => {
   const response = await axiosInstance.post(`/openvidu/sessions/${sessionId}/connections`, payload);
-  if (response.data.success !== undefined) {
-    return response.data;
-  }
-  return {
-    success: true,
-    data: response.data,
-    error: null
-  };
+  return response;
 };
 
 // 세션 종료

@@ -56,17 +56,13 @@ export const createRoomMock = async (
 
 export const createRoom = async (
   payload: CreateRoomRequest
-): Promise<CreateRoomResponse> => {
+) => {
   const useMock = import.meta.env.VITE_USE_MOCK_ROOMS === 'true';
   if (useMock) {
-    return createRoomMock(payload);
+    return { data: await createRoomMock(payload) };
   }
   const response = await axiosInstance.post('/rooms', payload);
-  return {
-    success: true,
-    data: response.data,
-    error: null
-  };
+  return response;
 };
 
 export interface RoomMember {
@@ -100,17 +96,9 @@ export interface RoomDetailResponse {
   } | null;
 }
 
-export const getRoomDetail = async (roomId: number): Promise<RoomDetailResponse> => {
+export const getRoomDetail = async (roomId: number) => {
   const response = await axiosInstance.get(`/rooms/${roomId}`);
-  // 백엔드에서 success 필드 없이 데이터만 오는 경우 처리
-  if (response.data.success !== undefined) {
-    return response.data;
-  }
-  return {
-    success: true,
-    data: response.data,
-    error: null
-  };
+  return response;
 };
 
 export interface EnterRoomRequest {
@@ -132,17 +120,9 @@ export interface EnterRoomResponse {
 export const enterRoom = async (
   roomId: number,
   payload: EnterRoomRequest
-): Promise<EnterRoomResponse> => {
+) => {
   const response = await axiosInstance.post(`/rooms/${roomId}/enter`, payload);
-  // 백엔드에서 success 필드 없이 데이터만 오는 경우 처리
-  if (response.data.success !== undefined) {
-    return response.data;
-  }
-  return {
-    success: true,
-    data: response.data,
-    error: null
-  };
+  return response;
 };
 
 export const leaveRoom = async (roomId: number): Promise<void> => {
@@ -168,16 +148,9 @@ export interface WebRTCEnterResponse {
 export const enterWebRTC = async (
   roomId: number,
   payload: WebRTCEnterRequest
-): Promise<WebRTCEnterResponse> => {
+) => {
   const response = await axiosInstance.post(`/rooms/${roomId}/webrtc/enter`, payload);
-  if (response.data.success !== undefined) {
-    return response.data;
-  }
-  return {
-    success: true,
-    data: response.data,
-    error: null
-  };
+  return response;
 };
 
 export const leaveWebRTC = async (roomId: number): Promise<void> => {

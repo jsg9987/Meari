@@ -61,6 +61,7 @@ export function useVideoRoom({
       }
       arr.push({ id: s.stream.streamId, streamManager: s, label: name });
     });
+    console.log(arr)
     return arr;
   }, [publisher, subscribers, nickname]);
 
@@ -102,11 +103,11 @@ export function useVideoRoom({
           room_id: roomId
         });
 
-        if (!sessionResponse.success || !sessionResponse.data) {
-          throw new Error(sessionResponse.error?.message || "세션 생성에 실패했습니다");
+        if (!sessionResponse.data.success || !sessionResponse.data.data) {
+          throw new Error(sessionResponse.data.error?.message || "세션 생성에 실패했습니다");
         }
 
-        const { session_id } = sessionResponse.data;
+        const { session_id } = sessionResponse.data.data;
         setSessionId(session_id);
 
         const connectionResponse = await createConnection(session_id, {
@@ -115,20 +116,20 @@ export function useVideoRoom({
           role_id: roleId
         });
 
-        if (!connectionResponse.success || !connectionResponse.data) {
-          throw new Error(connectionResponse.error?.message || "연결 토큰 생성에 실패했습니다");
+        if (!connectionResponse.data.success || !connectionResponse.data.data) {
+          throw new Error(connectionResponse.data.error?.message || "연결 토큰 생성에 실패했습니다");
         }
 
-        token = connectionResponse.data.token;
+        token = connectionResponse.data.data.token;
       } else {
         // 일반 사용자: enterWebRTC 사용
         const webrtcResponse = await enterWebRTC(roomId, { password });
 
-        if (!webrtcResponse.success || !webrtcResponse.data) {
-          throw new Error(webrtcResponse.error?.message || "WebRTC 입장에 실패했습니다");
+        if (!webrtcResponse.data.success || !webrtcResponse.data.data) {
+          throw new Error(webrtcResponse.data.error?.message || "WebRTC 입장에 실패했습니다");
         }
 
-        token = webrtcResponse.data.token;
+        token = webrtcResponse.data.data.token;
       }
 
       await mySession.connect(token, { clientData: nickname });

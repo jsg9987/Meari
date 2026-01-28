@@ -10,13 +10,15 @@ export interface LoginResponse {
 }
 
 // Mock API
-const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginResponse> => {
+const loginMock = async ({ email, password }: LoginCredentials) => {
     console.log('[API] Mock Login Requested:', { email, password });
     return new Promise((resolve, reject) => {
         setTimeout(() => {
             if (email === "user@gmail.com" && password === "1234") {
                 resolve({
-                    access_token: "mock-jwt-access-token-eyJhbGciOi-mock",
+                    data: {
+                        access_token: "mock-jwt-access-token-eyJhbGciOi-mock",
+                    }
                 });
                 return;
             }
@@ -34,13 +36,12 @@ const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginRe
 };
 
 // Real API
-const loginReal = async ({ email, password }: LoginCredentials): Promise<LoginResponse> => {
+const loginReal = async ({ email, password }: LoginCredentials) => {
     const response = await axiosInstance.post<LoginResponse>('/auth/login', {
         email,
         password,
     });
-    console.log(response)
-    return response.data;
+    return response;
 };
 
 // --- Signup ---
@@ -61,7 +62,7 @@ export interface SignupResponse {
     } | null;
 }
 
-const signupMock = async (credentials: SignupCredentials): Promise<SignupResponse> => {
+const signupMock = async (credentials: SignupCredentials) => {
     console.log('[API] Mock Signup Requested:', credentials);
     return new Promise((resolve, reject) => {
         setTimeout(() => {
@@ -85,17 +86,19 @@ const signupMock = async (credentials: SignupCredentials): Promise<SignupRespons
 
             // 성공
             resolve({
-                success: true,
-                data: { message: "회원가입 성공" },
-                error: null,
+                data: {
+                    success: true,
+                    data: { message: "회원가입 성공" },
+                    error: null,
+                }
             });
         }, 700);
     });
 };
 
-const signupReal = async (credentials: SignupCredentials): Promise<SignupResponse> => {
+const signupReal = async (credentials: SignupCredentials) => {
     const response = await axiosInstance.post<SignupResponse>('/auth/signup', credentials);
-    return response.data;
+    return response;
 };
 
 // --- Get User Info ---
@@ -114,26 +117,28 @@ export interface UserInfoResponse {
     } | null;
 }
 
-const getUserInfoMock = async (): Promise<UserInfoResponse> => {
+const getUserInfoMock = async () => {
     console.log('[API] Mock Get User Info Requested');
     return new Promise((resolve) => {
         setTimeout(() => {
             resolve({
-                success: true,
                 data: {
-                    email: "user@gmail.com",
-                    profile_url: "http://",
-                    nickname: "김싸피"
-                },
-                error: null
+                    success: true,
+                    data: {
+                        email: "user@gmail.com",
+                        profile_url: "http://",
+                        nickname: "김싸피"
+                    },
+                    error: null
+                }
             });
         }, 300);
     });
 };
 
-const getUserInfoReal = async (): Promise<UserInfoResponse> => {
+const getUserInfoReal = async () => {
     const response = await axiosInstance.get<UserInfoResponse>('/members/me');
-    return response.data;
+    return response;
 };
 
 const useMock = import.meta.env.VITE_USE_MOCK_AUTH === 'true';
