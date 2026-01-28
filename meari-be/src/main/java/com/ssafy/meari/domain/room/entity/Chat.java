@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.redis.core.RedisHash;
+import org.springframework.data.redis.core.index.Indexed;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -27,6 +28,7 @@ public class Chat implements Serializable {
     @Builder.Default
     private String id = UUID.randomUUID().toString();
 
+    @Indexed
     @Schema(description = "방 ID")
     private Long roomId;
 
