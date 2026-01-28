@@ -40,11 +40,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/v1/auth/email/check".equals(requestURI) ||
             "/api/v1/auth/nickname/check".equals(requestURI) ||
             "/api/v1/auth/refresh".equals(requestURI) ||
+            "/websocket-test.html".equals(requestURI) ||
             requestURI.startsWith("/swagger-ui") ||    // swagger-ui 관련 모든 리소스
             requestURI.startsWith("/v3/api-docs") ||   // OpenAPI3 스펙 경로
             requestURI.startsWith("/api-docs")         // 기존 api-docs 경로
         ) {
-            log.debug("JwtAuthentication 스킵");
+            log.debug("JwtAuthentication 스킵: {}", requestURI);
             filterChain.doFilter(request, response);
             return;
         }
