@@ -2,6 +2,7 @@ package com.ssafy.meari.domain.room.controller;
 
 import com.ssafy.meari.domain.room.dto.request.ContentSelectRequest;
 import com.ssafy.meari.domain.room.dto.request.GameStartRequest;
+import com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest;
 import com.ssafy.meari.domain.room.dto.request.RoundStartRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomCreateRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomEnterRequest;
@@ -103,7 +104,7 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
-    @Operation(summary = "게임 시작", description = "게임을 시작합니다. 방장만 가능하며, 동영상을 선택하고 모든 참여자가 준비 완료 상태여야 합니다.")
+    @Operation(summary = "게임 시작", description = "게임을 시작합니다. 방장만 가능하며, 모든 참여자가 준비 완료 상태여야 합니다.")
     @PostMapping("/{roomId}/start")
     public ResponseEntity<ApiResponse<Void>> startGame(
             @Parameter(description = "방 ID") @PathVariable Long roomId,
@@ -124,11 +125,11 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
-    @Operation(summary = "역할 선택 완료", description = "모든 참여자의 역할 선택을 확정합니다. 방장만 가능하며, ROLE_PICK 단계에서만 가능합니다. 확정 후에는 역할 변경이 불가능합니다.")
+    @Operation(summary = "역할 확정", description = "최종 역할 할당을 확정합니다. 방장만 가능하며, ROLE_PICK 단계에서만 가능합니다.")
     @PostMapping("/{roomId}/roles/confirm")
     public ResponseEntity<ApiResponse<Void>> confirmRoles(
             @Parameter(description = "방 ID") @PathVariable Long roomId,
-            @Valid @RequestBody com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest request,
+            @Valid @RequestBody RoleConfirmRequest request,
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
         roomService.confirmRoles(roomId, request, userDetails.getMember().getMemberId());
