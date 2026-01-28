@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import RoomCard from './RoomCard'
 import PasswordModal from './PasswordModal'
+import CreateRoomButton from './CreateRoomButton'
 import { getRooms, joinRoom, type RoomItem } from '../../api/rooms.api'
 
 const themes = ['전체', '일상회화', '비즈니스', '뉴스', '여행'] as const
@@ -122,6 +123,11 @@ const ShadowingPanel = () => {
         <p className='text-sm text-gray-600'>
           한국인의 음성을 실시간으로 따라하며 발음 정확도를 교정 받으세요.
         </p>
+      </div>
+
+      {/* 방 생성 버튼 */}
+      <div className='flex justify-end mb-4'>
+        <CreateRoomButton />
       </div>
 
       {/* 필터 및 검색 */}

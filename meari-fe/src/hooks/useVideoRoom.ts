@@ -40,7 +40,6 @@ export function useVideoRoom({
   const [error, setError] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const ovRef = useRef<OpenVidu | null>(null);
   const statusRef = useRef<ConnectionStatus>("idle");
@@ -108,7 +107,6 @@ export function useVideoRoom({
         }
 
         const { session_id } = sessionResponse.data.data;
-        setSessionId(session_id);
 
         const connectionResponse = await createConnection(session_id, {
           member_id: memberId,
@@ -173,7 +171,6 @@ export function useVideoRoom({
       setSession(null);
       setPublisher(null);
       setSubscribers([]);
-      setSessionId(null);
       statusRef.current = "idle";
       setStatus("idle");
       setError(null);
