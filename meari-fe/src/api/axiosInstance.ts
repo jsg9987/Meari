@@ -28,7 +28,7 @@ axiosInstance.interceptors.request.use(
 // 요청을 받기 전에 탈취해서 처리하는 로직
 // ex) accessToken이 만료되어 재요청을 보내는 로직 or 로그아웃
 axiosInstance.interceptors.response.use(
-  (response: AxiosResponse) => response.data,
+  (response: AxiosResponse) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       // TODO: 로그아웃 or 토큰 재발급 처리
