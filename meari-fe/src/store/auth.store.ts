@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { login, type LoginCredentials, getUserInfo, type UserInfo } from '../api/auth.api';
+import { login, type LoginCredentials, type UserInfo, getUserInfo } from '../api/auth.api';
 
 interface AuthState {
     user: { email: string } | null;
@@ -10,10 +10,11 @@ interface AuthState {
     login: (credentials: LoginCredentials) => Promise<void>;
     logout: () => void;
     checkAuth: () => void;
+    setUserInfo: (userInfo: UserInfo | null) => void;
     fetchUserInfo: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
     user: null,
     userInfo: null,
     isAuthenticated: false,
@@ -49,7 +50,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     logout: () => {
         localStorage.removeItem('accessToken');
-        set({ user: null, isAuthenticated: false, error: null });
+        set({ user: null, userInfo: null, isAuthenticated: false, error: null });
     },
 
     checkAuth: () => {
@@ -60,17 +61,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
-    fetchUserInfo: async () => {
-        // 이미 사용자 정보가 있으면 다시 요청하지 않음
-        if (get().userInfo) {
-            return;
-        }
+    setUserInfo: (userInfo) => {
+        set({ userInfo });
+    },
 
+    fetchUserInfo: async () => {
         try {
             const response = await getUserInfo();
-            console.log(response)
             if (response.success && response.data) {
-                console.log("데이터 문제 없음")
                 set({ userInfo: response.data });
             }
         } catch (error) {

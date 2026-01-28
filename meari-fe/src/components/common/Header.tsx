@@ -33,14 +33,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
   const languageRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
 
-  // Zustand store에서 사용자 정보 가져오기
-  const { userInfo, fetchUserInfo } = useAuthStore()
-
-  // 사용자 정보 불러오기
-  useEffect(() => {
-    console.log("사용자 정보 요청")
-    fetchUserInfo()
-  }, [fetchUserInfo])
+  // Zustand store에서 사용자 정보 가져오기 (App.tsx에서 초기화됨)
+  const userInfo = useAuthStore((state) => state.userInfo)
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
