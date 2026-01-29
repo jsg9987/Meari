@@ -1,4 +1,6 @@
 import axiosInstance from './axiosInstance';
+import type { AxiosResponse } from 'axios';
+import type { ApiResponse } from './auth.api';
 
 export interface Theme {
   theme_id: number;
@@ -17,67 +19,55 @@ export interface Content {
   duration: number;
 }
 
-export interface GetThemesResponse {
-  success: boolean;
-  data: Theme[];
-  error: {
-    code: string;
-    message: string;
-  } | null;
-}
+export type GetThemesResponse = AxiosResponse<ApiResponse<Theme[]>>;
 
-export interface GetThemeContentsResponse {
-  success: boolean;
-  data: Content[];
-  error: {
-    code: string;
-    message: string;
-  } | null;
-}
+export type GetThemeContentsResponse = AxiosResponse<ApiResponse<Content[]>>;
 
 export const getThemesMock = async (): Promise<GetThemesResponse> => {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
-        success: true,
-        data: [
-          {
-            theme_id: 1,
-            name: '일상회화',
-            description: '한국인들이 일상에서 자주 사용하는 회화 표현 연습',
-            theme_url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
-          },
-          {
-            theme_id: 2,
-            name: '비즈니스',
-            description: '회사에서 사용하는 업무 관련 전문 대화 연습',
-            theme_url: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
-          },
-          {
-            theme_id: 3,
-            name: '뉴스',
-            description: '시사 뉴스 리포트를 따라하며 정확한 발음 연습',
-            theme_url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
-          },
-          {
-            theme_id: 4,
-            name: '여행',
-            description: '가이드와 관광객의 대화를 통한 상황별 회화 연습',
-            theme_url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
-          },
-        ],
-        error: null,
-      });
+        data: {
+          success: true,
+          data: [
+            {
+              theme_id: 1,
+              name: '일상회화',
+              description: '한국인들이 일상에서 자주 사용하는 회화 표현 연습',
+              theme_url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
+            },
+            {
+              theme_id: 2,
+              name: '비즈니스',
+              description: '회사에서 사용하는 업무 관련 전문 대화 연습',
+              theme_url: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
+            },
+            {
+              theme_id: 3,
+              name: '뉴스',
+              description: '시사 뉴스 리포트를 따라하며 정확한 발음 연습',
+              theme_url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
+            },
+            {
+              theme_id: 4,
+              name: '여행',
+              description: '가이드와 관광객의 대화를 통한 상황별 회화 연습',
+              theme_url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
+            },
+          ],
+          error: null,
+        }
+      } as GetThemesResponse);
     }, 400);
   });
 };
 
-export const getThemes = async () => {
+export const getThemes = async (): Promise<GetThemesResponse> => {
   const useMock = import.meta.env.VITE_USE_MOCK_CONTENTS === 'true';
   if (useMock) {
-    return { data: await getThemesMock() };
+    return await getThemesMock();
   }
-  const response = await axiosInstance.get<GetThemesResponse>('/contents/themes');
+  const response = await axiosInstance.get<ApiResponse<Theme[]>>('/contents/themes');
   return response;
 };
 
@@ -177,19 +167,39 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
       };
 
       resolve({
-        success: true,
-        data: mockContents[themeId] || [],
-        error: null,
-      });
+        data: {
+          success: true,
+          data: mockContents[themeId] || [],
+          error: null,
+        }
+      } as GetThemeContentsResponse);
     }, 600);
   });
 };
 
-export const getThemeContents = async (themeId: number) => {
+export const getThemeContents = async (themeId: number): Promise<GetThemeContentsResponse> => {
   const useMock = import.meta.env.VITE_USE_MOCK_CONTENTS === 'true';
   if (useMock) {
-    return { data: await getThemeContentsMock(themeId) };
+    return await getThemeContentsMock(themeId);
   }
-  const response = await axiosInstance.get<GetThemeContentsResponse>(`/themes/${themeId}/contents`);
+  const response = await axiosInstance.get<ApiResponse<Content[]>>(`/themes/${themeId}/contents`);
+  return response;
+};
+
+// --- Select Room Content (방 컨텐츠 선택) ---
+export interface SelectRoomContentData {
+  message: string;
+}
+
+export type SelectRoomContentResponse = AxiosResponse<ApiResponse<SelectRoomContentData>>;
+
+// TODO: 실제 구현시 선택된 content의 content_id 사용
+export const selectRoomContent = async (
+  roomId: number
+): Promise<SelectRoomContentResponse> => {
+  const response = await axiosInstance.post<ApiResponse<SelectRoomContentData>>(
+    `/rooms/${roomId}/content`,
+    { content_id: 1 }
+  );
   return response;
 };

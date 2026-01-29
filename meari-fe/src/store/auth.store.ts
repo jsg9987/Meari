@@ -24,21 +24,25 @@ export const useAuthStore = create<AuthState>((set) => ({
     login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await login(credentials) as { data: { access_token: string } };
+            const response = await login(credentials);
             console.log(response);
 
-            const token = response.data.access_token;
-            localStorage.setItem('accessToken', token);
+            if (response.data.success && response.data.data) {
+                const token = response.data.data.access_token;
+                localStorage.setItem('accessToken', token);
 
-            set({
-                isAuthenticated: true,
-                user: { email: credentials.email },
-                isLoading: false
-            });
+                set({
+                    isAuthenticated: true,
+                    user: { email: credentials.email },
+                    isLoading: false
+                });
+            } else {
+                throw new Error(response.data.error?.message || '로그인에 실패했습니다.');
+            }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             console.error('[AuthStore] Login failed', err);
-            const errorMessage = err.response?.data?.message || '로그인에 실패했습니다.';
+            const errorMessage = err.response?.data?.error?.message || err.message || '로그인에 실패했습니다.';
             set({
                 isAuthenticated: false,
                 user: null,
@@ -67,7 +71,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     fetchUserInfo: async () => {
         try {
-            const response = await getUserInfo() as { data: { success: boolean; data: UserInfo | null; error: { code: string; message: string } | null } };
+            const response = await getUserInfo();
             if (response.data.success && response.data.data) {
                 set({ userInfo: response.data.data });
             }

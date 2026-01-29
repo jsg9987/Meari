@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2 } from "lucide-react";
+import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2, UserCircle } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
 import VideoControls from "../components/webrtc/VideoControls";
@@ -8,10 +8,15 @@ import ChatPanel from "../components/webrtc/ChatPanel";
 import MediaCheckScreen from "../components/webrtc/MediaCheckScreen";
 import ContentSelectModal from "../components/webrtc/ContentSelectModal";
 import PasswordModal from "../components/webrtc/PasswordModal";
+import Toast from "../components/common/Toast";
+import RoleSelectModal from "../components/webrtc/RoleSelectModal";
 import { useVideoRoom } from "../hooks/useVideoRoom";
+import { useRoomWebSocket, type Role } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
-import { getRoomDetail, enterRoom, leaveRoom } from "../api/rooms.api";
+import { selectRoomContent } from "../api/contents.api";
+import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom } from "../api/rooms.api";
 import { useRoomStore } from "../store/room.store";
+import { useRoleStore } from "../store/role.store";
 
 type SidebarTab = "video" | "chat";
 type LayoutMode = "narrow" | "grid" | "wide";
@@ -23,6 +28,14 @@ export default function ShadowingRoom() {
   const location = useLocation();
   const isOwner = location.state?.isOwner === true;
   const { roomData, setRoomData, clearRoomData } = useRoomStore();
+  const {
+    availableRoles,
+    mySelectedRoleId,
+    setAvailableRoles,
+    setMySelectedRole,
+    setMemberRole,
+    getConfirmData,
+  } = useRoleStore();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("video");
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordError, setPasswordError] = useState('');
@@ -33,21 +46,23 @@ export default function ShadowingRoom() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("narrow");
   const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
   const [isMediaChecked, setIsMediaChecked] = useState(false);
-  const [, setInitialAudioEnabled] = useState(true);
-  const [, setInitialVideoEnabled] = useState(true);
-  const [, setInitialAudioDeviceId] = useState<string>();
-  const [, setInitialVideoDeviceId] = useState<string>();
   const [isContentSelectOpen, setIsContentSelectOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
-  const [isHost, ] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
-  const [isReady, setIsReady] = useState(false); // 내 준비 상태
-  const [participantsReady, setParticipantsReady] = useState<Record<string, boolean>>({
-    me: false,
-    user1: false,
-    user2: false,
-    user3: false,
-  }); // 각 참가자의 준비 상태
+  const [isHost] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
+  const [ isReady, setIsReady] = useState(false); // 내 준비 상태
+  const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false); // 역할 선택 모달 상태
+  const [isConfirmingRoles, setIsConfirmingRoles] = useState(false); // 역할 확정 로딩 상태
+  const [isRoleAssigned, setIsRoleAssigned] = useState(false); // 역할 선택 완료 여부
+  const [isGameStarting, setIsGameStarting] = useState(false); // 게임 시작 중 여부
+  const [isRoundStarting, setIsRoundStarting] = useState(false); // 라운드 시작 중 여부
+  const [currentRound, setCurrentRound] = useState(0); // 현재 라운드 (0: 시작 전)
+  const [isRoundInProgress, setIsRoundInProgress] = useState(false); // 라운드 진행 중 여부
+  const [isReadyLoading, setIsReadyLoading] = useState(false); // 준비 완료 로딩 상태
+  const [participantsReady, setParticipantsReady] = useState<Record<number, boolean>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
+  const readyTimeoutRef = useRef<number | null>(null);
+  const memberId = 1; // TODO: 실제 사용자 ID로 변경 필요
 
   // 영상 재생 관련 상태
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -57,6 +72,91 @@ export default function ShadowingRoom() {
   const [subtitles, setSubtitles] = useState<Array<{ start: number; end: number; text: string }>>([]);
 
   const nickname = "User";
+
+  // 더미 역할 데이터
+  const dummyRoles: Role[] = [
+    { id: 1, role_id: 1, name: "선엽", created_at: "2026-01-29 10:05:23.000000", updated_at: "2026-01-29 10:05:23.000000" },
+    { id: 1, role_id: 3, name: "오타니", created_at: "2026-01-29 10:05:59.000000", updated_at: "2026-01-29 10:06:00.000000" },
+    { id: 1, role_id: 4, name: "야마모토", created_at: "2026-01-29 10:06:28.000000", updated_at: "2026-01-29 10:06:29.000000" },
+    { id: 1, role_id: 5, name: "선엽씨", created_at: "2026-01-29 10:06:47.000000", updated_at: "2026-01-29 10:06:47.000000" },
+  ];
+
+  // 웹소켓 연결
+  const {
+    toggleReady: wsToggleReady,
+    assignRole,
+  } = useRoomWebSocket({
+    roomId: Number(roomId),
+    memberId,
+    onReady: (message) => {
+      // 준비 상태 메시지 수신
+      if (message.member_id !== undefined && message.ready !== undefined) {
+        setParticipantsReady(prev => ({
+          ...prev,
+          [message.member_id!]: message.ready!,
+        }));
+
+        // 내 준비 상태 업데이트
+        if (message.member_id === memberId) {
+          // 타임아웃 클리어
+          if (readyTimeoutRef.current) {
+            clearTimeout(readyTimeoutRef.current);
+            readyTimeoutRef.current = null;
+          }
+          setIsReadyLoading(false); // 로딩 종료
+          setIsReady(message.ready);
+        }
+      }
+    },
+    onRolePick: (message) => {
+      console.log('Role pick received:', message);
+      // 더미 역할 데이터로 모달 열기
+      console.log('Opening role select modal with dummy roles');
+      setAvailableRoles(dummyRoles);
+      setIsRoleSelectOpen(true);
+    },
+    onRoleAssigned: (message) => {
+      console.log('Role assigned:', message);
+      // 역할 선점 성공 시 선택된 역할 ID 저장
+      if (message.role_id && message.member_id) {
+        setMySelectedRole(message.role_id);
+        setMemberRole(message.member_id, message.role_id);
+        setIsRoleAssigned(true); // 역할 선택 완료
+        setToastMessage('역할이 등록되었습니다');
+      }
+    },
+    onRoleReleased: (message) => {
+      console.log('Role released:', message);
+      // 역할 해제 시 선택된 역할 ID 초기화
+      setMySelectedRole(undefined);
+      setToastMessage('역할이 해제되었습니다');
+    },
+    onGameStart: (message) => {
+      console.log('Game starting:', message);
+      // 게임 시작 시 카운트다운 시작
+      if (message.phase === 'WATCHING') {
+        setCountdown(3);
+      }
+    },
+    onPhaseWaiting: (message) => {
+      console.log('Phase WAITING received:', message);
+      // 대기 상태로 돌아가기
+      resetToWaitingState();
+    },
+    onMemberJoin: (message) => {
+      console.log('Member joined:', message);
+      // TODO: 멤버 입장 시 처리 로직
+    },
+    onConnect: () => {
+      console.log('WebSocket connected');
+    },
+    onDisconnect: () => {
+      console.log('WebSocket disconnected');
+    },
+    onError: (error) => {
+      console.error('WebSocket error:', error);
+    },
+  });
 
   // 방 정보 가져오기
   useEffect(() => {
@@ -146,7 +246,7 @@ export default function ShadowingRoom() {
         try {
           const useMock = import.meta.env.VITE_USE_MOCK_CONTENTS === 'true';
           if (useMock) {
-            // Mock 자막 데이터 로드
+            // TODO: Mock 자막 데이터 로드
             const response = await fetch('/src/assets/video/description.txt');
             const data = await response.json();
             setSubtitles(data);
@@ -173,8 +273,24 @@ export default function ShadowingRoom() {
         videoRef.current.play();
         setIsPlaying(true);
       }
+
+      // TODO: 임시 구현 - 실제로는 영상이 끝난 후 호출해야 함
+      // 카운트다운 후 바로 영상 시청 완료 API 호출
+      if (roomId) {
+        finishWatching(Number(roomId))
+          .then((response) => {
+            if (response.data.success) {
+              console.log('Watching finished successfully');
+            } else {
+              console.error('Failed to finish watching:', response.data.error?.message);
+            }
+          })
+          .catch((error) => {
+            console.error('Failed to finish watching:', error);
+          });
+      }
     }
-  }, [countdown]);
+  }, [countdown, roomId]);
 
   // 영상 시간에 따른 자막 업데이트
   useEffect(() => {
@@ -192,10 +308,6 @@ export default function ShadowingRoom() {
     video.addEventListener('timeupdate', updateSubtitle);
     return () => video.removeEventListener('timeupdate', updateSubtitle);
   }, [subtitles]);
-
-  // 모든 참가자가 준비 완료되었는지 확인
-  // TODO: 실제 배포 시에는 Object.values(participantsReady).every(ready => ready)로 변경
-  const allParticipantsReady = participantsReady.me; // 테스트: 본인만 준비되면 시작 가능
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -249,36 +361,168 @@ export default function ShadowingRoom() {
     themeId: 1
   };
 
-  const handleContentSelect = (content: Content) => {
-    setSelectedContent(content);
-    setIsContentSelectOpen(false);
-    // 컨텐츠 선택 시 모든 참가자의 준비 상태 초기화
-    setIsReady(false);
-    setParticipantsReady({
-      me: false,
-      user1: false,
-      user2: false,
-      user3: false,
-    });
-    // TODO: 실제로는 선택한 컨텐츠의 비디오를 로드하고 재생
-    console.log('Selected content:', content);
+  const handleContentSelect = async (content: Content) => {
+    if (!roomId) return;
+
+    try {
+      // 방 컨텐츠 선택 API 호출
+      const response = await selectRoomContent(Number(roomId));
+
+      if (response.data.success) {
+        setSelectedContent(content);
+        setIsContentSelectOpen(false);
+        // 컨텐츠 선택 시 모든 참가자의 준비 상태 초기화
+        setIsReady(false);
+        setParticipantsReady({});
+        console.log('Content selected successfully:', content);
+      } else {
+        setToastMessage('컨텐츠 선택에 실패했어요');
+      }
+    } catch (error) {
+      console.error('Failed to select content:', error);
+      setToastMessage('컨텐츠 선택에 실패했어요');
+    }
   };
 
   const handleToggleReady = () => {
-    const newReadyState = !isReady;
-    setIsReady(newReadyState);
-    setParticipantsReady(prev => ({
-      ...prev,
-      me: newReadyState,
-    }));
-    // TODO: WebSocket으로 준비 상태 전송
-    console.log('Ready state:', newReadyState);
+    if (isReadyLoading) return; // 이미 처리 중이면 무시
+
+    setIsReadyLoading(true);
+
+    // 기존 타임아웃 클리어
+    if (readyTimeoutRef.current) {
+      clearTimeout(readyTimeoutRef.current);
+    }
+
+    // 타임아웃 설정 (5초 후 응답 없으면 실패 처리)
+    readyTimeoutRef.current = setTimeout(() => {
+      setIsReadyLoading(false);
+      setToastMessage('준비 완료에 실패했어요');
+    }, 5000);
+
+    // WebSocket으로 준비 상태 전송
+    try {
+      wsToggleReady(!isReady);
+    } catch (error) {
+      if (readyTimeoutRef.current) {
+        clearTimeout(readyTimeoutRef.current);
+      }
+      setIsReadyLoading(false);
+      setToastMessage('준비 완료에 실패했어요');
+      console.error('Failed to toggle ready:', error);
+    }
   };
 
-  const handleStartShadowing = () => {
-    // 카운트다운 시작 (3초)
-    setCountdown(3);
-    console.log('Starting shadowing countdown...');
+  const handleStartShadowing = async () => {
+    if (!roomId) return;
+
+    try {
+      setIsGameStarting(true); // 게임 시작 중 상태로 변경
+      // 방장이 게임 시작 API 호출
+      const response = await startGame(Number(roomId));
+
+      if (response.data.success) {
+        console.log('Game start API called successfully');
+        // API 호출 성공 시 카운트다운은 WebSocket GAME_START 메시지로 시작됨
+      } else {
+        setIsGameStarting(false);
+        setToastMessage('게임 시작에 실패했어요');
+      }
+    } catch (error) {
+      console.error('Failed to start game:', error);
+      setIsGameStarting(false);
+      setToastMessage('게임 시작에 실패했어요');
+    }
+  };
+
+  const handleStartRound = async (round: number) => {
+    if (!roomId) return;
+
+    try {
+      setIsRoundStarting(true);
+      const response = await startRound(Number(roomId), { round });
+
+      if (response.data.success) {
+        console.log(`Round ${round} start API called successfully`);
+        setCurrentRound(round);
+        setIsRoundInProgress(true);
+        setToastMessage(`Round ${round}이 시작되었습니다`);
+
+        // 3초 후 라운드 완료
+        setTimeout(() => {
+          setIsRoundInProgress(false);
+        }, 3000);
+      } else {
+        setToastMessage('라운드 시작에 실패했어요');
+      }
+    } catch (error) {
+      console.error('Failed to start round:', error);
+      setToastMessage('라운드 시작에 실패했어요');
+    } finally {
+      setIsRoundStarting(false);
+    }
+  };
+
+  const handleRoleSelect = (role: Role) => {
+    // WebSocket으로 역할 선택 메시지 전송
+    assignRole(role.role_id);
+    console.log('Role selected:', role);
+  };
+
+  const handleConfirmRoles = async () => {
+    if (!roomId) return;
+
+    try {
+      setIsConfirmingRoles(true);
+      const confirmData = getConfirmData();
+
+      console.log('Confirming roles:', confirmData);
+      const response = await confirmRoles(Number(roomId), { roles: confirmData });
+
+      if (response.data.success) {
+        setToastMessage('역할 선택이 확정되었습니다');
+        setIsRoleSelectOpen(false);
+      } else {
+        setToastMessage('역할 확정에 실패했어요');
+      }
+    } catch (error) {
+      console.error('Failed to confirm roles:', error);
+      setToastMessage('역할 확정에 실패했어요');
+    } finally {
+      setIsConfirmingRoles(false);
+    }
+  };
+
+  // 상태 초기화 함수
+  const resetToWaitingState = () => {
+    console.log('Resetting to waiting state');
+    setIsRoleAssigned(false);
+    setCurrentRound(0);
+    setIsRoundInProgress(false);
+    setIsGameStarting(false);
+    setIsRoundStarting(false);
+    setIsReady(false);
+    setSelectedContent(null);
+    setToastMessage('대기 상태로 돌아갔습니다');
+  };
+
+  const handleFinishRoom = async () => {
+    if (!roomId) return;
+
+    try {
+      console.log('Finishing room...');
+      const response = await finishRoom(Number(roomId));
+
+      if (response.data.success) {
+        console.log('Room finished successfully');
+        // WebSocket PHASE_CHANGE (WAITING) 메시지를 기다림
+      } else {
+        setToastMessage('처음으로 돌아가기에 실패했어요');
+      }
+    } catch (error) {
+      console.error('Failed to finish room:', error);
+      setToastMessage('처음으로 돌아가기에 실패했어요');
+    }
   };
 
   // WebRTC 연결
@@ -307,6 +551,11 @@ export default function ShadowingRoom() {
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
 
   const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
+
+  // 모든 참가자가 준비 완료되었는지 확인
+  const totalParticipants = tiles.length;
+  const readyCount = Object.values(participantsReady).filter(ready => ready).length;
+  const allParticipantsReady = totalParticipants > 0 && readyCount === totalParticipants;
 
   const handleAudioDeviceChange = (deviceId: string) => {
     setSelectedAudioDevice(deviceId);
@@ -377,15 +626,11 @@ export default function ShadowingRoom() {
   };
 
   const handleMediaCheckComplete = (
-    audioEnabled: boolean,
-    videoEnabled: boolean,
+    _audioEnabled: boolean,
+    _videoEnabled: boolean,
     audioDeviceId?: string,
     videoDeviceId?: string
   ) => {
-    setInitialAudioEnabled(audioEnabled);
-    setInitialVideoEnabled(videoEnabled);
-    setInitialAudioDeviceId(audioDeviceId);
-    setInitialVideoDeviceId(videoDeviceId);
     setIsMediaChecked(true);
 
     // 선택된 장치 정보 저장
@@ -539,42 +784,103 @@ export default function ShadowingRoom() {
                     ) : (
                       <div className="text-center">
                         <p className="text-gray-600 font-medium mb-2">현재 컨텐츠</p>
-                        <p className="text-gray-900 text-lg font-semibold mb-4">{selectedContent.title}</p>
+                        <p className="text-white text-lg font-semibold mb-4">{selectedContent.title}</p>
 
                         <div className="flex flex-col items-center gap-3">
-                          {/* 준비 완료 버튼 (모든 참가자) */}
-                          <button
-                            onClick={handleToggleReady}
-                            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                              isReady
-                                ? "bg-green-500 hover:bg-green-600 text-white"
-                                : "bg-blue-600 hover:bg-blue-700 text-white"
-                            }`}
-                          >
-                            {isReady ? "준비 완료" : "준비하기"}
-                          </button>
-
-                          {/* 시작 버튼 (방장만) */}
-                          {isHost && (
-                            <div className="flex flex-col items-center gap-2 mt-2">
-                              <div className="text-sm text-gray-600 mb-1">
-                                준비 완료: {Object.values(participantsReady).filter(r => r).length} / {Object.keys(participantsReady).length}
-                              </div>
+                          {/* 게임 시작 전: 준비 완료 및 시작 버튼 */}
+                          {!isGameStarting && !isRoleAssigned && (
+                            <>
+                              {/* 준비 완료 버튼 (모든 참가자) */}
                               <button
-                                onClick={handleStartShadowing}
-                                disabled={!allParticipantsReady}
-                                className={`px-8 py-3 rounded-lg font-semibold transition-all ${
-                                  allParticipantsReady
-                                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                onClick={handleToggleReady}
+                                disabled={isReadyLoading}
+                                className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                                  isReadyLoading
+                                    ? "bg-gray-400 cursor-not-allowed text-white"
+                                    : isReady
+                                    ? "bg-green-500 hover:bg-green-600 text-white"
+                                    : "bg-blue-600 hover:bg-blue-700 text-white"
                                 }`}
                               >
-                                쉐도잉 시작
+                                {isReadyLoading && (
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                )}
+                                {isReadyLoading ? "처리 중..." : isReady ? "준비 완료" : "준비하기"}
                               </button>
-                              {!allParticipantsReady && (
-                                <p className="text-xs text-gray-500">모든 참가자가 준비될 때까지 기다려주세요</p>
+
+                              {/* 시작 버튼 (방장만) */}
+                              {isHost && (
+                                <div className="flex flex-col items-center gap-2 mt-2">
+                                  {totalParticipants > 0 && (
+                                    <div className="text-sm text-gray-600 mb-1">
+                                      준비 완료: {readyCount} / {totalParticipants}
+                                    </div>
+                                  )}
+                                  <button
+                                    onClick={handleStartShadowing}
+                                    disabled={!allParticipantsReady}
+                                    className={`px-8 py-3 rounded-lg font-semibold transition-all ${
+                                      allParticipantsReady
+                                        ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    }`}
+                                  >
+                                    쉐도잉 시작
+                                  </button>
+                                  {!allParticipantsReady && (
+                                    <p className="text-xs text-gray-500">모든 참가자가 준비될 때까지 기다려주세요</p>
+                                  )}
+                                </div>
                               )}
-                            </div>
+                            </>
+                          )}
+
+                          {/* 역할 선택 완료 후: Round 버튼 (방장만) */}
+                          {isRoleAssigned && isHost && (
+                            <>
+                              {/* 라운드 진행 중 표시 */}
+                              {isRoundInProgress && (
+                                <div className="flex flex-col items-center gap-2">
+                                  <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                  <p className="text-gray-700 text-lg font-semibold">
+                                    Round {currentRound} 진행 중..
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* 라운드 시작 버튼 (Round 2까지만) */}
+                              {!isRoundInProgress && currentRound < 2 && (
+                                <button
+                                  onClick={() => handleStartRound(currentRound + 1)}
+                                  disabled={isRoundStarting}
+                                  className={`px-8 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                                    isRoundStarting
+                                      ? "bg-gray-400 cursor-not-allowed text-white"
+                                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                                  }`}
+                                >
+                                  {isRoundStarting && (
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  )}
+                                  {isRoundStarting ? "시작 중..." : `Round ${currentRound + 1} 시작하기`}
+                                </button>
+                              )}
+
+                              {/* Round 2 완료 후 메시지 및 버튼 */}
+                              {!isRoundInProgress && currentRound === 2 && (
+                                <div className="flex flex-col items-center gap-4">
+                                  <p className="text-gray-700 text-lg font-semibold">
+                                    모든 라운드가 완료되었습니다
+                                  </p>
+                                  <button
+                                    onClick={handleFinishRoom}
+                                    className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
+                                  >
+                                    처음으로 돌아가기
+                                  </button>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -599,6 +905,17 @@ export default function ShadowingRoom() {
                 className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
               >
                 컨텐츠 변경
+              </button>
+            )}
+
+            {/* 캐릭터 선택 버튼 - 역할 선택 완료 전까지만 표시 */}
+            {status === "connected" && !isPlaying && !isRoleAssigned && availableRoles.length > 0 && (
+              <button
+                onClick={() => setIsRoleSelectOpen(true)}
+                className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
+              >
+                <UserCircle size={20} />
+                캐릭터 선택
               </button>
             )}
           </div>
@@ -704,7 +1021,7 @@ export default function ShadowingRoom() {
                     muted={t.muted}
                     label={t.label}
                     isSpeaker={t.isSpeaker}
-                    isReady={t.isReady}
+                    isReady={t.id === "me" ? isReady : false}
                     videoClassName={layoutMode === "wide" ? "aspect-[21/9]" : undefined}
                   />
                 ))
@@ -729,6 +1046,28 @@ export default function ShadowingRoom() {
           themeId={roomInfo.themeId}
           onClose={() => setIsContentSelectOpen(false)}
           onSelect={handleContentSelect}
+        />
+      )}
+
+      {/* 역할 선택 모달 */}
+      {isRoleSelectOpen && (
+        <RoleSelectModal
+          roles={availableRoles}
+          onSelect={handleRoleSelect}
+          onClose={() => setIsRoleSelectOpen(false)}
+          onConfirm={handleConfirmRoles}
+          selectedRoleId={mySelectedRoleId}
+          isHost={isHost}
+          isConfirming={isConfirmingRoles}
+        />
+      )}
+
+      {/* 토스트 알림 */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type="error"
+          onClose={() => setToastMessage(null)}
         />
       )}
     </div>

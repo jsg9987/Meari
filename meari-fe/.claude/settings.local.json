@@ -5,7 +5,8 @@
       "Bash(npm install:*)",
       "Bash(npm cache clean:*)",
       "Bash(npm:*)",
-      "Bash(node --version)"
+      "Bash(node --version)",
+      "Bash(pnpm install:*)"
     ]
   }
 }

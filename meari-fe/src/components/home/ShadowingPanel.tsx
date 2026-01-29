@@ -7,6 +7,7 @@ import { getRooms, joinRoom, type RoomItem } from '../../api/rooms.api'
 
 const themes = ['전체', '일상회화', '비즈니스', '뉴스', '여행'] as const
 
+// TODO: useEffect 4번 호출 버그 수정
 const ShadowingPanel = () => {
   const navigate = useNavigate()
   const [selectedTheme, setSelectedTheme] = useState<string>('전체')
@@ -25,6 +26,7 @@ const ShadowingPanel = () => {
 
   // 방 목록 불러오기 함수
   const fetchRooms = useCallback(async (isFirstPage: boolean = false) => {
+
     if (isFirstPage) {
       setIsInitialLoading(true)
     } else {
@@ -42,15 +44,15 @@ const ShadowingPanel = () => {
         size: 16
       });
 
-      if (response.success && response.data) {
-        const newRooms = response.data.contents;
+      if (response.data.success && response.data.data) {
+        const newRooms = response.data.data.contents;
         if (isFirstPage) {
           setRooms(newRooms);
         } else {
           setRooms(prev => [...prev, ...newRooms]);
         }
-        setNextCursor(response.data.next_cursor);
-        setHasNext(response.data.has_next);
+        setNextCursor(response.data.data.next_cursor);
+        setHasNext(response.data.data.has_next);
       }
     } catch (error) {
       console.error('Failed to fetch rooms:', error)
@@ -69,7 +71,10 @@ const ShadowingPanel = () => {
 
   // 무한 스크롤 Observer 설정
   useEffect(() => {
-    if (!observerTarget.current || !hasNext || isFetchingNextPage || isInitialLoading) return
+    if (!observerTarget.current || !hasNext || isFetchingNextPage || isInitialLoading) {
+      console.log('⏭️ Observer 설정 스킵:', { hasObserverTarget: !!observerTarget.current, hasNext, isFetchingNextPage, isInitialLoading })
+      return
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -81,7 +86,9 @@ const ShadowingPanel = () => {
     )
 
     observer.observe(observerTarget.current)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+    }
   }, [fetchRooms, hasNext, isFetchingNextPage, isInitialLoading])
 
   // 방 클릭 핸들러
@@ -103,7 +110,7 @@ const ShadowingPanel = () => {
         room_id: selectedRoomId as number,
         password,
       })
-      if (response.success) {
+      if (response.data.success) {
         setIsPasswordModalOpen(false)
         navigate(`/shadowing/${selectedRoomId}`)
       }
