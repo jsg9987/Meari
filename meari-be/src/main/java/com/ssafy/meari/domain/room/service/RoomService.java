@@ -2,8 +2,10 @@ package com.ssafy.meari.domain.room.service;
 
 import com.ssafy.meari.domain.content.entity.Content;
 import com.ssafy.meari.domain.content.entity.Role;
+import com.ssafy.meari.domain.content.entity.Sentence;
 import com.ssafy.meari.domain.content.repository.ContentRepository;
 import com.ssafy.meari.domain.content.repository.RoleRepository;
+import com.ssafy.meari.domain.content.repository.SentenceRepository;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
 import com.ssafy.meari.domain.report.entity.ShadowingReport;
@@ -15,7 +17,10 @@ import com.ssafy.meari.domain.room.dto.response.RoomDetailResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomListResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomMemberResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomResponse;
+import com.ssafy.meari.domain.room.dto.websocket.MemberSegmentInfo;
+import com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
+import com.ssafy.meari.domain.room.dto.websocket.SentenceSegmentInfo;
 import com.ssafy.meari.global.common.CursorPageResponse;
 import com.ssafy.meari.domain.room.entity.GamePhase;
 import com.ssafy.meari.domain.room.entity.MemberRoom;
@@ -27,6 +32,7 @@ import com.ssafy.meari.domain.theme.entity.Theme;
 import com.ssafy.meari.domain.theme.repository.ThemeRepository;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +58,7 @@ public class RoomService {
     private final ThemeRepository themeRepository;
     private final ContentRepository contentRepository;
     private final RoleRepository roleRepository;
+    private final SentenceRepository sentenceRepository;
     private final ShadowingReportRepository shadowingReportRepository;
     private final RoomSessionService roomSessionService;
     private final SimpMessagingTemplate messagingTemplate;
@@ -90,8 +97,9 @@ public class RoomService {
                 .build();
         memberRoomRepository.save(memberRoom);
 
-        // Redis에 참여자 추가
+        // Redis에 참여자 추가 및 멤버→방 매핑
         roomSessionService.addMember(room.getRoomId(), memberId);
+        roomSessionService.setMemberRoom(memberId, room.getRoomId());
 
         return RoomResponse.from(room, 1);
     }
@@ -203,8 +211,9 @@ public class RoomService {
                 .build();
         memberRoomRepository.save(memberRoom);
 
-        // Redis에 참여자 추가
+        // Redis에 참여자 추가 및 멤버→방 매핑
         roomSessionService.addMember(roomId, memberId);
+        roomSessionService.setMemberRoom(memberId, roomId);
 
         // 입장 알림 브로드캐스트
         RoomStateMessage message = RoomStateMessage.memberJoin(memberId, member.getNickname());
@@ -232,6 +241,7 @@ public class RoomService {
 
         // Redis에서 참여자 제거 (준비 상태, 역할도 함께 제거됨)
         roomSessionService.removeMember(roomId, memberId);
+        roomSessionService.clearMemberRoom(memberId);
 
         // 방장이 나간 경우 처리 및 새 방장 ID 반환
         Long newOwnerId = null;
@@ -488,9 +498,12 @@ public class RoomService {
     /**
      * Round 시작 (방장 전용)
      * Round1 시작 시 역할 정보 DB 저장
+     * Sentence 조회, 멤버-역할 매핑, ROUND_START 브로드캐스트
      */
     @Transactional
     public void startRound(Long roomId, Integer round, Long memberId) {
+        log.info("Round 시작 요청: roomId={}, round={}, memberId={}", roomId, round, memberId);
+
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
@@ -506,12 +519,10 @@ public class RoomService {
         // 현재 phase 검증
         GamePhase currentPhase = roomSessionService.getPhase(roomId);
         if (round == 1) {
-            // Round1은 ROLE_PICK 단계에서만 시작 가능
             if (currentPhase != GamePhase.ROLE_PICK) {
                 throw new BusinessException(ErrorCode.INVALID_PHASE);
             }
         } else if (round == 2) {
-            // Round2는 ROUND_1 단계에서만 시작 가능
             if (currentPhase != GamePhase.ROUND_1) {
                 throw new BusinessException(ErrorCode.INVALID_PHASE);
             }
@@ -534,6 +545,104 @@ public class RoomService {
         // phase 변경
         GamePhase newPhase = round == 1 ? GamePhase.ROUND_1 : GamePhase.ROUND_2;
         roomSessionService.setPhase(roomId, newPhase);
+
+        // Sentence 조회 및 멤버별 세그먼트 구성
+        List<Sentence> sentences = sentenceRepository.findByContent_ContentId(contentId);
+        Map<Long, String> roleAssignments = roomSessionService.getAllRoles(roomId);
+        List<MemberRoom> memberRooms = memberRoomRepository.findByRoomIdWithMember(roomId);
+
+        List<MemberSegmentInfo> segments = buildMemberSegments(memberRooms, roleAssignments, sentences);
+
+        // 각 멤버별 예상 문장수 저장
+        for (MemberSegmentInfo segment : segments) {
+            roomSessionService.setMemberTotalSentences(roomId, round, segment.getMemberId(), segment.getSentences().size());
+        }
+
+        // Round 시작 시각 저장
+        long serverTime = System.currentTimeMillis();
+        roomSessionService.setRoundStartTime(roomId, serverTime);
+
+        // ROUND_START 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.roundStart(newPhase, round, serverTime, segments);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
+        log.info("Round 시작 완료: roomId={}, round={}, phase={}", roomId, round, newPhase);
+    }
+
+    /**
+     * 멤버별 문장 세그먼트 구성
+     */
+    private List<MemberSegmentInfo> buildMemberSegments(
+            List<MemberRoom> memberRooms,
+            Map<Long, String> roleAssignments,
+            List<Sentence> sentences
+    ) {
+        // roleId → List<Sentence> 매핑
+        Map<Long, List<Sentence>> sentencesByRole = sentences.stream()
+                .collect(Collectors.groupingBy(s -> s.getRole().getRoleId()));
+
+        return memberRooms.stream()
+                .map(mr -> {
+                    Long mId = mr.getMember().getMemberId();
+                    Long roleId = findRoleIdByMemberId(roleAssignments, mId);
+
+                    Role role = roleRepository.findById(roleId)
+                            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROLE));
+
+                    List<SentenceSegmentInfo> memberSentences = sentencesByRole.getOrDefault(roleId, List.of())
+                            .stream()
+                            .map(s -> SentenceSegmentInfo.builder()
+                                    .sentenceId(s.getSentenceId())
+                                    .sequence(s.getSequence())
+                                    .startTime(s.getStartTime().doubleValue())
+                                    .endTime(s.getEndTime().doubleValue())
+                                    .textKo(s.getTextKo())
+                                    .textVn(s.getTextVn())
+                                    .build())
+                            .sorted(Comparator.comparingInt(SentenceSegmentInfo::getSequence))
+                            .collect(Collectors.toList());
+
+                    return MemberSegmentInfo.builder()
+                            .memberId(mId)
+                            .roleId(roleId)
+                            .roleName(role.getName())
+                            .sentences(memberSentences)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 문장별 녹음 완료 처리
+     */
+    @Transactional
+    public void recordingComplete(Long roomId, RecordingCompleteMessage message) {
+        log.info("녹음 완료 요청: roomId={}, memberId={}, sentenceId={}",
+                roomId, message.getMemberId(), message.getSentenceId());
+
+        // 현재 phase가 ROUND인지 확인
+        GamePhase currentPhase = roomSessionService.getPhase(roomId);
+        if (currentPhase != GamePhase.ROUND_1 && currentPhase != GamePhase.ROUND_2) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
+        }
+
+        // 방의 멤버인지 확인
+        if (!roomSessionService.isMember(roomId, message.getMemberId())) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_MEMBER);
+        }
+
+        int round = currentPhase == GamePhase.ROUND_1 ? 1 : 2;
+
+        // 문장 녹음 완료 마킹
+        roomSessionService.markRecordingComplete(roomId, round, message.getMemberId(), message.getSentenceId());
+
+        // 모든 멤버의 모든 문장이 완료되었는지 확인
+        if (roomSessionService.isAllRecordingsComplete(roomId, round)) {
+            log.info("모든 멤버 녹음 완료: roomId={}, round={}", roomId, round);
+
+            RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
+            messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+        }
     }
 
     /**
@@ -560,6 +669,7 @@ public class RoomService {
 
     /**
      * 역할 목록에서 특정 멤버의 역할 ID 찾기
+     * @throws BusinessException 역할을 찾지 못한 경우
      */
     private Long findRoleIdByMemberId(Map<Long, String> roles, Long memberId) {
         for (Map.Entry<Long, String> entry : roles.entrySet()) {
@@ -567,7 +677,7 @@ public class RoomService {
                 return entry.getKey();
             }
         }
-        return null;
+        throw new BusinessException(ErrorCode.ROLE_NOT_SELECTED);
     }
 
     /**
