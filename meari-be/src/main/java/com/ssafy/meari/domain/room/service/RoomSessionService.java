@@ -453,6 +453,29 @@ public class RoomSessionService {
     }
 
     /**
+     * 특정 멤버의 모든 문장 녹음이 완료되었는지 확인
+     */
+    public boolean isMemberRecordingsComplete(Long roomId, Integer round, Long memberId) {
+        // 예상 문장수 조회
+        String totalKey = String.format(KEY_MEMBER_TOTAL_SENTENCES, roomId, round, memberId);
+        String totalValue = redisTemplate.opsForValue().get(totalKey);
+        if (totalValue == null) {
+            return false;
+        }
+        int totalSentences = Integer.parseInt(totalValue);
+
+        // 완료된 문장수 조회
+        String recordingsKey = String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId);
+        Long completedCount = redisTemplate.opsForSet().size(recordingsKey);
+        if (completedCount == null || completedCount < totalSentences) {
+            return false;
+        }
+
+        log.debug("멤버 {} 모든 녹음 완료: {}/{}", memberId, completedCount, totalSentences);
+        return true;
+    }
+
+    /**
      * 모든 멤버의 모든 문장 녹음이 완료되었는지 확인
      */
     public boolean isAllRecordingsComplete(Long roomId, Integer round) {
@@ -463,19 +486,7 @@ public class RoomSessionService {
 
         for (String memberIdStr : members) {
             Long memberId = Long.parseLong(memberIdStr);
-
-            // 예상 문장수 조회
-            String totalKey = String.format(KEY_MEMBER_TOTAL_SENTENCES, roomId, round, memberId);
-            String totalValue = redisTemplate.opsForValue().get(totalKey);
-            if (totalValue == null) {
-                return false;
-            }
-            int totalSentences = Integer.parseInt(totalValue);
-
-            // 완료된 문장수 조회
-            String recordingsKey = String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId);
-            Long completedCount = redisTemplate.opsForSet().size(recordingsKey);
-            if (completedCount == null || completedCount < totalSentences) {
+            if (!isMemberRecordingsComplete(roomId, round, memberId)) {
                 return false;
             }
         }

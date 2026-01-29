@@ -1,5 +1,6 @@
 package com.ssafy.meari.domain.room.service;
 
+import com.ssafy.meari.domain.analysis.service.AnalysisProducer;
 import com.ssafy.meari.domain.content.entity.Content;
 import com.ssafy.meari.domain.content.entity.Role;
 import com.ssafy.meari.domain.content.entity.Sentence;
@@ -62,6 +63,7 @@ public class RoomService {
     private final ShadowingReportRepository shadowingReportRepository;
     private final RoomSessionService roomSessionService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final AnalysisProducer analysisProducer;
 
     /**
      * 방 생성
@@ -660,6 +662,14 @@ public class RoomService {
 
         // 문장 녹음 완료 마킹
         roomSessionService.markRecordingComplete(roomId, round, message.getMemberId(), message.getSentenceId());
+
+        // 이 멤버의 모든 문장이 완료되었는지 체크
+        if (roomSessionService.isMemberRecordingsComplete(roomId, round, message.getMemberId())) {
+            log.info("멤버 {} 모든 녹음 완료, 분석 요청", message.getMemberId());
+
+            // 멤버별 발음 분석 요청 (비동기)
+            analysisProducer.requestMemberAnalysis(roomId, round, message.getMemberId());
+        }
 
         // 타임아웃 체크
         if (checkAndHandleRecordingTimeout(roomId, round, currentPhase)) {
