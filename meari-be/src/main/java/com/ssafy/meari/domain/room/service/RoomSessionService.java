@@ -40,6 +40,8 @@ public class RoomSessionService {
     private static final String KEY_ROUND_START_TIME = "room:%d:round_start_time";
     private static final String KEY_MEMBER_RECORDINGS = "room:%d:round:%d:member:%d:recordings";
     private static final String KEY_MEMBER_TOTAL_SENTENCES = "room:%d:round:%d:member:%d:total_sentences";
+    private static final String KEY_ROUND_TIMEOUT = "room:%d:round:%d:timeout";
+    private static final String KEY_ROUND_COMPLETED = "room:%d:round:%d:completed";
 
     // === 참여자 관리 ===
 
@@ -524,6 +526,46 @@ public class RoomSessionService {
         redisTemplate.delete(String.format(KEY_PHASE, roomId));
         redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
         log.info("방 {} 게임 상태 초기화 (준비 단계로 복귀)", roomId);
+    }
+
+    // === 타임아웃 관리 ===
+
+    /**
+     * 라운드 타임아웃 시간 설정
+     */
+    public void setRoundTimeout(Long roomId, Integer round, Long timeoutMillis) {
+        String key = String.format(KEY_ROUND_TIMEOUT, roomId, round);
+        redisTemplate.opsForValue().set(key, String.valueOf(timeoutMillis));
+        setExpire(key);
+        log.debug("라운드 타임아웃 설정: roomId={}, round={}, timeout={}", roomId, round, timeoutMillis);
+    }
+
+    /**
+     * 라운드 타임아웃 시간 조회
+     */
+    public Long getRoundTimeout(Long roomId, Integer round) {
+        String key = String.format(KEY_ROUND_TIMEOUT, roomId, round);
+        String value = redisTemplate.opsForValue().get(key);
+        return value != null ? Long.parseLong(value) : null;
+    }
+
+    /**
+     * 라운드 완료 플래그 설정
+     */
+    public void markRoundCompleted(Long roomId, Integer round) {
+        String key = String.format(KEY_ROUND_COMPLETED, roomId, round);
+        redisTemplate.opsForValue().set(key, "true");
+        setExpire(key);
+        log.debug("라운드 완료 마킹: roomId={}, round={}", roomId, round);
+    }
+
+    /**
+     * 라운드가 완료되었는지 확인
+     */
+    public boolean isRoundCompleted(Long roomId, Integer round) {
+        String key = String.format(KEY_ROUND_COMPLETED, roomId, round);
+        String value = redisTemplate.opsForValue().get(key);
+        return "true".equals(value);
     }
 
     // === 유틸리티 ===
