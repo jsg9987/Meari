@@ -89,4 +89,9 @@ public class JwtUtil {
         return expiration.getTime() - now;
     }
 
+    // Refresh Token 만료 시간 조회 (초 단위)
+    public long getRefreshTokenExpireSeconds() {
+        return refreshTokenExpirePeriodMs / 1000;
+    }
+
 }
