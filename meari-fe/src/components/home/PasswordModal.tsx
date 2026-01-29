@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 type PasswordModalProps = {
     isOpen: boolean
@@ -8,8 +9,6 @@ type PasswordModalProps = {
 
 const PasswordModal = ({ isOpen, onClose, onSubmit }: PasswordModalProps) => {
     const [password, setPassword] = useState('')
-
-    if (!isOpen) return null
 
     const handleSubmit = () => {
         if (password.trim()) {
@@ -24,7 +23,27 @@ const PasswordModal = ({ isOpen, onClose, onSubmit }: PasswordModalProps) => {
         }
     }
 
-    return (
+    // 모달이 열릴 때 스크롤 방지
+    useEffect(() => {
+        if (isOpen) {
+            const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+            document.body.style.overflow = 'hidden';
+            // 스크롤바가 사라지면서 화면이 밀리는 것 방지
+            document.body.style.paddingRight = `${scrollBarWidth}px`;
+        } else {
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        }
+
+        return () => {
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        }
+    }, [isOpen])
+
+    if (!isOpen) return null
+
+    return createPortal(
         <div
             className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'
             onClick={onClose}
@@ -45,12 +64,13 @@ const PasswordModal = ({ isOpen, onClose, onSubmit }: PasswordModalProps) => {
                 <button
                     type='button'
                     onClick={handleSubmit}
-                    className='w-full bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm py-2 rounded-md transition-colors'
+                    className='w-full bg-[#2D9CDB] hover:bg-[#2789c2] text-white text-sm py-2 rounded-md transition-colors font-medium'
                 >
                     비밀번호 입력
                 </button>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 

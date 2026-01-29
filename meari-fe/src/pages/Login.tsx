@@ -15,6 +15,10 @@ const Login = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         await login({ email, password });
+        // 로그인 에러가 없으면 메인으로 이동
+        if (!useAuthStore.getState().error) {
+            navigate('/');
+        }
     };
 
     const labelClass = 'text-sm font-medium text-[#001C27]';
@@ -41,12 +45,12 @@ const Login = () => {
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 flex flex-col lg:flex-row items-center justify-center">
+                <div className="flex-1 flex flex-col lg:flex-row items-center justify-center pl-20">
 
                     {/* Login Card */}
                     <div
                         className={
-                            'w-full max-w-[400px] rounded-xl border border-[#bebebe] bg-white p-6 sm:p-10 ' +
+                            'w-full max-w-[400px] rounded-xl border border-[#bebebe] bg-white p-8 sm:p-10' +
                             'shadow-[0_1px_2px_rgba(0,0,0,0.25)]' +
                             'transition-opacity duration-200'
                         }

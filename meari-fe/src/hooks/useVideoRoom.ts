@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { OpenVidu, Publisher, Session, Subscriber } from "openvidu-browser";
 import { enterWebRTC, leaveWebRTC } from "../api/rooms.api";
 import { createSession, createConnection } from "../api/webrtc.api";
+import { useAuthStore } from "../store/auth.store";
 
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
 
@@ -30,9 +31,10 @@ export function useVideoRoom({
   password,
   autoJoin = false,
   isOwner = false,
-  memberId = 1, // TODO: 실제 사용자 ID로 변경 필요
   roleId = null
 }: UseVideoRoomOptions) {
+  const { userInfo } = useAuthStore();
+  const memberId = userInfo?.member_id;
   const [session, setSession] = useState<Session | null>(null);
   const [publisher, setPublisher] = useState<Publisher | null>(null);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -109,7 +111,7 @@ export function useVideoRoom({
         const { session_id } = sessionResponse.data.data;
 
         const connectionResponse = await createConnection(session_id, {
-          member_id: memberId,
+          member_id: memberId as number,
           nickname,
           role_id: roleId
         });
@@ -156,7 +158,7 @@ export function useVideoRoom({
       setStatus("error");
       try {
         mySession.disconnect();
-      } catch {}
+      } catch { }
     }
   }, [roomId, nickname, password, isOwner, memberId, roleId]);
 
@@ -201,7 +203,7 @@ export function useVideoRoom({
       if (session) {
         try {
           session.disconnect();
-        } catch {}
+        } catch { }
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
