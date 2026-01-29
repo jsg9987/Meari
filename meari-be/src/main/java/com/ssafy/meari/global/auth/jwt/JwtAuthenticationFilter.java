@@ -42,7 +42,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/v1/auth/refresh".equals(requestURI) ||
             requestURI.startsWith("/swagger-ui") ||    // swagger-ui 관련 모든 리소스
             requestURI.startsWith("/v3/api-docs") ||   // OpenAPI3 스펙 경로
-            requestURI.startsWith("/api-docs")         // 기존 api-docs 경로
+            requestURI.startsWith("/api-docs") ||      // 기존 api-docs 경로
+            requestURI.startsWith("/api/v1/admin")     // Admin API (테스트용)
 		////////////////// chat-test.html 테스트를 위한 접근제한 해제 /////////////
 			//            || requestURI.startsWith("/api/v1/auth") ||
 			//            requestURI.startsWith("/ws") ||

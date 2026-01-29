@@ -15,6 +15,7 @@ import com.ssafy.meari.domain.word.repository.WordRepository;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
 import com.ssafy.meari.global.pipeline.videosaving.dto.HomonymWordDto;
+import com.ssafy.meari.global.pipeline.videosaving.homonym.service.HomonymDisambiguationService;
 import com.ssafy.meari.global.pipeline.videosaving.nlp.dto.MorphemeAnalysisResponseDto;
 import com.ssafy.meari.global.pipeline.videosaving.nlp.service.NlpService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -34,13 +36,14 @@ public class ScriptSavingService {
 
 	private final CsvScriptParser csvScriptParser;
 	private final NlpService nlpService;
+	private final HomonymDisambiguationService homonymDisambiguationService;
 	private final SentenceRepository sentenceRepository;
 	private final ContentRepository contentRepository;
 	private final RoleRepository roleRepository;
 	private final WordRepository wordRepository;
 	private final SentenceWordRepository sentenceWordRepository;
 
-	// 동음이의어 리스트 (나중에 수동 처리용)
+	// 동음이의어 리스트
 	private List<HomonymWordDto> homonymList = new ArrayList<>();
 
 	/**
@@ -92,14 +95,26 @@ public class ScriptSavingService {
 		List<Sentence> savedSentences = new ArrayList<>();
 		homonymList.clear(); // 동음이의어 리스트 초기화
 
+		// 전체 스크립트 생성 (동음이의어 맥락 파악용)
+		String fullScript = buildFullScript(rows);
+
 		for (ScriptCsvRowDto row : rows) {
+			log.info("[Pipeline] CSV 행 처리 - contentId: {}, roleId: {}, sequence: {}",
+					row.getContentId(), row.getRoleId(), row.getSequence());
+
 			// Content 조회
 			Content content = contentRepository.findById(row.getContentId())
-					.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_CONTENT));
+					.orElseThrow(() -> {
+						log.error("[Pipeline] Content 조회 실패 - contentId: {}", row.getContentId());
+						return new BusinessException(ErrorCode.NOT_FOUND_CONTENT);
+					});
 
 			// Role 조회
 			Role role = roleRepository.findById(row.getRoleId())
-					.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROLE));
+					.orElseThrow(() -> {
+						log.error("[Pipeline] Role 조회 실패 - roleId: {}", row.getRoleId());
+						return new BusinessException(ErrorCode.NOT_FOUND_ROLE);
+					});
 
 			// Sentence 엔티티 생성
 			Sentence sentence = Sentence.builder()
@@ -126,11 +141,31 @@ public class ScriptSavingService {
 			linkWordsToSentence(savedSentence, morphemeResult);
 		}
 
+		// 동음이의어 LLM 처리
 		if (!homonymList.isEmpty()) {
-			log.info("[Pipeline] 동음이의어 {}개 발견 - 수동 처리 필요", homonymList.size());
+			log.info("[Pipeline] 동음이의어 {}개 발견 - 목록:", homonymList.size());
+			for (HomonymWordDto dto : homonymList) {
+				log.info("  - '{}' (후보 {}개) in 문장[{}]: {}",
+						dto.getWordKr(),
+						dto.getHomonymWords().size(),
+						dto.getSentence().getSequence(),
+						dto.getSentence().getTextKo());
+			}
+			log.info("[Pipeline] LLM 처리 시작");
+			int processedCount = homonymDisambiguationService.processHomonyms(homonymList, fullScript);
+			log.info("[Pipeline] 동음이의어 LLM 처리 완료 - {}개 처리됨", processedCount);
 		}
 
 		return savedSentences;
+	}
+
+	/**
+	 * CSV 데이터로 전체 스크립트 생성
+	 */
+	private String buildFullScript(List<ScriptCsvRowDto> rows) {
+		return rows.stream()
+				.map(row -> String.format("[%d] %s", row.getSequence(), row.getTextKo()))
+				.collect(Collectors.joining("\n"));
 	}
 
 	/**

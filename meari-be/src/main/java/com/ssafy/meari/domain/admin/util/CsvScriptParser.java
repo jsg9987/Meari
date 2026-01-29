@@ -75,7 +75,11 @@ public class CsvScriptParser {
 				throw new BusinessException(ErrorCode.CSV_EMPTY_FILE);
 			}
 
-			log.debug("CSV 파싱 완료 - 파일: {}, 행 개수: {}", file.getOriginalFilename(), rows.size());
+			log.info("CSV 파싱 완료 - 파일: {}, 행 개수: {}", file.getOriginalFilename(), rows.size());
+			for (ScriptCsvRowDto row : rows) {
+				log.info("파싱된 행 - contentId: {}, roleId: {}, sequence: {}, startTime: {}, textKo: {}",
+						row.getContentId(), row.getRoleId(), row.getSequence(), row.getStartTime(), row.getTextKo());
+			}
 			return rows;
 		} catch (BusinessException e) {
 			throw e;
@@ -209,10 +213,36 @@ public class CsvScriptParser {
 			.contentId(Long.parseLong(record.get("content_id")))
 			.sequence(Integer.parseInt(record.get("sequence")))
 			.roleId(Long.parseLong(record.get("role_id")))
-			.startTime(new BigDecimal(record.get("start_time")))
-			.endTime(new BigDecimal(record.get("end_time")))
+			.startTime(parseTime(record.get("start_time")))
+			.endTime(parseTime(record.get("end_time")))
 			.textKo(record.get("text_ko"))
 			.textVn(record.get("text_vn"))
 			.build();
+	}
+
+	/**
+	 * 시간 문자열을 초 단위 BigDecimal로 변환
+	 * 지원 형식: "MM:SS.ms" (예: "00:01.30") 또는 순수 숫자 (예: "1.30")
+	 *
+	 * @param timeStr 시간 문자열
+	 * @return 초 단위 BigDecimal
+	 */
+	private BigDecimal parseTime(String timeStr) {
+		if (timeStr == null || timeStr.isBlank()) {
+			return BigDecimal.ZERO;
+		}
+
+		timeStr = timeStr.trim();
+
+		// MM:SS.ms 형식 (예: "00:01.30")
+		if (timeStr.contains(":")) {
+			String[] parts = timeStr.split(":");
+			int minutes = Integer.parseInt(parts[0]);
+			BigDecimal seconds = new BigDecimal(parts[1]);
+			return seconds.add(BigDecimal.valueOf(minutes * 60));
+		}
+
+		// 순수 숫자 형식 (예: "1.30")
+		return new BigDecimal(timeStr);
 	}
 }

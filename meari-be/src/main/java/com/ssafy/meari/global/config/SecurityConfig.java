@@ -78,6 +78,9 @@ public class SecurityConfig {
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/api/v1/nlp/**").permitAll()
 
+                // Admin API (테스트용, 운영 시 인증 필요로 변경 권장)
+                .requestMatchers("/api/v1/admin/**").permitAll()
+
                 ////////////////// chat-test.html 테스트를 위한 접근제한 해제 /////////////
                // .requestMatchers("/**/*.html").permitAll()
                // .requestMatchers("/**/*.js").permitAll()
