@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getThemes, type Theme } from '../../api/contents.api'
+import ThemeConfirmModal from './ThemeConfirmModal'
 
 // 설명 카드 이미지 (SVG)
 import newsClickImg from '../../assets/images/copik/learning-preparation.svg'
@@ -7,8 +9,6 @@ import questionFlowImg from '../../assets/images/copik/question-speaking.svg'
 import resultCheckImg from '../../assets/images/copik/result-check.svg'
 import progressChartImg from '../../assets/images/copik/mypage-chart.svg'
 
-// 테마 더미 썸네일
-const dummyThemeImg = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=400&h=300&fit=crop'
 
 // 설명 카드 데이터
 const stepCards = [
@@ -43,60 +43,91 @@ const stepCards = [
   },
 ]
 
-// 테마 데이터 (더미)
-const themes = [
-  { id: 1, name: '생활', description: '테마 설명', duration: '2 minute', sections: 16, thumbnail: dummyThemeImg },
-  { id: 2, name: '생활', description: '테마 설명', duration: '2 minute', sections: 16, thumbnail: dummyThemeImg },
-  { id: 3, name: '생활', description: '테마 설명', duration: '2 minute', sections: 16, thumbnail: dummyThemeImg },
-  { id: 4, name: '생활', description: '테마 설명', duration: '2 minute', sections: 16, thumbnail: dummyThemeImg },
-]
+// 테마 데이터는 API를 통해 동적으로 가져옵니다.
 
 const KopicPanel = () => {
   const navigate = useNavigate()
+  const [themes, setThemes] = useState<Theme[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [selectedTheme, setSelectedTheme] = useState<number | null>(null)
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        setIsLoading(true)
+        const response = await getThemes()
+        if (response.data.success && response.data.data) {
+          setThemes(response.data.data)
+        }
+      } catch (error) {
+        console.error('Failed to load themes:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadThemes()
+  }, [])
 
   const handleStartEvaluation = () => {
     if (selectedTheme) {
-      navigate(`/kopic/evaluation/${selectedTheme}`)
+      setIsConfirmModalOpen(true)
     } else {
       alert('테마를 선택해주세요.')
     }
   }
 
+  const handleThemeClick = (themeId: number) => {
+    setSelectedTheme(themeId)
+  }
+
+  const handleConfirmStart = () => {
+    if (selectedTheme) {
+      navigate(`/kopic/evaluation/${selectedTheme}`)
+    }
+    setIsConfirmModalOpen(false)
+  }
+
+  const handleCloseModal = () => {
+    setIsConfirmModalOpen(false)
+  }
+
+  const currentThemeName = themes.find(t => t.theme_id === selectedTheme)?.name || ''
+
   return (
     <section>
       {/* 타이틀 및 시작 버튼 */}
-      <div className='flex items-start justify-between mb-8'>
+      <div className='flex items-end justify-between mb-10'>
         <div>
-          <h1 className='text-2xl font-bold text-gray-900 mb-2'>
+          <h1 className='text-[1.65rem] font-bold text-gray-900 mb-2'>
             코픽 (K-OPIC)
           </h1>
-          <p className='text-sm text-gray-600'>
+          <p className='text-[16px] text-gray-600'>
             보다 정확한 검증을 통해 현재의 실력을 평가 받아보세요.
           </p>
         </div>
         <button
           type='button'
           onClick={handleStartEvaluation}
-          className='px-8 py-3 bg-[#2D9CDB] text-white font-medium rounded-lg hover:bg-[#2789c2] transition-colors cursor-pointer'
+          className='px-9 py-2.5 bg-[#2D9CDB] text-white font-medium rounded-full hover:bg-[#2789c2] transition-colors cursor-pointer'
         >
           평가 시작하기
         </button>
       </div>
 
       {/* 설명 카드 영역 - 높이 고정 및 이미지 절대 배치 */}
-      <div className='grid grid-cols-4 gap-4 mb-9'>
+      <div className='grid grid-cols-4 gap-[18px] mb-10'>
         {stepCards.map((card) => (
           <div
             key={card.id}
-            className='bg-white rounded-lg p-2 shadow-sm border border-gray-100 relative overflow-hidden h-40'
+            className='bg-white rounded-lg p-[9px] shadow-sm border border-gray-100 relative overflow-hidden h-48'
           >
             {/* 배지 (시안 스타일: 어두운 배경 + 전구 아이콘) */}
-            <div className='inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded bg-[#001C27] relative z-10'>
+            <div className='inline-flex items-center gap-1.5 mb-3 px-[9px] py-[4px] rounded bg-[#001C27] relative z-10'>
               <span className='text-[14px] font-bold text-[#38bdf8]'>
                 {card.badge}
               </span>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2a6 6 0 0 1 6 6c0 2.97-1 3.5-2.5 4.5-.37.26-1.5.5-1.5 2.5a2 2 0 0 1-4 0c0-2-1.13-2.25-1.5-2.5A6 6 0 0 1 12 2z"></path>
                 <path d="M9 18h6"></path>
                 <path d="M10 22h4"></path>
@@ -105,8 +136,8 @@ const KopicPanel = () => {
 
             {/* 텍스트 */}
             <div className='relative z-10 max-w-[60%]'>
-              <p className='text-[15px] text-gray-500 leading-tight'>{card.title}</p>
-              <p className='text-[15px] font-semibold text-gray-900 leading-tight'>{card.subtitle}</p>
+              <p className='text-[14px] text-gray-500 leading-tight'>{card.title}</p>
+              <p className='text-[14px] font-semibold text-gray-900 leading-tight'>{card.subtitle}</p>
             </div>
 
             {/* 이미지 영역 - 절대 배치로 우측 하단 고정 및 확대 */}
@@ -123,40 +154,54 @@ const KopicPanel = () => {
 
       {/* 테마 선택 영역 */}
       <div>
-        <h2 className='text-lg font-bold text-gray-900 mb-4'>테마 선택</h2>
-        <div className='grid grid-cols-4 gap-4'>
-          {themes.map((theme) => (
-            <div
-              key={theme.id}
-              onClick={() => setSelectedTheme(theme.id)}
-              className={`bg-white rounded-lg overflow-hidden shadow-md cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${selectedTheme === theme.id
-                ? 'ring-2 ring-[#2D9CDB] ring-offset-2'
-                : ''
-                }`}
-            >
-              {/* 썸네일 */}
-              <div className='aspect-square bg-gray-100'>
-                <img
-                  src={theme.thumbnail}
-                  alt={theme.name}
-                  className='w-full h-full object-cover'
-                />
-              </div>
+        <h2 className='text-xl font-bold text-gray-900 mb-[18px]'>테마 선택</h2>
+        {isLoading ? (
+          <div className='text-center py-20 text-gray-500'>로딩 중...</div>
+        ) : themes.length === 0 ? (
+          <div className='text-center py-20 text-gray-500'>테마 정보를 불러올 수 없습니다.</div>
+        ) : (
+          <div className='grid grid-cols-4 gap-[18px]'>
+            {themes.map((theme) => (
+              <div
+                key={theme.theme_id}
+                onClick={() => handleThemeClick(theme.theme_id)}
+                className={`bg-white rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02] ${selectedTheme === theme.theme_id
+                  ? 'shadow-[0_0_35px_rgba(45,156,219,0.8)] z-10 scale-[1.02]'
+                  : 'shadow-md hover:shadow-xl'
+                  }`}
+              >
+                {/* 썸네일 */}
+                <div className='aspect-4/3 bg-gray-100'>
+                  <img
+                    src={theme.theme_url}
+                    alt={theme.name}
+                    className='w-full h-full object-cover'
+                  />
+                </div>
 
-              {/* 정보 */}
-              <div className='p-4'>
-                <h3 className='text-base font-semibold text-gray-900 mb-1'>
-                  {theme.name}
-                </h3>
-                <p className='text-sm text-gray-500 mb-2'>{theme.description}</p>
-                <p className='text-xs text-gray-400'>
-                  {theme.duration} · {theme.sections} section
-                </p>
+                {/* 정보 */}
+                <div className='px-3 py-4'>
+                  <h3 className='text-[18px] font-semibold text-gray-900 mb-4'>
+                    {theme.name}
+                  </h3>
+                  <p className='text-[13px] text-gray-500 mb-4'>{theme.description}</p>
+                  <p className='text-[13px] text-gray-400'>
+                    2 minute · 16 section
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* 확인 모달 */}
+      <ThemeConfirmModal
+        isOpen={isConfirmModalOpen}
+        themeName={currentThemeName}
+        onClose={handleCloseModal}
+        onConfirm={handleConfirmStart}
+      />
     </section>
   )
 }

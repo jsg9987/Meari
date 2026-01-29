@@ -32,9 +32,23 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const languageRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+  const tabsRef = useRef<(HTMLButtonElement | null)[]>([])
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 })
 
-  // Zustand store에서 사용자 정보 가져오기 (App.tsx에서 초기화됨)
+  // 탭 인디케이터 위치 및 너비 계산
+  useEffect(() => {
+    const activeTabElement = tabsRef.current[activeIndex]
+    if (activeTabElement) {
+      setIndicatorStyle({
+        left: activeTabElement.offsetLeft,
+        width: activeTabElement.offsetWidth
+      })
+    }
+  }, [activeIndex])
+
+  // Zustand store에서 사용자 정보 및 로그아웃 가져오기
   const userInfo = useAuthStore((state) => state.userInfo)
+  const logout = useAuthStore((state) => state.logout)
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -55,8 +69,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
 
   // 표시용 사용자 정보 (로딩 중 기본값 처리)
   const displayInfo = {
-    nickname: userInfo?.nickname || 'User',
-    email: userInfo?.email || 'user@example.com',
+    nickname: userInfo?.nickname || (useAuthStore.getState().isAuthenticated ? 'Loading...' : 'Guest'),
+    email: userInfo?.email || '',
     profileImage: userInfo?.profile_url && userInfo.profile_url !== 'http://' ? userInfo.profile_url : null
   }
 
@@ -69,8 +83,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
 
   const handleLogoutClick = () => {
     setIsProfileOpen(false)
-    // TODO: 로그아웃 처리
-    console.log('Logout')
+    logout()
+    navigate('/login')
   }
 
   return (
@@ -78,34 +92,38 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
       <div className='mx-auto grid h-full w-full max-w-300 grid-cols-[1fr_auto_1fr] items-center px-6'>
         {/* 로고 */}
         <div className='flex items-center gap-3'>
-          <img src={logoWhite} alt='Meari' className='h-5' />
+          <img src={logoWhite} alt='Meari' className='h-[22px]' />
         </div>
 
         {/* 메뉴 탭 */}
         <nav className='flex items-center justify-center' aria-label='Main'>
           <div className='relative flex gap-3'>
             <div
-              className='absolute top-0 left-0 h-full w-30 rounded-lg transition-transform duration-300 ease-out'
+              className='absolute top-0 h-full rounded-lg transition-all duration-300 ease-out'
               style={{
-                transform: `translateX(${activeIndex * 132}px)`,
+                left: `${indicatorStyle.left}px`,
+                width: `${indicatorStyle.width}px`,
                 backgroundColor: 'var(--color-tab-active)'
               }}
               aria-hidden
             />
-            <div className='relative z-10 flex gap-3 text-[15px] font-medium text-white/80' role='tablist'>
-              {tabs.map((tab) => {
+            <div className='relative z-10 flex gap-[13px] text-[17px] font-medium text-white/80' role='tablist'>
+              {tabs.map((tab, index) => {
                 const Icon = tab.icon
                 return (
                   <button
                     key={tab.id}
+                    ref={(el) => {
+                      tabsRef.current[index] = el
+                    }}
                     type='button'
                     role='tab'
                     aria-selected={tab.id === activeTab}
-                    className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg transition-colors cursor-pointer min-w-30 ${tab.id === activeTab ? 'text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
+                    className={`flex items-center justify-center gap-2 px-7 py-3 rounded-lg transition-colors cursor-pointer min-w-[132px] ${tab.id === activeTab ? 'text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
                       }`}
                     onClick={() => onTabChange(tab.id)}
                   >
-                    <Icon size={17} />
+                    <Icon size={19} />
                     <span>{tab.label}</span>
                   </button>
                 )
@@ -115,7 +133,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
         </nav>
 
         {/* 오른쪽 메뉴 */}
-        <div className='flex items-center justify-end gap-1 text-[15px] text-white/80'>
+        <div className='flex items-center justify-end gap-2 text-[17px] text-white/80'>
           {/* 언어 선택 드롭다운 */}
           <div className='relative' ref={languageRef}>
             <button
@@ -124,7 +142,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
               className='flex items-center gap-1.5 rounded-full px-3 py-1.5 hover:bg-white/5 transition-colors cursor-pointer'
             >
               {currentLanguage?.nativeLabel}
-              <ChevronDown size={15} className={`transition-transform ${isLanguageOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={17} className={`transition-transform ${isLanguageOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* 언어 드롭다운 메뉴 */}
@@ -151,10 +169,10 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
           {/* 설정 버튼 */}
           <button
             type='button'
-            className='flex items-center justify-center w-9 h-9 rounded-full hover:bg-white/5 transition-colors cursor-pointer'
+            className='flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors cursor-pointer'
             title='설정'
           >
-            <Settings size={19} />
+            <Settings size={21} />
           </button>
 
           {/* 프로필 버튼 */}
@@ -162,7 +180,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
             <button
               type='button'
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className='flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors cursor-pointer'
+              className='flex items-center justify-center w-10 h-10 rounded-full bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors cursor-pointer'
               title='프로필'
             >
               {displayInfo.profileImage ? (
@@ -178,7 +196,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                 {/* 사용자 정보 */}
                 <div className='px-3 py-2.5 border-b border-gray-200 mb-1'>
                   <div className='flex items-center gap-3'>
-                    <div className='flex items-center justify-center w-12 h-12 rounded-full bg-blue-500 text-white font-semibold text-lg'>
+                    <div className='flex items-center justify-center w-[52px] h-[52px] rounded-full bg-blue-500 text-white font-semibold text-xl'>
                       {displayInfo.profileImage ? (
                         <img src={displayInfo.profileImage} alt='Profile' className='w-full h-full rounded-full object-cover' />
                       ) : (
@@ -186,8 +204,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                       )}
                     </div>
                     <div className='flex-1'>
-                      <p className='font-semibold text-gray-900'>{displayInfo.nickname}</p>
-                      <p className='text-sm text-gray-500'>{displayInfo.email}</p>
+                      <p className='font-semibold text-gray-900'>{userInfo?.nickname || '사용자'}</p>
+                      <p className='text-sm text-gray-500'>{userInfo?.email || ''}</p>
                     </div>
                   </div>
                 </div>
@@ -198,14 +216,14 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                     onClick={handleMyPageClick}
                     className='flex items-center gap-3 px-3 py-2 w-full hover:bg-gray-100 transition-colors text-left text-gray-700 rounded-md cursor-pointer'
                   >
-                    <User size={18} />
+                    <User size={20} />
                     <span>마이페이지</span>
                   </button>
                   <button
                     onClick={handleLogoutClick}
                     className='flex items-center gap-3 px-3 py-2 w-full hover:bg-gray-100 transition-colors text-left text-red-600 rounded-md cursor-pointer'
                   >
-                    <LogOut size={18} />
+                    <LogOut size={20} />
                     <span>로그아웃</span>
                   </button>
                 </div>

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2 } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
+import { useAuthStore } from "../store/auth.store";
 import VideoControls from "../components/webrtc/VideoControls";
 import ChatPanel from "../components/webrtc/ChatPanel";
 import MediaCheckScreen from "../components/webrtc/MediaCheckScreen";
@@ -20,8 +21,9 @@ type LayoutMode = "narrow" | "grid" | "wide";
 export default function ShadowingRoom() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const isOwner = location.state?.isOwner === true;
+  const { userInfo } = useAuthStore();
+  const roomOwnerId = useRoomStore((state) => state.roomData?.owner_id);
+  const isOwner = userInfo?.member_id === roomOwnerId;
   const { roomData, setRoomData, clearRoomData } = useRoomStore();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("video");
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -39,7 +41,7 @@ export default function ShadowingRoom() {
   const [, setInitialVideoDeviceId] = useState<string>();
   const [isContentSelectOpen, setIsContentSelectOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
-  const [isHost, ] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
+  const [isHost,] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
   const [isReady, setIsReady] = useState(false); // 내 준비 상태
   const [participantsReady, setParticipantsReady] = useState<Record<string, boolean>>({
     me: false,
@@ -56,7 +58,7 @@ export default function ShadowingRoom() {
   const [currentSubtitle, setCurrentSubtitle] = useState<string>("");
   const [subtitles, setSubtitles] = useState<Array<{ start: number; end: number; text: string }>>([]);
 
-  const nickname = "User";
+  const nickname = userInfo?.nickname || "User";
 
   // 방 정보 가져오기
   useEffect(() => {
@@ -109,7 +111,7 @@ export default function ShadowingRoom() {
     };
 
     fetchRoomDetail();
-  }, [roomId, navigate, setRoomData, isOwner]);
+  }, [roomId, navigate, setRoomData]);
 
   // 방 퇴장 처리 (컴포넌트 언마운트 시)
   useEffect(() => {
@@ -545,11 +547,10 @@ export default function ShadowingRoom() {
                           {/* 준비 완료 버튼 (모든 참가자) */}
                           <button
                             onClick={handleToggleReady}
-                            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                              isReady
-                                ? "bg-green-500 hover:bg-green-600 text-white"
-                                : "bg-blue-600 hover:bg-blue-700 text-white"
-                            }`}
+                            className={`px-6 py-3 rounded-lg font-semibold transition-all ${isReady
+                              ? "bg-green-500 hover:bg-green-600 text-white"
+                              : "bg-blue-600 hover:bg-blue-700 text-white"
+                              }`}
                           >
                             {isReady ? "준비 완료" : "준비하기"}
                           </button>
@@ -563,11 +564,10 @@ export default function ShadowingRoom() {
                               <button
                                 onClick={handleStartShadowing}
                                 disabled={!allParticipantsReady}
-                                className={`px-8 py-3 rounded-lg font-semibold transition-all ${
-                                  allParticipantsReady
-                                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                }`}
+                                className={`px-8 py-3 rounded-lg font-semibold transition-all ${allParticipantsReady
+                                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  }`}
                               >
                                 쉐도잉 시작
                               </button>
@@ -632,22 +632,20 @@ export default function ShadowingRoom() {
           <div className="flex gap-2 flex-1">
             <button
               onClick={() => setSidebarTab("video")}
-              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
-                sidebarTab === "video"
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
-              }`}
+              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${sidebarTab === "video"
+                ? "bg-blue-600 text-white shadow-md"
+                : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+                }`}
             >
               <Users size={18} />
               <span>참여자</span>
             </button>
             <button
               onClick={() => setSidebarTab("chat")}
-              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
-                sidebarTab === "chat"
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
-              }`}
+              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${sidebarTab === "chat"
+                ? "bg-blue-600 text-white shadow-md"
+                : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+                }`}
             >
               <MessageCircle size={18} />
               <span>채팅</span>
@@ -676,9 +674,8 @@ export default function ShadowingRoom() {
                     <button
                       key={mode}
                       onClick={() => handleLayoutChange(mode)}
-                      className={`flex items-center gap-3 px-4 py-3 w-full hover:bg-gray-50 transition-colors text-left ${
-                        layoutMode === mode ? "bg-blue-50 text-blue-600" : "text-gray-700"
-                      }`}
+                      className={`flex items-center gap-3 px-4 py-3 w-full hover:bg-gray-50 transition-colors text-left ${layoutMode === mode ? "bg-blue-50 text-blue-600" : "text-gray-700"
+                        }`}
                     >
                       <Icon size={18} />
                       <span className="text-sm">{config.label}</span>
@@ -693,9 +690,8 @@ export default function ShadowingRoom() {
         {/* 탭 콘텐츠 */}
         <div className="flex-1 overflow-hidden bg-white">
           {sidebarTab === "video" && (
-            <div className={`h-full overflow-y-auto p-3 ${
-              layoutMode === "grid" ? "grid grid-cols-2 gap-3 auto-rows-min" : "space-y-3"
-            }`}>
+            <div className={`h-full overflow-y-auto p-3 ${layoutMode === "grid" ? "grid grid-cols-2 gap-3 auto-rows-min" : "space-y-3"
+              }`}>
               {status === "connected" && tiles.length > 0 ? (
                 tiles.map((t) => (
                   <VideoTile
