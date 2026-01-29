@@ -586,6 +586,10 @@ public class RoomService {
                     Long mId = mr.getMember().getMemberId();
                     Long roleId = findRoleIdByMemberId(roleAssignments, mId);
 
+                    if (roleId == null) {
+                        throw new BusinessException(ErrorCode.ROLE_NOT_SELECTED);
+                    }
+
                     Role role = roleRepository.findById(roleId)
                             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROLE));
 
@@ -654,6 +658,9 @@ public class RoomService {
 
         for (MemberRoom mr : memberRooms) {
             Long roleId = findRoleIdByMemberId(roles, mr.getMember().getMemberId());
+            if (roleId == null) {
+                throw new BusinessException(ErrorCode.ROLE_NOT_SELECTED);
+            }
             Role role = roleRepository.findById(roleId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROLE));
 
@@ -669,15 +676,18 @@ public class RoomService {
 
     /**
      * 역할 목록에서 특정 멤버의 역할 ID 찾기
-     * @throws BusinessException 역할을 찾지 못한 경우
+     * @return 역할 ID 또는 null
      */
     private Long findRoleIdByMemberId(Map<Long, String> roles, Long memberId) {
+        if (roles == null) {
+            return null;
+        }
         for (Map.Entry<Long, String> entry : roles.entrySet()) {
             if (memberId.toString().equals(entry.getValue())) {
                 return entry.getKey();
             }
         }
-        throw new BusinessException(ErrorCode.ROLE_NOT_SELECTED);
+        return null;
     }
 
     /**
