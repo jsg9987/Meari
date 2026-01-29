@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 @Slf4j
@@ -41,6 +42,7 @@ public class KopicService {
 
         return shuffled.stream()
                 .limit(RANDOM_SENTENCE_COUNT)
+                .sorted(Comparator.comparing(KopicSentence::getKopicSentenceId))
                 .map(KopicSentenceResponse::from)
                 .toList();
     }
