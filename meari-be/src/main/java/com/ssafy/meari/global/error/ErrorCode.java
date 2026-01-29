@@ -77,18 +77,19 @@ public enum ErrorCode {
     CONTENT_NOT_SELECTED(HttpStatus.CONFLICT, "동영상이 선택되지 않았습니다."),
     CONTENT_MISMATCH(HttpStatus.CONFLICT, "선택된 동영상과 일치하지 않습니다."),
     CONTENT_SELECT_ONLY_WAITING(HttpStatus.CONFLICT, "동영상은 대기 중일 때만 선택할 수 있습니다."),
-
-    // Chat Error: 500
-    CHAT_SAVE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 저장에 실패했습니다."),
-    CHAT_BROADCAST_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 브로드캐스트에 실패했습니다."),
-
     ROOM_ALREADY_STARTED(HttpStatus.CONFLICT, "이미 학습이 시작된 방입니다."),
     ROOM_ALREADY_CLOSED(HttpStatus.CONFLICT, "이미 종료된 방입니다."),
+	ROLE_NOT_SELECTED(HttpStatus.CONFLICT, "모든 참여자가 역할을 선택하지 않았습니다."),
+	ROLES_NOT_CONFIRMED(HttpStatus.CONFLICT, "역할이 확정되지 않았습니다."),
+	ROLES_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "역할이 이미 확정되었습니다."),
+	ROLE_COUNT_MISMATCH(HttpStatus.BAD_REQUEST, "역할 개수가 참여자 수와 일치하지 않습니다."),
+	DUPLICATE_MEMBER_ROLE(HttpStatus.BAD_REQUEST, "한 멤버에게 여러 역할을 할당할 수 없습니다."),
+	DUPLICATE_ROLE_ASSIGNMENT(HttpStatus.CONFLICT, "같은 역할을 여러 멤버에게 할당할 수 없습니다."),
 
 
 	// Unsupported Media Type: 415
-
-
+	
+	
     // Internal Server Error: 500
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 에러입니다."),
     FILE_READ_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "파일을 읽어들이다 에러 발생"),
@@ -97,8 +98,10 @@ public enum ErrorCode {
     OPENVIDU_SESSION_CLOSE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 종료에 실패했습니다."),
     OPENVIDU_DISCONNECT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 연결 강제 종료에 실패했습니다."),
     OPENVIDU_FETCH_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 정보 조회에 실패했습니다."),
+	CHAT_SAVE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 저장에 실패했습니다."),
+	CHAT_BROADCAST_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 브로드캐스트에 실패했습니다."),
 
-    // External Server Error(BAD_GATEWAY): 502
+	// External Server Error(BAD_GATEWAY): 502
 	EXTERNAL_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "서버 외부 에러입니다.");
 	
 	private final HttpStatus httpStatus;

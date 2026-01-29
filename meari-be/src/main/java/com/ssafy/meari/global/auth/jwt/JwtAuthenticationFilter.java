@@ -36,24 +36,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // JWT 검증 스킵할 경로들
         if ("/api/v1/auth/login".equals(requestURI) ||
-            "/api/v1/auth/signup".equals(requestURI) ||
-            "/api/v1/auth/email/check".equals(requestURI) ||
-            "/api/v1/auth/nickname/check".equals(requestURI) ||
-            "/api/v1/auth/refresh".equals(requestURI) ||
-            requestURI.startsWith("/swagger-ui") ||    // swagger-ui 관련 모든 리소스
-            requestURI.startsWith("/v3/api-docs") ||   // OpenAPI3 스펙 경로
-            requestURI.startsWith("/api-docs")         // 기존 api-docs 경로
-		////////////////// chat-test.html 테스트를 위한 접근제한 해제 /////////////
-			//            || requestURI.startsWith("/api/v1/auth") ||
-			//            requestURI.startsWith("/ws") ||
-			//            requestURI.endsWith(".html") ||
-			//            requestURI.endsWith(".js") ||
-			//            requestURI.endsWith(".css") ||
-			//            requestURI.endsWith(".ico") ||
-			//            requestURI.endsWith(".png") ||
-			//            requestURI.endsWith(".jpg")
-		) {
-            log.debug("JwtAuthentication 스킵");
+                "/api/v1/auth/signup".equals(requestURI) ||
+                "/api/v1/auth/email/check".equals(requestURI) ||
+                "/api/v1/auth/nickname/check".equals(requestURI) ||
+                "/api/v1/auth/refresh".equals(requestURI) ||
+                "/websocket-test.html".equals(requestURI) ||
+                requestURI.startsWith("/swagger-ui") ||    // swagger-ui 관련 모든 리소스
+                requestURI.startsWith("/v3/api-docs") ||   // OpenAPI3 스펙 경로
+                requestURI.startsWith("/api-docs") ||      // 기존 api-docs 경로
+                requestURI.startsWith("/ws")
+           ) {
+            log.debug("JwtAuthentication 스킵: {}", requestURI);
             filterChain.doFilter(request, response);
             return;
         }
@@ -83,9 +76,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
             Authentication authentication = new UsernamePasswordAuthenticationToken(
-                userDetails,
-                null,
-                userDetails.getAuthorities()
+                    userDetails,
+                    null,
+                    userDetails.getAuthorities()
             );
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
