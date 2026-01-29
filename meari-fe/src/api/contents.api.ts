@@ -1,5 +1,5 @@
 import axiosInstance from './axiosInstance';
-import type { AxiosResponse } from 'axios';
+import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse } from './auth.api';
 
 export interface Theme {
@@ -27,35 +27,41 @@ export const getThemesMock = async (): Promise<GetThemesResponse> => {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
-        success: true,
-        data: [
-          {
-            theme_id: 1,
-            name: '일상회화',
-            description: '일상에서 자주 사용하는 회화 표현을 중심으로 자연스럽게 말하는 연습',
-            theme_url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
-          },
-          {
-            theme_id: 2,
-            name: '비즈니스',
-            description: '회사에서 사용하는 업무 관련 대화를 상황별로 익히는 실전 연습',
-            theme_url: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
-          },
-          {
-            theme_id: 3,
-            name: '뉴스',
-            description: '시사 뉴스 리포트를 따라하며 발음과 억양을 함께 다듬는 연습',
-            theme_url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
-          },
-          {
-            theme_id: 4,
-            name: '여행',
-            description: '가이드와 관광객의 대화를 통해 다양한 여행 상황 회화를 연습',
-            theme_url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
-          },
-        ],
-        error: null,
-      });
+        data: {
+          success: true,
+          data: [
+            {
+              theme_id: 1,
+              name: '일상회화',
+              description: '일상에서 자주 사용하는 회화 표현을 중심으로 자연스럽게 말하는 연습',
+              theme_url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
+            },
+            {
+              theme_id: 2,
+              name: '비즈니스',
+              description: '회사에서 사용하는 업무 관련 대화를 상황별로 익히는 실전 연습',
+              theme_url: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
+            },
+            {
+              theme_id: 3,
+              name: '뉴스',
+              description: '시사 뉴스 리포트를 따라하며 발음과 억양을 함께 다듬는 연습',
+              theme_url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
+            },
+            {
+              theme_id: 4,
+              name: '여행',
+              description: '가이드와 관광객의 대화를 통해 다양한 여행 상황 회화를 연습',
+              theme_url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
+            },
+          ],
+          error: null,
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as InternalAxiosRequestConfig,
+      } as GetThemesResponse);
     }, 400);
   });
 };
@@ -191,13 +197,75 @@ export interface SelectRoomContentData {
 
 export type SelectRoomContentResponse = AxiosResponse<ApiResponse<SelectRoomContentData>>;
 
-// TODO: 실제 구현시 선택된 content의 content_id 사용
 export const selectRoomContent = async (
-  roomId: number
+  roomId: number,
+  contentId: number
 ): Promise<SelectRoomContentResponse> => {
   const response = await axiosInstance.post<ApiResponse<SelectRoomContentData>>(
     `/rooms/${roomId}/content`,
-    { content_id: 1 }
+    { content_id: contentId }
+  );
+  return response;
+};
+
+// --- Get Content Roles (컨텐츠 역할 조회) ---
+export interface ContentRole {
+  role_id: number;
+  content_id: number;
+  name: string;
+}
+
+export type GetContentRolesResponse = AxiosResponse<ApiResponse<ContentRole[]>>;
+
+export const getContentRolesMock = async (contentId: number): Promise<GetContentRolesResponse> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      // Mock 데이터 (실제로는 contentId에 따라 다른 역할을 반환할 수 있음)
+      const mockRoles: ContentRole[] = [
+        {
+          role_id: 1,
+          content_id: contentId,
+          name: '선엽',
+        },
+        {
+          role_id: 3,
+          content_id: contentId,
+          name: '오타니',
+        },
+        {
+          role_id: 4,
+          content_id: contentId,
+          name: '야마모토',
+        },
+        {
+          role_id: 5,
+          content_id: contentId,
+          name: '선엽씨',
+        },
+      ];
+
+      resolve({
+        data: {
+          success: true,
+          data: mockRoles,
+          error: null,
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as InternalAxiosRequestConfig,
+      } as GetContentRolesResponse);
+    }, 300);
+  });
+};
+
+export const getContentRoles = async (contentId: number): Promise<GetContentRolesResponse> => {
+  const useMock = import.meta.env.VITE_USE_MOCK_CONTENTS === 'true';
+  if (useMock) {
+    return await getContentRolesMock(contentId);
+  }
+  const response = await axiosInstance.get<ApiResponse<ContentRole[]>>(
+    `/contents/${contentId}/roles`
   );
   return response;
 };

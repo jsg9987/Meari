@@ -10,7 +10,9 @@ export type WebSocketMessageType =
   | 'ROLE_ASSIGNED'
   | 'ROLE_RELEASED'
   | 'GAME_START'
-  | 'PHASE_CHANGE';
+  | 'PHASE_CHANGE'
+  | 'ROLES_CONFIRMED'
+  | 'ROUND_START';
 
 // 역할(캐릭터) 정보
 export interface Role {
@@ -19,6 +21,24 @@ export interface Role {
   name: string;
   created_at: string;
   updated_at: string;
+}
+
+// 대본 문장 정보
+export interface Sentence {
+  sentence_id: number;
+  sequence: number;
+  start_time: number;
+  end_time: number;
+  text_ko: string;
+  text_vn: string;
+}
+
+// 역할별 대본 세그먼트
+export interface RoleSegment {
+  member_id: number;
+  role_id: number;
+  role_name: string;
+  sentences: Sentence[];
 }
 
 // 웹소켓 메시지 페이로드
@@ -31,7 +51,10 @@ export interface WebSocketMessage {
   nickname?: string | null;
   new_owner_id?: number | null;
   content_id?: number | null;
+  round?: number | null;
+  server_time?: number | null;
   roles?: Role[]; // ROLE_PICK 메시지에서 사용
+  segments?: RoleSegment[]; // ROLES_CONFIRMED 및 ROUND_START 메시지에서 사용
 }
 
 // 준비 상태 변경 요청
@@ -64,6 +87,8 @@ interface UseRoomWebSocketOptions {
   onRoleReleased?: (message: WebSocketMessage) => void;
   onGameStart?: (message: WebSocketMessage) => void;
   onPhaseWaiting?: (message: WebSocketMessage) => void;
+  onRolesConfirmed?: (message: WebSocketMessage) => void;
+  onRoundStart?: (message: WebSocketMessage) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
@@ -80,6 +105,8 @@ export function useRoomWebSocket({
   onRoleReleased,
   onGameStart,
   onPhaseWaiting,
+  onRolesConfirmed,
+  onRoundStart,
   onConnect,
   onDisconnect,
   onError,
@@ -152,6 +179,17 @@ export function useRoomWebSocket({
           console.log('[WebSocket] Handling GAME_START');
           onGameStart?.(payload);
           break;
+        case 'ROLES_CONFIRMED':
+          console.log('[WebSocket] Handling ROLES_CONFIRMED');
+          console.log('[WebSocket] Segments:', payload.segments);
+          onRolesConfirmed?.(payload);
+          break;
+        case 'ROUND_START':
+          console.log('[WebSocket] Handling ROUND_START');
+          console.log('[WebSocket] Round:', payload.round, 'Server time:', payload.server_time);
+          console.log('[WebSocket] Segments:', payload.segments);
+          onRoundStart?.(payload);
+          break;
         default:
           console.warn('[WebSocket] Unknown message type:', payload.type);
       }
@@ -159,7 +197,7 @@ export function useRoomWebSocket({
       console.error('[WebSocket] Failed to parse message:', error);
       console.error('[WebSocket] Raw message:', message.body);
     }
-  }, [onMessage, onMemberJoin, onReady, onRolePick, onRoleAssigned, onRoleReleased, onGameStart, onPhaseWaiting]);
+  }, [onMessage, onMemberJoin, onReady, onRolePick, onRoleAssigned, onRoleReleased, onGameStart, onPhaseWaiting, onRolesConfirmed, onRoundStart]);
 
   // 웹소켓 연결
   const connect = useCallback(() => {
