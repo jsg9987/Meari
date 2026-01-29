@@ -1,7 +1,6 @@
 package com.ssafy.meari.global.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -13,38 +12,18 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    @Value("${spring.rabbitmq.host:localhost}")
-    private String rabbitmqHost;
-
-    @Value("${spring.rabbitmq.stomp.port:61613}")
-    private int rabbitmqStompPort;
-
-    @Value("${spring.rabbitmq.username:ssafy}")
-    private String rabbitmqUsername;
-
-    @Value("${spring.rabbitmq.password:ssafy}")
-    private String rabbitmqPassword;
-
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         // 클라이언트가 구독할 목적지 prefix
-        // RabbitMQ STOMP Broker Relay 사용
+        // SimpleBroker 사용 (인메모리 메시지 브로커)
         // /topic: 1:N 브로드캐스트
         // /queue: 1:1 메시지
-        registry.enableStompBrokerRelay("/topic", "/queue")
-                .setRelayHost(rabbitmqHost)
-                .setRelayPort(rabbitmqStompPort)
-                .setClientLogin(rabbitmqUsername)
-                .setClientPasscode(rabbitmqPassword)
-                .setSystemLogin(rabbitmqUsername)
-                .setSystemPasscode(rabbitmqPassword)
-                .setSystemHeartbeatSendInterval(10000)
-                .setSystemHeartbeatReceiveInterval(10000);
+        registry.enableSimpleBroker("/topic", "/queue");
 
         // 클라이언트가 메시지를 보낼 때 사용할 prefix
         registry.setApplicationDestinationPrefixes("/app");
 
-        log.info("RabbitMQ STOMP Broker Relay 설정 완료 - host: {}, port: {}", rabbitmqHost, rabbitmqStompPort);
+        log.info("SimpleBroker 설정 완료 - /topic, /queue");
     }
 
     @Override
