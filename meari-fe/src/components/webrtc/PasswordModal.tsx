@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Lock, X } from 'lucide-react';
 
 interface PasswordModalProps {
@@ -31,7 +32,19 @@ export default function PasswordModal({ roomTitle, onSubmit, onCancel, errorMess
     }
   };
 
-  return (
+  // 모달이 열릴 때 스크롤 방지
+  useEffect(() => {
+    const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollBarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+  }, [])
+
+  return createPortal(
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-1000 p-4">
       <div
         className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl"
@@ -95,6 +108,7 @@ export default function PasswordModal({ roomTitle, onSubmit, onCancel, errorMess
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

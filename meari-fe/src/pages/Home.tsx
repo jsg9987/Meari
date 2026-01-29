@@ -19,11 +19,17 @@ const Home = () => {
 
   return (
     <div className='min-h-screen w-full'>
-      <header className='w-full'>
+      <header className='w-full relative z-60'>
         <Header activeTab={activeTab} onTabChange={setActiveTab} />
       </header>
 
-      <main className='mx-auto w-full max-w-300 py-11'>
+      <main
+        className='mx-auto w-full max-w-[68.2rem] py-11'
+        style={{
+          transform: 'scale(1.1)',
+          transformOrigin: 'top center'
+        }}
+      >
         {renderContent()}
       </main>
     </div>

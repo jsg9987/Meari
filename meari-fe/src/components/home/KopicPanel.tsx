@@ -106,7 +106,7 @@ const KopicPanel = () => {
         <button
           type='button'
           onClick={handleStartEvaluation}
-          className='px-9 py-[10px] bg-[#2D9CDB] text-white font-medium rounded-full hover:bg-[#2789c2] transition-colors cursor-pointer'
+          className='px-9 py-2.5 bg-[#2D9CDB] text-white font-medium rounded-full hover:bg-[#2789c2] transition-colors cursor-pointer'
         >
           평가 시작하기
         </button>

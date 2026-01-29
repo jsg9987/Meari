@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { createRoom } from '../../api/rooms.api';
 import { getThemes, type Theme } from '../../api/contents.api';
@@ -19,6 +20,23 @@ const CreateRoomButton = () => {
   useEffect(() => {
     if (isOpen) {
       loadThemes();
+    }
+  }, [isOpen]);
+
+  // 모달이 열릴 때 스크롤 방지
+  useEffect(() => {
+    if (isOpen) {
+      const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollBarWidth}px`;
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
     }
   }, [isOpen]);
 
@@ -81,8 +99,6 @@ const CreateRoomButton = () => {
         theme_id: selectedThemeId
       });
 
-      console.log(response)
-
       if (!response.data.success) {
         setErrorMessage(response.data.error?.message ?? '방 생성에 실패했습니다.');
         return;
@@ -105,7 +121,7 @@ const CreateRoomButton = () => {
   };
 
   return (
-    <div>
+    <>
       <button
         className='bg-(--color-bg-button) rounded-(--radius-button) px-9 py-[10px] text-white font-medium cursor-pointer'
         type="button"
@@ -114,7 +130,7 @@ const CreateRoomButton = () => {
         방 생성
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-1000 p-4"
           onClick={handleClose}
@@ -125,7 +141,7 @@ const CreateRoomButton = () => {
             className="bg-white rounded-xl p-7 w-full max-w-125 max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col gap-[13px]"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="text-[1.375rem] font-semibold m-0">방 만들기</h2>
+            <h2 className="text-[1.375rem] font-semibold m-0 transition-none">방 만들기</h2>
 
             <label className="font-semibold text-[16px]">
               테마 선택 <span className="text-red-600">*</span>
@@ -220,7 +236,7 @@ const CreateRoomButton = () => {
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
-                className="px-[18px] py-[9px] rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-[18px] py-[9px] rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 취소
               </button>
@@ -228,15 +244,16 @@ const CreateRoomButton = () => {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="px-[18px] py-[9px] rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-[18px] py-[9px] rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isSubmitting ? '생성 중...' : '생성'}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 };
 

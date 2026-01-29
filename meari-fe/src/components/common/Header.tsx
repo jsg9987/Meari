@@ -46,8 +46,9 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
     }
   }, [activeIndex])
 
-  // Zustand store에서 사용자 정보 가져오기 (App.tsx에서 초기화됨)
+  // Zustand store에서 사용자 정보 및 로그아웃 가져오기
   const userInfo = useAuthStore((state) => state.userInfo)
+  const logout = useAuthStore((state) => state.logout)
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -82,8 +83,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
 
   const handleLogoutClick = () => {
     setIsProfileOpen(false)
-    // TODO: 로그아웃 처리
-    console.log('Logout')
+    logout()
+    navigate('/login')
   }
 
   return (
