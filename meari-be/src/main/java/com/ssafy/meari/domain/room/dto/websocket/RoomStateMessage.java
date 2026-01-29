@@ -107,4 +107,11 @@ public class RoomStateMessage {
                 .round(round)
                 .build();
     }
+
+    public static RoomStateMessage rolesConfirmed(List<MemberSegmentInfo> segments) {
+        return RoomStateMessage.builder()
+                .type("ROLES_CONFIRMED")
+                .segments(segments)
+                .build();
+    }
 }
