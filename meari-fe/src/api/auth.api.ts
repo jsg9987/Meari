@@ -156,7 +156,7 @@ const getUserInfoReal = async (): Promise<UserInfoResponse> => {
 };
 
 const useMock = apiConfig.shouldMock('AUTH');
-
+    
 export const login = useMock ? loginMock : loginReal;
 export const signup = useMock ? signupMock : signupReal;
 export const getUserInfo = useMock ? getUserInfoMock : getUserInfoReal;

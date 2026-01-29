@@ -15,7 +15,7 @@ import { useVideoRoom } from "../hooks/useVideoRoom";
 import { useRoomWebSocket, type Role } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
 import { selectRoomContent } from "../api/contents.api";
-import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom } from "../api/rooms.api";
+import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl } from "../api/rooms.api";
 import { useRoomStore } from "../store/room.store";
 import { useRoleStore } from "../store/role.store";
 
@@ -50,6 +50,7 @@ export default function ShadowingRoom() {
   const [isMediaChecked, setIsMediaChecked] = useState(false);
   const [isContentSelectOpen, setIsContentSelectOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isHost] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
   const [ isReady, setIsReady] = useState(false); // 내 준비 상태
   const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false); // 역할 선택 모달 상태
@@ -134,9 +135,9 @@ export default function ShadowingRoom() {
     },
     onGameStart: (message) => {
       console.log('Game starting:', message);
-      // 게임 시작 시 카운트다운 시작
+      // 게임 시작 시 즉시 영상 재생
       if (message.phase === 'WATCHING') {
-        setCountdown(3);
+        setIsPlaying(true);
       }
     },
     onPhaseWaiting: (message) => {
@@ -274,22 +275,6 @@ export default function ShadowingRoom() {
         videoRef.current.play();
         setIsPlaying(true);
       }
-
-      // TODO: 임시 구현 - 실제로는 영상이 끝난 후 호출해야 함
-      // 카운트다운 후 바로 영상 시청 완료 API 호출
-      if (roomId) {
-        finishWatching(Number(roomId))
-          .then((response) => {
-            if (response.data.success) {
-              console.log('Watching finished successfully');
-            } else {
-              console.error('Failed to finish watching:', response.data.error?.message);
-            }
-          })
-          .catch((error) => {
-            console.error('Failed to finish watching:', error);
-          });
-      }
     }
   }, [countdown, roomId]);
 
@@ -370,6 +355,16 @@ export default function ShadowingRoom() {
       const response = await selectRoomContent(Number(roomId));
 
       if (response.data.success) {
+        // 비디오 URL 가져오기
+        try {
+          const videoResponse = await getContentVideoUrl(content.content_id);
+          if (videoResponse.data.success && videoResponse.data.data) {
+            setVideoUrl(videoResponse.data.data.video_url);
+          }
+        } catch (error) {
+          console.error('Failed to get video URL:', error);
+        }
+
         setSelectedContent(content);
         setIsContentSelectOpen(false);
         // 컨텐츠 선택 시 모든 참가자의 준비 상태 초기화
@@ -424,7 +419,7 @@ export default function ShadowingRoom() {
 
       if (response.data.success) {
         console.log('Game start API called successfully');
-        // API 호출 성공 시 카운트다운은 WebSocket GAME_START 메시지로 시작됨
+        // WebSocket에서 phase가 WATCHING으로 변경되면 카운트다운 시작
       } else {
         setIsGameStarting(false);
         setToastMessage('게임 시작에 실패했어요');
@@ -505,6 +500,7 @@ export default function ShadowingRoom() {
     setIsRoundStarting(false);
     setIsReady(false);
     setSelectedContent(null);
+    setVideoUrl(null);
     setToastMessage('대기 상태로 돌아갔습니다');
   };
 
@@ -752,14 +748,34 @@ export default function ShadowingRoom() {
                 )}
 
                 {/* 영상 재생 중 */}
-                {isPlaying && selectedContent && (
-                  <div className="relative w-full h-full">
+                {isPlaying && selectedContent && videoUrl && (
+                  <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
                     <video
                       ref={videoRef}
-                      src={selectedContent.video_url}
-                      className="w-full h-full object-contain"
+                      src={videoUrl}
+                      className="absolute inset-0 w-full h-full object-contain"
+                      autoPlay
+                      playsInline
                       onContextMenu={(e) => e.preventDefault()}
                       style={{ pointerEvents: 'none' }}
+                      onEnded={async () => {
+                        // 영상 재생 완료 시 finishWatching API 호출
+                        if (roomId) {
+                          try {
+                            const response = await finishWatching(Number(roomId));
+                            if (response.data.success) {
+                              console.log('Watching finished successfully');
+                              // 비디오 종료 후 blur 배경 표시를 위해 isPlaying false로 설정
+                              setIsPlaying(false);
+                              setIsGameStarting(false);
+                            } else {
+                              console.error('Failed to finish watching:', response.data.error?.message);
+                            }
+                          } catch (error) {
+                            console.error('Failed to finish watching:', error);
+                          }
+                        }
+                      }}
                     />
 
                     {/* 자막 표시 */}
@@ -775,18 +791,33 @@ export default function ShadowingRoom() {
 
                 {/* 영상 재생 전 */}
                 {!isPlaying && (
-                  <div className="flex flex-col items-center gap-4">
-                    {!selectedContent ? (
-                      <div className="text-center">
-                        <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
-                        {isHost && (
-                          <p className="text-gray-400 text-xs">컨텐츠를 선택해주세요</p>
-                        )}
+                  <>
+                    {/* 비디오 배경 (blur 처리) */}
+                    {selectedContent && videoUrl && (
+                      <div className="absolute inset-0">
+                        <video
+                          src={videoUrl}
+                          className="w-full h-full object-cover"
+                          style={{ filter: 'blur(20px)', transform: 'scale(1.1)' }}
+                          muted
+                          playsInline
+                        />
+                        <div className="absolute inset-0 bg-black/40" />
                       </div>
-                    ) : (
-                      <div className="text-center">
-                        <p className="text-gray-600 font-medium mb-2">현재 컨텐츠</p>
-                        <p className="text-white text-lg font-semibold mb-4">{selectedContent.title}</p>
+                    )}
+
+                    <div className="relative flex flex-col items-center gap-4 z-10">
+                      {!selectedContent ? (
+                        <div className="text-center">
+                          <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
+                          {isHost && (
+                            <p className="text-gray-400 text-xs">컨텐츠를 선택해주세요</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-gray-200 font-medium mb-2">현재 컨텐츠</p>
+                          <p className="text-white text-lg font-semibold mb-4">{selectedContent.title}</p>
 
                         <div className="flex flex-col items-center gap-3">
                           {/* 게임 시작 전: 준비 완료 및 시작 버튼 */}
@@ -885,9 +916,10 @@ export default function ShadowingRoom() {
                             </>
                           )}
                         </div>
-                      </div>
-                    )}
-                  </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -900,8 +932,8 @@ export default function ShadowingRoom() {
               </button>
             )}
 
-            {/* 컨텐츠 변경 버튼 (방장만) - 영상 재생 중이 아닐 때만 표시 */}
-            {status === "connected" && isHost && !isPlaying && (
+            {/* 컨텐츠 변경 버튼 (방장만) - 영상 재생 중이 아니고 게임 시작 전일 때만 표시 */}
+            {status === "connected" && isHost && !isPlaying && !isGameStarting && countdown === null && (
               <button
                 onClick={() => setIsContentSelectOpen(true)}
                 className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
@@ -911,7 +943,7 @@ export default function ShadowingRoom() {
             )}
 
             {/* 캐릭터 선택 버튼 - 역할 선택 완료 전까지만 표시 */}
-            {status === "connected" && !isPlaying && !isRoleAssigned && availableRoles.length > 0 && (
+            {status === "connected" && !isPlaying && !isGameStarting && countdown === null && !isRoleAssigned && availableRoles.length > 0 && (
               <button
                 onClick={() => setIsRoleSelectOpen(true)}
                 className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
@@ -1019,7 +1051,7 @@ export default function ShadowingRoom() {
                     muted={t.muted}
                     label={t.label}
                     isSpeaker={t.isSpeaker}
-                    isReady={t.id === "me" ? isReady : false}
+                    isReady={t.id === "me" ? (isReady && !isGameStarting && !isPlaying) : false}
                     videoClassName={layoutMode === "wide" ? "aspect-[21/9]" : undefined}
                   />
                 ))

@@ -168,8 +168,16 @@ export function useRoomWebSocket({
       return;
     }
 
-    const wsUrl = getWebSocketUrl();
-    console.log('[WebSocket] Connecting to:', wsUrl);
+    // JWT 토큰 가져오기
+    const accessToken = localStorage.getItem('accessToken');
+
+    // WebSocket URL에 토큰 추가 (SockJS는 URL 파라미터로 토큰을 전달해야 함)
+    let wsUrl = getWebSocketUrl();
+    if (accessToken) {
+      wsUrl = `${wsUrl}?token=${encodeURIComponent(accessToken)}`;
+    }
+
+    console.log('[WebSocket] Connecting to:', wsUrl.replace(/token=[^&]+/, 'token=***'));
 
     // SockJS를 사용한 WebSocket 연결
     const client = new Client({
@@ -180,6 +188,13 @@ export function useRoomWebSocket({
       debug: (str) => {
         console.log('[WebSocket Debug]', str);
       },
+
+      beforeConnect: async () => {
+        const token = localStorage.getItem('access_token');
+        if (!token) throw new Error('No access token');
+        client.connectHeaders = { Authorization: `Bearer ${token}` };
+      },
+
       onConnect: () => {
         console.log('[WebSocket] Connected');
         setIsConnected(true);
@@ -228,8 +243,7 @@ export function useRoomWebSocket({
       },
     });
 
-    // JWT 토큰을 헤더에 추가
-    const accessToken = localStorage.getItem('accessToken');
+    // JWT 토큰을 STOMP 연결 헤더에도 추가 (이중 보안)
     if (accessToken) {
       client.connectHeaders = {
         Authorization: `Bearer ${accessToken}`,

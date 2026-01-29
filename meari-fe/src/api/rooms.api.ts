@@ -374,4 +374,19 @@ export const finishRoom = async (roomId: number): Promise<FinishRoomResponse> =>
   return response;
 };
 
+// --- Get Content Video URL (컨텐츠 비디오 URL 조회) ---
+export interface ContentVideoUrlData {
+  video_url: string;
+  expires_in: number;
+}
+
+export type ContentVideoUrlResponse = AxiosResponse<ApiResponse<ContentVideoUrlData>>;
+
+export const getContentVideoUrl = async (contentId: number): Promise<ContentVideoUrlResponse> => {
+  const response = await axiosInstance.get<ApiResponse<ContentVideoUrlData>>(
+    `/s3/contents/${contentId}/video-url`
+  );
+  return response;
+};
+
 console.log(`[RoomsAPI] Initialized. Mode: ${useMock ? 'MOCK' : 'REAL'}`);
