@@ -1,8 +1,11 @@
 package com.ssafy.meari.global.auth.controller;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.ssafy.meari.domain.member.service.MemberService;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
-import com.ssafy.meari.global.auth.request.RefreshTokenRequestDto;
 import com.ssafy.meari.global.auth.request.SignupRequestDto;
 import com.ssafy.meari.global.auth.response.AccessTokenResponseDto;
 import com.ssafy.meari.global.auth.response.EmailCheckResponseDto;
@@ -24,6 +26,7 @@ import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,10 +40,10 @@ public class AuthController {
     private final AuthService authService;
     private final MemberService memberService;
 
-    // Refresh Token으로 Access Token 재발급
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AccessTokenResponseDto>> refresh(@Valid @RequestBody RefreshTokenRequestDto requestDto) {
-        String accessToken = authService.refreshAccessToken(requestDto.getRefreshToken());
+    public ResponseEntity<ApiResponse<AccessTokenResponseDto>> refresh(
+            @CookieValue(name = "refresh_token") String refreshToken) {
+        String accessToken = authService.refreshAccessToken(refreshToken);
 
         return ResponseEntity
             .ok(ApiResponse.success(new AccessTokenResponseDto(accessToken)));
@@ -48,7 +51,10 @@ public class AuthController {
 
     // 로그아웃
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal UserDetailsImpl userDetails, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            HttpServletRequest request,
+            HttpServletResponse response) {
         String email = userDetails.getUsername();
 
         // Authorization 헤더에서 Access Token 추출
@@ -61,6 +67,16 @@ public class AuthController {
 
         // 로그아웃 처리
         authService.logout(email, accessToken);
+
+        // Refresh Token 쿠키 삭제
+        ResponseCookie deleteCookie = ResponseCookie.from("refresh_token", "")
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(0)
+            .sameSite("Strict")
+            .build();
+        response.setHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
 
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }

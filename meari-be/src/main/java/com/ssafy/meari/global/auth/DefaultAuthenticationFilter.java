@@ -1,9 +1,12 @@
 package com.ssafy.meari.global.auth;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -76,8 +79,16 @@ public class DefaultAuthenticationFilter extends AbstractAuthenticationProcessin
 		// Refresh Token을 Redis에 저장
 		refreshTokenService.saveRefreshToken(email, refreshToken);
 
-		// 응답 헤더에 Refresh Token 추가
-		response.setHeader("refresh_token", refreshToken);
+		// Set-Cookie로 Refresh Token 설정
+		ResponseCookie cookie = ResponseCookie.from("refresh_token", refreshToken)
+			.httpOnly(true)
+			.secure(true)
+			.path("/")
+			.maxAge(Duration.ofSeconds(jwtUtil.getRefreshTokenExpireSeconds()))
+			.sameSite("Strict")
+			.build();
+		response.setHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
 		response.setContentType("application/json;charset=UTF-8");
 		response.setStatus(HttpServletResponse.SC_OK);
 
