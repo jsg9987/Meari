@@ -669,6 +669,7 @@ public class RoomService {
 
     /**
      * 역할 목록에서 특정 멤버의 역할 ID 찾기
+     * @throws BusinessException 역할을 찾지 못한 경우
      */
     private Long findRoleIdByMemberId(Map<Long, String> roles, Long memberId) {
         for (Map.Entry<Long, String> entry : roles.entrySet()) {
@@ -676,7 +677,7 @@ public class RoomService {
                 return entry.getKey();
             }
         }
-        return null;
+        throw new BusinessException(ErrorCode.ROLE_NOT_SELECTED);
     }
 
     /**
