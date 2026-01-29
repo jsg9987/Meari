@@ -1,10 +1,5 @@
 package com.ssafy.meari.domain.room.controller;
 
-import com.ssafy.meari.domain.room.dto.websocket.*;
-import com.ssafy.meari.domain.room.service.RoomService;
-import com.ssafy.meari.domain.room.service.RoomSessionService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -16,11 +11,13 @@ import org.springframework.stereotype.Controller;
 
 import com.ssafy.meari.domain.room.dto.websocket.ChatMessage;
 import com.ssafy.meari.domain.room.dto.websocket.ReadyMessage;
+import com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoleReleaseMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoleSelectMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
 import com.ssafy.meari.domain.room.entity.Chat;
 import com.ssafy.meari.domain.room.repository.ChatRepository;
+import com.ssafy.meari.domain.room.service.RoomService;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
 
 import lombok.RequiredArgsConstructor;
