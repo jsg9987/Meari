@@ -55,7 +55,7 @@ const loginReal = async ({ email, password }: LoginCredentials): Promise<LoginRe
         email,
         password,
     });
-    return response.data;
+    return response;
 };
 
 // --- Signup ---
