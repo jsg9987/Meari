@@ -97,6 +97,7 @@ public class SecurityConfig {
 
                 // 기존 방 관련 API (테스트용)
                 .requestMatchers("/api/v1/rooms/**").permitAll()
+                .requestMatchers("/api/v1/contents/**").permitAll()
 
 
                 // 나머지는 인증 필요
