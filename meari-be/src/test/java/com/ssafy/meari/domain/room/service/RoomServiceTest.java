@@ -74,6 +74,9 @@ class RoomServiceTest {
     private com.ssafy.meari.domain.content.repository.RoleRepository roleRepository;
 
     @Mock
+    private com.ssafy.meari.domain.content.repository.SentenceRepository sentenceRepository;
+
+    @Mock
     private com.ssafy.meari.domain.report.repository.ShadowingReportRepository shadowingReportRepository;
 
     private Member testMember;
@@ -860,10 +863,138 @@ class RoomServiceTest {
     }
 
     @Nested
+    @DisplayName("영상 시청 완료")
+    class FinishWatching {
+
+        @Test
+        @DisplayName("성공 - WATCHING → ROLE_PICK phase 전환")
+        void finishWatching_Success() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.WATCHING);
+
+            // When
+            roomService.finishWatching(1L, 1L);
+
+            // Then
+            verify(roomSessionService).setPhase(1L, GamePhase.ROLE_PICK);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/1/state"), any(com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 방장이 아님")
+        void finishWatching_Fail_NotOwner() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishWatching(1L, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        @Test
+        @DisplayName("실패 - 진행 중인 방이 아님")
+        void finishWatching_Fail_NotInProgress() {
+            // Given
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishWatching(1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        @Test
+        @DisplayName("실패 - WATCHING 단계가 아님")
+        void finishWatching_Fail_InvalidPhase() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishWatching(1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
+        }
+    }
+
+    @Nested
+    @DisplayName("게임 종료")
+    class FinishGame {
+
+        @Test
+        @DisplayName("성공 - ROUND_2에서 WAITING으로 복귀")
+        void finishGame_Success() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROUND_2);
+
+            // When
+            roomService.finishGame(1L, 1L);
+
+            // Then
+            assertThat(testRoom.getStatus()).isEqualTo(RoomStatus.WAITING);
+            verify(roomSessionService).resetGameState(1L);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/1/state"), any(com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 방장이 아님")
+        void finishGame_Fail_NotOwner() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishGame(1L, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        @Test
+        @DisplayName("실패 - 진행 중인 방이 아님")
+        void finishGame_Fail_NotInProgress() {
+            // Given
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishGame(1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        @Test
+        @DisplayName("실패 - ROUND_2 단계가 아님")
+        void finishGame_Fail_InvalidPhase() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROUND_1);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.finishGame(1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
+        }
+    }
+
+    @Nested
     @DisplayName("라운드 시작")
     class StartRound {
 
         private com.ssafy.meari.domain.content.entity.Content testContent;
+        private com.ssafy.meari.domain.content.entity.Role role1;
+        private com.ssafy.meari.domain.content.entity.Role role2;
+        private Member member2;
+        private MemberRoom mr1;
+        private MemberRoom mr2;
 
         @BeforeEach
         void setUp() {
@@ -872,6 +1003,17 @@ class RoomServiceTest {
                     .videoUrl("http://test.com/video.mp4")
                     .build();
             ReflectionTestUtils.setField(testContent, "contentId", 1L);
+
+            member2 = Member.builder().email("m2@test.com").password("pw").nickname("M2").build();
+            ReflectionTestUtils.setField(member2, "memberId", 2L);
+
+            mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
+            mr2 = MemberRoom.builder().room(testRoom).member(member2).build();
+
+            role1 = com.ssafy.meari.domain.content.entity.Role.builder().content(testContent).name("화자A").build();
+            role2 = com.ssafy.meari.domain.content.entity.Role.builder().content(testContent).name("화자B").build();
+            ReflectionTestUtils.setField(role1, "roleId", 1L);
+            ReflectionTestUtils.setField(role2, "roleId", 2L);
         }
 
         @Test
@@ -880,45 +1022,86 @@ class RoomServiceTest {
             // Given
             testRoom.updateStatus(RoomStatus.IN_PROGRESS);
 
-            Member member2 = Member.builder().email("m2@test.com").password("pw").nickname("M2").build();
-            Member member3 = Member.builder().email("m3@test.com").password("pw").nickname("M3").build();
-            Member member4 = Member.builder().email("m4@test.com").password("pw").nickname("M4").build();
-            ReflectionTestUtils.setField(member2, "memberId", 2L);
-            ReflectionTestUtils.setField(member3, "memberId", 3L);
-            ReflectionTestUtils.setField(member4, "memberId", 4L);
+            com.ssafy.meari.domain.content.entity.Sentence sentence1 = com.ssafy.meari.domain.content.entity.Sentence.builder()
+                    .role(role1).content(testContent).sequence(1)
+                    .startTime(java.math.BigDecimal.valueOf(0.0)).endTime(java.math.BigDecimal.valueOf(3.5))
+                    .textKo("안녕하세요").textVn("Xin chào").build();
+            ReflectionTestUtils.setField(sentence1, "sentenceId", 10L);
 
-            MemberRoom mr1 = MemberRoom.builder().room(testRoom).member(testMember).build();
-            MemberRoom mr2 = MemberRoom.builder().room(testRoom).member(member2).build();
-            MemberRoom mr3 = MemberRoom.builder().room(testRoom).member(member3).build();
-            MemberRoom mr4 = MemberRoom.builder().room(testRoom).member(member4).build();
-
-            com.ssafy.meari.domain.content.entity.Role role1 = com.ssafy.meari.domain.content.entity.Role.builder().name("역할1").build();
-            com.ssafy.meari.domain.content.entity.Role role2 = com.ssafy.meari.domain.content.entity.Role.builder().name("역할2").build();
-            com.ssafy.meari.domain.content.entity.Role role3 = com.ssafy.meari.domain.content.entity.Role.builder().name("역할3").build();
-            com.ssafy.meari.domain.content.entity.Role role4 = com.ssafy.meari.domain.content.entity.Role.builder().name("역할4").build();
-            ReflectionTestUtils.setField(role1, "roleId", 1L);
-            ReflectionTestUtils.setField(role2, "roleId", 2L);
-            ReflectionTestUtils.setField(role3, "roleId", 3L);
-            ReflectionTestUtils.setField(role4, "roleId", 4L);
+            com.ssafy.meari.domain.content.entity.Sentence sentence2 = com.ssafy.meari.domain.content.entity.Sentence.builder()
+                    .role(role2).content(testContent).sequence(2)
+                    .startTime(java.math.BigDecimal.valueOf(3.5)).endTime(java.math.BigDecimal.valueOf(7.0))
+                    .textKo("반갑습니다").textVn("Rất vui").build();
+            ReflectionTestUtils.setField(sentence2, "sentenceId", 11L);
 
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
             given(roomSessionService.getContentId(1L)).willReturn(1L);
             given(contentRepository.findById(1L)).willReturn(Optional.of(testContent));
-            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2, mr3, mr4));
-            given(roomSessionService.getAllRoles(1L)).willReturn(java.util.Map.of(1L, "1", 2L, "2", 3L, "3", 4L, "4"));
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2));
+            given(roomSessionService.getAllRoles(1L)).willReturn(java.util.Map.of(1L, "1", 2L, "2"));
             given(roleRepository.findById(1L)).willReturn(Optional.of(role1));
             given(roleRepository.findById(2L)).willReturn(Optional.of(role2));
-            given(roleRepository.findById(3L)).willReturn(Optional.of(role3));
-            given(roleRepository.findById(4L)).willReturn(Optional.of(role4));
+            given(sentenceRepository.findByContent_ContentId(1L)).willReturn(java.util.List.of(sentence1, sentence2));
 
             // When
             roomService.startRound(1L, 1, 1L);
 
             // Then
-            verify(shadowingReportRepository, times(4)).save(any());
+            verify(shadowingReportRepository, times(2)).save(any());
             verify(roomSessionService).setPhase(1L, GamePhase.ROUND_1);
+            verify(roomSessionService).setMemberTotalSentences(1L, 1, 1L, 1);
+            verify(roomSessionService).setMemberTotalSentences(1L, 1, 2L, 1);
+            verify(roomSessionService).setRoundStartTime(eq(1L), anyLong());
+            verify(messagingTemplate).convertAndSend(eq("/topic/room/1/state"), any(com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage.class));
+        }
+
+        @Test
+        @DisplayName("성공 - Round1 시작 시 ROUND_START 메시지에 segments 포함")
+        void startRound_Success_Round1_BroadcastWithSegments() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            com.ssafy.meari.domain.content.entity.Sentence sentence1 = com.ssafy.meari.domain.content.entity.Sentence.builder()
+                    .role(role1).content(testContent).sequence(1)
+                    .startTime(java.math.BigDecimal.valueOf(0.0)).endTime(java.math.BigDecimal.valueOf(3.5))
+                    .textKo("안녕하세요").textVn("Xin chào").build();
+            ReflectionTestUtils.setField(sentence1, "sentenceId", 10L);
+
+            com.ssafy.meari.domain.content.entity.Sentence sentence2 = com.ssafy.meari.domain.content.entity.Sentence.builder()
+                    .role(role2).content(testContent).sequence(2)
+                    .startTime(java.math.BigDecimal.valueOf(3.5)).endTime(java.math.BigDecimal.valueOf(7.0))
+                    .textKo("반갑습니다").textVn("Rất vui").build();
+            ReflectionTestUtils.setField(sentence2, "sentenceId", 11L);
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
+            given(roomSessionService.getContentId(1L)).willReturn(1L);
+            given(contentRepository.findById(1L)).willReturn(Optional.of(testContent));
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2));
+            given(roomSessionService.getAllRoles(1L)).willReturn(java.util.Map.of(1L, "1", 2L, "2"));
+            given(roleRepository.findById(1L)).willReturn(Optional.of(role1));
+            given(roleRepository.findById(2L)).willReturn(Optional.of(role2));
+            given(sentenceRepository.findByContent_ContentId(1L)).willReturn(java.util.List.of(sentence1, sentence2));
+
+            // When
+            roomService.startRound(1L, 1, 1L);
+
+            // Then
+            org.mockito.ArgumentCaptor<com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage> captor =
+                    org.mockito.ArgumentCaptor.forClass(com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage.class);
+            verify(messagingTemplate).convertAndSend(eq("/topic/room/1/state"), captor.capture());
+
+            com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage sentMessage = captor.getValue();
+            assertThat(sentMessage.getType()).isEqualTo("ROUND_START");
+            assertThat(sentMessage.getPhase()).isEqualTo(GamePhase.ROUND_1);
+            assertThat(sentMessage.getRound()).isEqualTo(1);
+            assertThat(sentMessage.getServerTime()).isNotNull();
+            assertThat(sentMessage.getSegments()).hasSize(2);
+            assertThat(sentMessage.getSegments().get(0).getSentences()).hasSize(1);
+            assertThat(sentMessage.getSegments().get(1).getSentences()).hasSize(1);
         }
 
         @Test
@@ -926,11 +1109,29 @@ class RoomServiceTest {
         void startRound_Success_Round2() {
             // Given
             testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            com.ssafy.meari.domain.content.entity.Sentence sentence1 = com.ssafy.meari.domain.content.entity.Sentence.builder()
+                    .role(role1).content(testContent).sequence(1)
+                    .startTime(java.math.BigDecimal.valueOf(0.0)).endTime(java.math.BigDecimal.valueOf(3.5))
+                    .textKo("안녕하세요").textVn("Xin chào").build();
+            ReflectionTestUtils.setField(sentence1, "sentenceId", 10L);
+
+            com.ssafy.meari.domain.content.entity.Sentence sentence2 = com.ssafy.meari.domain.content.entity.Sentence.builder()
+                    .role(role2).content(testContent).sequence(2)
+                    .startTime(java.math.BigDecimal.valueOf(3.5)).endTime(java.math.BigDecimal.valueOf(7.0))
+                    .textKo("반갑습니다").textVn("Rất vui").build();
+            ReflectionTestUtils.setField(sentence2, "sentenceId", 11L);
+
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROUND_1);
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
             given(roomSessionService.getContentId(1L)).willReturn(1L);
             given(contentRepository.findById(1L)).willReturn(Optional.of(testContent));
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2));
+            given(roomSessionService.getAllRoles(1L)).willReturn(java.util.Map.of(1L, "1", 2L, "2"));
+            given(roleRepository.findById(1L)).willReturn(Optional.of(role1));
+            given(roleRepository.findById(2L)).willReturn(Optional.of(role2));
+            given(sentenceRepository.findByContent_ContentId(1L)).willReturn(java.util.List.of(sentence1, sentence2));
 
             // When
             roomService.startRound(1L, 2, 1L);
@@ -938,6 +1139,7 @@ class RoomServiceTest {
             // Then
             verify(shadowingReportRepository, never()).save(any());
             verify(roomSessionService).setPhase(1L, GamePhase.ROUND_2);
+            verify(messagingTemplate).convertAndSend(eq("/topic/room/1/state"), any(com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage.class));
         }
 
         @Test
@@ -953,6 +1155,20 @@ class RoomServiceTest {
         }
 
         @Test
+        @DisplayName("실패 - ROLE_PICK이 아닌 phase에서 Round1 시작 시도")
+        void startRound_Fail_InvalidPhase_Round1() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.WATCHING);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.startRound(1L, 1, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
+        }
+
+        @Test
         @DisplayName("실패 - 역할이 확정되지 않음")
         void startRound_Fail_RolesNotConfirmed() {
             // Given
@@ -965,6 +1181,123 @@ class RoomServiceTest {
             assertThatThrownBy(() -> roomService.startRound(1L, 1, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROLES_NOT_CONFIRMED);
+        }
+    }
+
+    @Nested
+    @DisplayName("녹음 완료 처리")
+    class RecordingComplete {
+
+        @Test
+        @DisplayName("성공 - 단일 문장 녹음 완료 마킹 (전체 완료 아님)")
+        void recordingComplete_Success_SingleSentence_NotComplete() {
+            // Given
+            Long roomId = 1L;
+            com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage message =
+                    new com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage();
+            message.setMemberId(1L);
+            message.setSentenceId(10L);
+            message.setAudioUrl("https://s3.example.com/audio/1_10.webm");
+
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_1);
+            given(roomSessionService.isMember(roomId, 1L)).willReturn(true);
+            given(roomSessionService.isAllRecordingsComplete(roomId, 1)).willReturn(false);
+
+            // When
+            roomService.recordingComplete(roomId, message);
+
+            // Then
+            verify(roomSessionService).markRecordingComplete(roomId, 1, 1L, 10L);
+            verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+        }
+
+        @Test
+        @DisplayName("성공 - 마지막 문장 완료 시 RECORDINGS_COMPLETE 브로드캐스트")
+        void recordingComplete_Success_AllComplete_Broadcast() {
+            // Given
+            Long roomId = 1L;
+            com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage message =
+                    new com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage();
+            message.setMemberId(2L);
+            message.setSentenceId(11L);
+            message.setAudioUrl("https://s3.example.com/audio/2_11.webm");
+
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_1);
+            given(roomSessionService.isMember(roomId, 2L)).willReturn(true);
+            given(roomSessionService.isAllRecordingsComplete(roomId, 1)).willReturn(true);
+
+            // When
+            roomService.recordingComplete(roomId, message);
+
+            // Then
+            verify(roomSessionService).markRecordingComplete(roomId, 1, 2L, 11L);
+
+            org.mockito.ArgumentCaptor<com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage> captor =
+                    org.mockito.ArgumentCaptor.forClass(com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage.class);
+            verify(messagingTemplate).convertAndSend(eq("/topic/room/" + roomId + "/state"), captor.capture());
+
+            com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage sentMessage = captor.getValue();
+            assertThat(sentMessage.getType()).isEqualTo("RECORDINGS_COMPLETE");
+            assertThat(sentMessage.getPhase()).isEqualTo(GamePhase.ROUND_1);
+            assertThat(sentMessage.getRound()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("성공 - Round2에서 녹음 완료 처리")
+        void recordingComplete_Success_Round2() {
+            // Given
+            Long roomId = 1L;
+            com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage message =
+                    new com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage();
+            message.setMemberId(1L);
+            message.setSentenceId(10L);
+
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_2);
+            given(roomSessionService.isMember(roomId, 1L)).willReturn(true);
+            given(roomSessionService.isAllRecordingsComplete(roomId, 2)).willReturn(false);
+
+            // When
+            roomService.recordingComplete(roomId, message);
+
+            // Then
+            verify(roomSessionService).markRecordingComplete(roomId, 2, 1L, 10L);
+        }
+
+        @Test
+        @DisplayName("실패 - 현재 phase가 ROUND가 아닌 경우")
+        void recordingComplete_Fail_InvalidPhase() {
+            // Given
+            Long roomId = 1L;
+            com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage message =
+                    new com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage();
+            message.setMemberId(1L);
+            message.setSentenceId(10L);
+
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.WATCHING);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.recordingComplete(roomId, message))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
+        }
+
+        @Test
+        @DisplayName("실패 - 해당 방의 멤버가 아닌 경우")
+        void recordingComplete_Fail_NotRoomMember() {
+            // Given
+            Long roomId = 1L;
+            com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage message =
+                    new com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage();
+            message.setMemberId(999L);
+            message.setSentenceId(10L);
+
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_1);
+            given(roomSessionService.isMember(roomId, 999L)).willReturn(false);
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.recordingComplete(roomId, message))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_MEMBER);
         }
     }
 }
