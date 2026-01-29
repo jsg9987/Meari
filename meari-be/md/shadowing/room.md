@@ -206,8 +206,8 @@ room:{roomId}:round:{round}:member:{memberId}:total_sentences = 5
       "text_ko": "어서오세요",
       "accuracy": 85,
       "intonation": 90,
-      "accuracy_detail": { ... },
-      "intonation_detail": { ... }
+      "accuracy_detail": {  },
+      "intonation_detail": {  }
     }
   ]
 }
@@ -238,11 +238,10 @@ room:{roomId}:round:{round}:member:{memberId}:total_sentences = 5
 - ✅ **라운드 시작 및 문장 분배 로직**
 - ✅ **라운드별 녹음 완료 상태 관리 및 감지**
 - ◻️ Issue7: 영상 동기화 (WebSocket `/video-sync`)
-- ◻️ Issue8: 턴 알림 시스템 (WebSocket `/turn`)
-- ✅ Issue9: 실시간 채팅 (WebSocket `/chat`) - RoomWebSocketController 구현 완료
+- ✅ Issue9: 실시간 채팅 (WebSocket `/chat`)
 
 ### Phase 4: 녹음 및 분석
-- ✅ Issue10: S3 Presigned URL 발급 API - S3Service, S3Controller 구현 완료
+- ✅ Issue10: S3 Presigned URL 발급 API
 - 🔄 Issue11: 쉐도잉 리포트 생성 API (`/analyze`)
 - ◻️ Issue12: AI 분석 연동 (RabbitMQ)
 - ◻️ Issue13: 리포트 조회 API
