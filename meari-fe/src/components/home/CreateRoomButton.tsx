@@ -26,9 +26,9 @@ const CreateRoomButton = () => {
     setIsLoadingThemes(true);
     try {
       const response = await getThemes();
-      if (response.success && response.data.length > 0) {
-        setThemes(response.data);
-        setSelectedThemeId(response.data[0].theme_id);
+      if (response.data.success && response.data.data.length > 0) {
+        setThemes(response.data.data);
+        setSelectedThemeId(response.data.data[0].theme_id);
       }
     } catch (error) {
       console.error('Failed to load themes:', error);
@@ -81,21 +81,22 @@ const CreateRoomButton = () => {
         theme_id: selectedThemeId
       });
 
-      if (!response.success) {
-        setErrorMessage(response.error?.message ?? '방 생성에 실패했습니다.');
+      console.log(response)
+
+      if (!response.data.success) {
+        setErrorMessage(response.data.error?.message ?? '방 생성에 실패했습니다.');
         return;
       }
 
-      const roomId =
-        response.data?.room_id ??
-        (response as { data?: { data?: { room_id?: string } } }).data?.data?.room_id;
+      const roomId = response.data.data?.room_id;
       if (!roomId) {
+        setErrorMessage('방 ID를 가져올 수 없습니다.');
         return;
       }
 
       handleClose();
       resetForm();
-      navigate(`/shadowing/${roomId}`);
+      navigate(`/shadowing/${roomId}`, { state: { isOwner: true } });
     } catch (error) {
       setErrorMessage('방 생성에 실패했습니다.');
     } finally {
@@ -149,11 +150,10 @@ const CreateRoomButton = () => {
                     key={theme.theme_id}
                     type="button"
                     onClick={() => setSelectedThemeId(theme.theme_id)}
-                    className={`border-2 rounded-lg p-0 cursor-pointer bg-white transition-all overflow-hidden text-left ${
-                      selectedThemeId === theme.theme_id
+                    className={`border-2 rounded-lg p-0 cursor-pointer bg-white transition-all overflow-hidden text-left ${selectedThemeId === theme.theme_id
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-300 hover:border-gray-400'
-                    }`}
+                      }`}
                   >
                     <img
                       src={theme.theme_url}
@@ -195,9 +195,8 @@ const CreateRoomButton = () => {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="비밀번호 입력"
-              className={`px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 ${
-                !usePassword ? 'bg-gray-100' : ''
-              }`}
+              className={`px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 ${!usePassword ? 'bg-gray-100' : ''
+                }`}
               disabled={!usePassword}
             />
 

@@ -2,6 +2,7 @@ package com.ssafy.meari.domain.room.dto.websocket;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import com.ssafy.meari.domain.room.entity.GamePhase;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -17,7 +18,7 @@ public class RoomStateMessage {
     private Long memberId;
     private Boolean ready;
     private Long roleId;
-    private String phase;
+    private GamePhase phase;
     private String nickname;
     private Long newOwnerId;  // 방장 변경 시
     private Long contentId;   // 동영상 선택 시
@@ -62,7 +63,7 @@ public class RoomStateMessage {
                 .build();
     }
 
-    public static RoomStateMessage phaseChange(String phase) {
+    public static RoomStateMessage phaseChange(GamePhase phase) {
         return RoomStateMessage.builder()
                 .type("PHASE_CHANGE")
                 .phase(phase)
@@ -76,7 +77,7 @@ public class RoomStateMessage {
                 .build();
     }
 
-    public static RoomStateMessage gameStart(Long contentId, String phase) {
+    public static RoomStateMessage gameStart(Long contentId, GamePhase phase) {
         return RoomStateMessage.builder()
                 .type("GAME_START")
                 .contentId(contentId)

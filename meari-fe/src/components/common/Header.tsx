@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Mic, FileText, Calendar, Settings, ChevronDown, User, LogOut } from 'lucide-react'
 import logoWhite from '../../assets/images/common/logo-white.svg'
+import { useAuthStore } from '../../store/auth.store'
 
 export type HomeTab = 'shadowing' | 'copik' | 'daily'
 export type Language = 'ko' | 'vi' | 'en'
@@ -32,12 +33,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
   const languageRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
 
-  // Mock 사용자 정보
-  const userInfo = {
-    nickname: 'User',
-    email: 'user@example.com',
-    profileImage: null // null이면 이니셜 표시
-  }
+  // Zustand store에서 사용자 정보 가져오기 (App.tsx에서 초기화됨)
+  const userInfo = useAuthStore((state) => state.userInfo)
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -55,6 +52,13 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
+
+  // 표시용 사용자 정보 (로딩 중 기본값 처리)
+  const displayInfo = {
+    nickname: userInfo?.nickname || 'User',
+    email: userInfo?.email || 'user@example.com',
+    profileImage: userInfo?.profile_url && userInfo.profile_url !== 'http://' ? userInfo.profile_url : null
+  }
 
   const currentLanguage = languages.find((lang) => lang.code === selectedLanguage)
 
@@ -88,7 +92,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
               }}
               aria-hidden
             />
-            <div className='relative z-10 flex gap-3 text-sm font-medium text-white/80' role='tablist'>
+            <div className='relative z-10 flex gap-3 text-[15px] font-medium text-white/80' role='tablist'>
               {tabs.map((tab) => {
                 const Icon = tab.icon
                 return (
@@ -97,12 +101,11 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                     type='button'
                     role='tab'
                     aria-selected={tab.id === activeTab}
-                    className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg transition-colors cursor-pointer min-w-30 ${
-                      tab.id === activeTab ? 'text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
-                    }`}
+                    className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg transition-colors cursor-pointer min-w-30 ${tab.id === activeTab ? 'text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
+                      }`}
                     onClick={() => onTabChange(tab.id)}
                   >
-                    <Icon size={16} />
+                    <Icon size={17} />
                     <span>{tab.label}</span>
                   </button>
                 )
@@ -112,16 +115,16 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
         </nav>
 
         {/* 오른쪽 메뉴 */}
-        <div className='flex items-center justify-end gap-3 text-sm text-white/80'>
+        <div className='flex items-center justify-end gap-1 text-[15px] text-white/80'>
           {/* 언어 선택 드롭다운 */}
           <div className='relative' ref={languageRef}>
             <button
               type='button'
               onClick={() => setIsLanguageOpen(!isLanguageOpen)}
-              className='flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 hover:bg-white/5 transition-colors cursor-pointer'
+              className='flex items-center gap-1.5 rounded-full px-3 py-1.5 hover:bg-white/5 transition-colors cursor-pointer'
             >
               {currentLanguage?.nativeLabel}
-              <ChevronDown size={14} className={`transition-transform ${isLanguageOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={15} className={`transition-transform ${isLanguageOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* 언어 드롭다운 메뉴 */}
@@ -134,9 +137,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                       setSelectedLanguage(lang.code)
                       setIsLanguageOpen(false)
                     }}
-                    className={`flex flex-col items-start px-3 py-2 w-full hover:bg-gray-100 transition-colors text-left rounded-md cursor-pointer ${
-                      selectedLanguage === lang.code ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                    }`}
+                    className={`flex flex-col items-start px-3 py-2 w-full hover:bg-gray-100 transition-colors text-left rounded-md cursor-pointer ${selectedLanguage === lang.code ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                      }`}
                   >
                     <span className='font-medium'>{lang.nativeLabel}</span>
                     <span className='text-xs text-gray-500'>{lang.label}</span>
@@ -149,24 +151,24 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
           {/* 설정 버튼 */}
           <button
             type='button'
-            className='flex items-center justify-center w-9 h-9 rounded-full border border-white/20 hover:bg-white/5 transition-colors cursor-pointer'
+            className='flex items-center justify-center w-9 h-9 rounded-full hover:bg-white/5 transition-colors cursor-pointer'
             title='설정'
           >
-            <Settings size={18} />
+            <Settings size={19} />
           </button>
 
           {/* 프로필 버튼 */}
-          <div className='relative' ref={profileRef}>
+          <div className='relative ml-3' ref={profileRef}>
             <button
               type='button'
               onClick={() => setIsProfileOpen(!isProfileOpen)}
               className='flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors cursor-pointer'
               title='프로필'
             >
-              {userInfo.profileImage ? (
-                <img src={userInfo.profileImage} alt='Profile' className='w-full h-full rounded-full object-cover' />
+              {displayInfo.profileImage ? (
+                <img src={displayInfo.profileImage} alt='Profile' className='w-full h-full rounded-full object-cover' />
               ) : (
-                userInfo.nickname.charAt(0).toUpperCase()
+                displayInfo.nickname.charAt(0).toUpperCase()
               )}
             </button>
 
@@ -177,15 +179,15 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                 <div className='px-3 py-2.5 border-b border-gray-200 mb-1'>
                   <div className='flex items-center gap-3'>
                     <div className='flex items-center justify-center w-12 h-12 rounded-full bg-blue-500 text-white font-semibold text-lg'>
-                      {userInfo.profileImage ? (
-                        <img src={userInfo.profileImage} alt='Profile' className='w-full h-full rounded-full object-cover' />
+                      {displayInfo.profileImage ? (
+                        <img src={displayInfo.profileImage} alt='Profile' className='w-full h-full rounded-full object-cover' />
                       ) : (
-                        userInfo.nickname.charAt(0).toUpperCase()
+                        displayInfo.nickname.charAt(0).toUpperCase()
                       )}
                     </div>
                     <div className='flex-1'>
-                      <p className='font-semibold text-gray-900'>{userInfo.nickname}</p>
-                      <p className='text-sm text-gray-500'>{userInfo.email}</p>
+                      <p className='font-semibold text-gray-900'>{displayInfo.nickname}</p>
+                      <p className='text-sm text-gray-500'>{displayInfo.email}</p>
                     </div>
                   </div>
                 </div>

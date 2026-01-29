@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2 } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
@@ -7,10 +7,11 @@ import VideoControls from "../components/webrtc/VideoControls";
 import ChatPanel from "../components/webrtc/ChatPanel";
 import MediaCheckScreen from "../components/webrtc/MediaCheckScreen";
 import ContentSelectModal from "../components/webrtc/ContentSelectModal";
-// import { useVideoRoom } from "../hooks/useVideoRoom";
-import type { VideoTileData, ConnectionStatus } from "../hooks/useVideoRoom";
-import type { Publisher, Subscriber } from "openvidu-browser";
+import PasswordModal from "../components/webrtc/PasswordModal";
+import { useVideoRoom } from "../hooks/useVideoRoom";
 import type { Content } from "../api/contents.api";
+import { getRoomDetail, enterRoom, leaveRoom } from "../api/rooms.api";
+import { useRoomStore } from "../store/room.store";
 
 type SidebarTab = "video" | "chat";
 type LayoutMode = "narrow" | "grid" | "wide";
@@ -19,7 +20,15 @@ type LayoutMode = "narrow" | "grid" | "wide";
 export default function ShadowingRoom() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isOwner = location.state?.isOwner === true;
+  const { roomData, setRoomData, clearRoomData } = useRoomStore();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("video");
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [isRoomLoading, setIsRoomLoading] = useState(true);
+  const [isEntered, setIsEntered] = useState(false);
+  const [roomPassword, setRoomPassword] = useState<string | undefined>(undefined);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("narrow");
   const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
@@ -48,6 +57,87 @@ export default function ShadowingRoom() {
   const [subtitles, setSubtitles] = useState<Array<{ start: number; end: number; text: string }>>([]);
 
   const nickname = "User";
+
+  // 방 정보 가져오기
+  useEffect(() => {
+    const fetchRoomDetail = async () => {
+      if (!roomId) return;
+
+      try {
+        setIsRoomLoading(true);
+        const response = await getRoomDetail(Number(roomId));
+
+        if (!response.data.success || !response.data.data) {
+          alert('방 정보를 가져올 수 없습니다.');
+          navigate('/');
+          return;
+        }
+
+        setRoomData(response.data.data);
+
+        // 방장이면 enterRoom API 호출 없이 바로 입장
+        if (isOwner) {
+          setIsEntered(true);
+        } else {
+          // 비밀번호가 있는 방이면 비밀번호 모달 표시
+          if (response.data.data.has_password) {
+            setIsPasswordModalOpen(true);
+          } else {
+            // 비밀번호 없는 방은 enterRoom 호출
+            try {
+              const enterResponse = await enterRoom(Number(roomId), {});
+              if (enterResponse.data.success) {
+                setIsEntered(true);
+              } else {
+                alert('방 입장에 실패했습니다.');
+                navigate('/');
+              }
+            } catch (error) {
+              console.error('Failed to enter room:', error);
+              alert('방 입장에 실패했습니다.');
+              navigate('/');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch room detail:', error);
+        alert('방 정보를 가져오는데 실패했습니다.');
+        navigate('/');
+      } finally {
+        setIsRoomLoading(false);
+      }
+    };
+
+    fetchRoomDetail();
+  }, [roomId, navigate, setRoomData, isOwner]);
+
+  // 방 퇴장 처리 (컴포넌트 언마운트 시)
+  useEffect(() => {
+    return () => {
+      if (roomId && isEntered) {
+        leaveRoom(Number(roomId)).catch((error) => {
+          console.error('Failed to leave room:', error);
+        });
+        clearRoomData();
+      }
+    };
+  }, [roomId, isEntered, clearRoomData]);
+
+  // 브라우저 닫기/새로고침 시 퇴장 처리
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (roomId && isEntered) {
+        leaveRoom(Number(roomId)).catch((error) => {
+          console.error('Failed to leave room on unload:', error);
+        });
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [roomId, isEntered]);
 
   // 자막 데이터 로드
   useEffect(() => {
@@ -121,12 +211,42 @@ export default function ShadowingRoom() {
     };
   }, []);
 
-  // Mock 방 정보 (실제로는 API에서 가져와야 함)
-  const roomInfo = {
-    isLocked: true,
-    title: "English Conversation Practice Room",
-    password: "abc123",
-    themeId: 1 // 방 생성 시 선택한 테마 ID
+  // 비밀번호 검증 처리
+  const handlePasswordSubmit = async (password: string) => {
+    if (!roomId) return;
+
+    try {
+      const response = await enterRoom(Number(roomId), { password });
+
+      if (response.data.success) {
+        setRoomPassword(password);
+        setIsPasswordModalOpen(false);
+        setIsEntered(true);
+        setPasswordError('');
+      } else {
+        setPasswordError(response.data.error?.message || '비밀번호가 일치하지 않습니다.');
+        throw new Error('Invalid password');
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handlePasswordCancel = () => {
+    navigate('/');
+  };
+
+  // 방 정보 (store에서 가져오기)
+  const roomInfo = roomData ? {
+    isLocked: roomData.has_password,
+    title: roomData.title,
+    password: '',
+    themeId: roomData.theme_id
+  } : {
+    isLocked: false,
+    title: "Loading...",
+    password: "",
+    themeId: 1
   };
 
   const handleContentSelect = (content: Content) => {
@@ -161,91 +281,31 @@ export default function ShadowingRoom() {
     console.log('Starting shadowing countdown...');
   };
 
-  const mockProfileImages: Record<string, string> = {
-    me: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80",
-    user1: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80",
-    user2: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    user3: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80",
-  };
+  // WebRTC 연결
+  const {
+    status,
+    error,
+    tiles,
+    isAudioEnabled,
+    isVideoEnabled,
+    join,
+    leave,
+    toggleAudio,
+    toggleVideo,
+  } = useVideoRoom({
+    roomId: Number(roomId),
+    nickname,
+    password: roomPassword,
+    autoJoin: false,
+    isOwner
+  });
 
-
-  // ============================================================================
-  // MOCK DATA - UI 개발용 (실제 배포시 주석 제거하고 아래 useVideoRoom 주석 해제)
-  // ============================================================================
-  const [status, setStatus] = useState<ConnectionStatus>("connected");
-  const [error, ] = useState<string | null>(null);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [volume, setVolume] = useState(100);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
   const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
 
-  // Mock StreamManager 생성
-  const createMockStreamManager = (id: string): Publisher | Subscriber => {
-    return {
-      addVideoElement: (videoElement: HTMLVideoElement) => {
-        // Mock: 색상 배경으로 비디오 대체
-        const imageUrl = mockProfileImages[id];
-        if (imageUrl) {
-          videoElement.style.backgroundImage = `url("${imageUrl}")`;
-          videoElement.style.backgroundSize = "cover";
-          videoElement.style.backgroundPosition = "center";
-          videoElement.style.backgroundRepeat = "no-repeat";
-        } else {
-          videoElement.style.backgroundColor = "#111827";
-        }
-      },
-      stream: {
-        streamId: id,
-        connection: {
-          data: JSON.stringify({ clientData: id === "me" ? nickname : `참여자${id}` })
-        }
-      }
-    } as Publisher | Subscriber;
-  };
-
-  // Mock tiles 데이터 (4명의 참가자)
-  const tiles: VideoTileData[] = [
-    {
-      id: "me",
-      streamManager: createMockStreamManager("me"),
-      muted: true,
-      label: `${nickname} (Me)`,
-      isReady: participantsReady.me,
-    },
-    {
-      id: "user1",
-      streamManager: createMockStreamManager("user1"),
-      label: "User 1",
-      isSpeaker: true,
-      isReady: participantsReady.user1,
-    },
-    {
-      id: "user2",
-      streamManager: createMockStreamManager("user2"),
-      label: "User 2",
-      isReady: participantsReady.user2,
-    },
-    {
-      id: "user3",
-      streamManager: createMockStreamManager("user3"),
-      label: "User 3",
-      isReady: participantsReady.user3,
-    },
-  ];
-
-  const join = () => {
-    console.log("Mock join");
-    setStatus("connected");
-  };
-  const leave = () => {
-    console.log("Mock leave");
-    setStatus("idle");
-  };
-  const toggleAudio = () => setIsAudioEnabled(!isAudioEnabled);
-  const toggleVideo = () => setIsVideoEnabled(!isVideoEnabled);
   const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
 
   const handleAudioDeviceChange = (deviceId: string) => {
@@ -259,25 +319,14 @@ export default function ShadowingRoom() {
     // TODO: 실제 구현시 미디어 스트림 변경 로직 추가
     console.log('Video device changed to:', deviceId);
   };
-  // ============================================================================
-  // MOCK DATA 끝
-  // ============================================================================
 
-  // ============================================================================
-  // 실제 API 사용시 아래 주석 해제하고 위의 MOCK DATA 섹션 주석 처리
-  // ============================================================================
-  // const {
-  //   status,
-  //   error,
-  //   tiles,
-  //   isAudioEnabled,
-  //   isVideoEnabled,
-  //   join,
-  //   leave,
-  //   toggleAudio,
-  //   toggleVideo,
-  // } = useVideoRoom({ sessionName: roomId ?? "", nickname, autoJoin: !!roomId });
-  // ============================================================================
+  // 미디어 체크 완료 후 WebRTC 연결
+  useEffect(() => {
+    if (isMediaChecked && isEntered && roomId && status === 'idle') {
+      join();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMediaChecked, isEntered, roomId, status]);
 
   if (!roomId) {
     return (
@@ -293,8 +342,16 @@ export default function ShadowingRoom() {
     );
   }
 
-  const handleLeave = () => {
-    leave();
+  const handleLeave = async () => {
+    if (roomId) {
+      try {
+        await leave();
+        await leaveRoom(Number(roomId));
+        clearRoomData();
+      } catch (error) {
+        console.error('Failed to leave room:', error);
+      }
+    }
     navigate("/");
   };
 
@@ -331,12 +388,42 @@ export default function ShadowingRoom() {
     setInitialVideoDeviceId(videoDeviceId);
     setIsMediaChecked(true);
 
-    // TODO: 실제 구현 시 선택된 장치 정보를 useVideoRoom에 전달
-    setIsAudioEnabled(audioEnabled);
-    setIsVideoEnabled(videoEnabled);
+    // 선택된 장치 정보 저장
     setSelectedAudioDevice(audioDeviceId);
     setSelectedVideoDevice(videoDeviceId);
   };
+
+  // 방 정보 로딩 중
+  if (isRoomLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-gray-50">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-600">방 정보를 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  // 비밀번호 입력 모달
+  if (isPasswordModalOpen) {
+    return (
+      <PasswordModal
+        roomTitle={roomInfo.title}
+        onSubmit={handlePasswordSubmit}
+        onCancel={handlePasswordCancel}
+        errorMessage={passwordError}
+      />
+    );
+  }
+
+  // 입장 전
+  if (!isEntered) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-gray-50">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-600">입장 중...</p>
+      </div>
+    );
+  }
 
   // 미디어 체크가 완료되지 않았으면 미디어 체크 화면 표시
   if (!isMediaChecked) {
