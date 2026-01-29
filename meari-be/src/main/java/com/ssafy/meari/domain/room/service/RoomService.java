@@ -492,7 +492,19 @@ public class RoomService {
         // 4. 확정 플래그 설정
         roomSessionService.setRolesConfirmed(roomId, true);
 
-        log.info("역할 확정 완료: roomId={}", roomId);
+        // 5. 전체 segments 정보 생성 및 브로드캐스트
+        Long contentId = roomSessionService.getContentId(roomId);
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_CONTENT));
+
+        List<Sentence> sentences = sentenceRepository.findByContent_ContentId(contentId);
+        Map<Long, String> roleAssignments = roomSessionService.getAllRoles(roomId);
+        List<MemberSegmentInfo> segments = buildMemberSegments(memberRooms, roleAssignments, sentences);
+
+        RoomStateMessage message = RoomStateMessage.rolesConfirmed(segments);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
+        log.info("역할 확정 완료 및 segments 브로드캐스트: roomId={}", roomId);
     }
 
     /**
@@ -558,21 +570,24 @@ public class RoomService {
             roomSessionService.setMemberTotalSentences(roomId, round, segment.getMemberId(), segment.getSentences().size());
         }
 
-        // Round 시작 시각 저장
-        long serverTime = System.currentTimeMillis();
-        roomSessionService.setRoundStartTime(roomId, serverTime);
+        // Round 시작 시각 저장 (타임아웃 계산용)
+        long currentTime = System.currentTimeMillis();
+        roomSessionService.setRoundStartTime(roomId, currentTime);
 
-        // 타임아웃 시간 계산 및 저장 (영상 길이 + 40초)
+        // 실제 재생 시작 시간 (현재 시간 + 2초)
+        long playStartTime = currentTime + 2000L;
+
+        // 타임아웃 시간 계산 및 저장 (재생 시작 시간 + 영상 길이 + 40초)
         int videoDurationSeconds = content.getTotalDuration().intValue();
-        long timeoutMillis = serverTime + (videoDurationSeconds * 1000L) + 40000L;
+        long timeoutMillis = playStartTime + (videoDurationSeconds * 1000L) + 40000L;
         roomSessionService.setRoundTimeout(roomId, round, timeoutMillis);
 
-        // ROUND_START 브로드캐스트
-        RoomStateMessage message = RoomStateMessage.roundStart(newPhase, round, serverTime, segments);
+        // ROUND_START 브로드캐스트 (재생 시작 시간 전달)
+        RoomStateMessage message = RoomStateMessage.roundStart(newPhase, round, playStartTime, segments);
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
-        log.info("Round 시작 완료: roomId={}, round={}, phase={}, 타임아웃={}초",
-                roomId, round, newPhase, videoDurationSeconds + 40);
+        log.info("Round 시작 완료: roomId={}, round={}, phase={}, 재생시작={}ms 후, 타임아웃={}초",
+                roomId, round, newPhase, 2, videoDurationSeconds + 40);
     }
 
     /**
