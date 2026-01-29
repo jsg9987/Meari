@@ -88,7 +88,8 @@ WAITING (다시 대기)
 | POST | /api/v1/rooms/{roomId}/rounds/start | Round 시작. ROUND_START 메시지 브로드캐스팅 트리거 | 방장 | ROLE_PICK/ROUND_1 |
 | POST | /api/v1/rooms/{roomId}/finish | 게임 종료 (준비로 복귀)| 방장 | ROUND_2 |
 | POST | /api/v1/rooms/{roomId}/role | 역할 선점 | 방 참여자 | ROLE_PICK |
-| POST | /api/v1/s3/presigned-url | S3 업로드 URL 요청 | 인증된 사용자 | - |
+| GET | /api/v1/s3/contents/{contentId}/video-url | 동영상 시청용 Presigned URL 발급 | 인증된 사용자 | - |
+| POST | /api/v1/s3/presigned-url | 녹음 파일 업로드용 Presigned URL 발급 | 인증된 사용자 | - |
 | POST | /api/v1/shadowing/analyze | 분석 요청 | 인증된 사용자 | - |
 | GET | /api/v1/shadowing/reports/{id} | 리포트 조회 | 인증된 사용자 | - |
 
@@ -205,8 +206,8 @@ room:{roomId}:round:{round}:member:{memberId}:total_sentences = 5
       "text_ko": "어서오세요",
       "accuracy": 85,
       "intonation": 90,
-      "accuracy_detail": { ... },
-      "intonation_detail": { ... }
+      "accuracy_detail": {  },
+      "intonation_detail": {  }
     }
   ]
 }
@@ -237,11 +238,10 @@ room:{roomId}:round:{round}:member:{memberId}:total_sentences = 5
 - ✅ **라운드 시작 및 문장 분배 로직**
 - ✅ **라운드별 녹음 완료 상태 관리 및 감지**
 - ◻️ Issue7: 영상 동기화 (WebSocket `/video-sync`)
-- ◻️ Issue8: 턴 알림 시스템 (WebSocket `/turn`)
-- ◻️ Issue9: 실시간 채팅 (WebSocket `/chat`)
+- ✅ Issue9: 실시간 채팅 (WebSocket `/chat`)
 
 ### Phase 4: 녹음 및 분석
-- 🔄 Issue10: S3 Presigned URL 발급 API
+- ✅ Issue10: S3 Presigned URL 발급 API
 - 🔄 Issue11: 쉐도잉 리포트 생성 API (`/analyze`)
 - ◻️ Issue12: AI 분석 연동 (RabbitMQ)
 - ◻️ Issue13: 리포트 조회 API
