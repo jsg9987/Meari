@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getThemes, type Theme } from '../../api/contents.api'
+import ThemeConfirmModal from './ThemeConfirmModal'
 
 // 설명 카드 이미지 (SVG)
 import newsClickImg from '../../assets/images/copik/learning-preparation.svg'
@@ -8,8 +9,6 @@ import questionFlowImg from '../../assets/images/copik/question-speaking.svg'
 import resultCheckImg from '../../assets/images/copik/result-check.svg'
 import progressChartImg from '../../assets/images/copik/mypage-chart.svg'
 
-// 테마 더미 썸네일
-const dummyThemeImg = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=400&h=300&fit=crop'
 
 // 설명 카드 데이터
 const stepCards = [
@@ -51,6 +50,7 @@ const KopicPanel = () => {
   const [themes, setThemes] = useState<Theme[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTheme, setSelectedTheme] = useState<number | null>(null)
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
 
   useEffect(() => {
     const loadThemes = async () => {
@@ -71,11 +71,28 @@ const KopicPanel = () => {
 
   const handleStartEvaluation = () => {
     if (selectedTheme) {
-      navigate(`/kopic/evaluation/${selectedTheme}`)
+      setIsConfirmModalOpen(true)
     } else {
       alert('테마를 선택해주세요.')
     }
   }
+
+  const handleThemeClick = (themeId: number) => {
+    setSelectedTheme(themeId)
+  }
+
+  const handleConfirmStart = () => {
+    if (selectedTheme) {
+      navigate(`/kopic/evaluation/${selectedTheme}`)
+    }
+    setIsConfirmModalOpen(false)
+  }
+
+  const handleCloseModal = () => {
+    setIsConfirmModalOpen(false)
+  }
+
+  const currentThemeName = themes.find(t => t.theme_id === selectedTheme)?.name || ''
 
   return (
     <section>
@@ -147,8 +164,10 @@ const KopicPanel = () => {
             {themes.map((theme) => (
               <div
                 key={theme.theme_id}
-                onClick={() => setSelectedTheme(theme.theme_id)}
-                className={`bg-white rounded-lg overflow-hidden shadow-md cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${selectedTheme === theme.theme_id ? 'ring-2 ring-[#2D9CDB] ring-offset-2' : ''
+                onClick={() => handleThemeClick(theme.theme_id)}
+                className={`bg-white rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02] ${selectedTheme === theme.theme_id
+                  ? 'shadow-[0_0_35px_rgba(45,156,219,0.8)] z-10 scale-[1.02]'
+                  : 'shadow-md hover:shadow-xl'
                   }`}
               >
                 {/* 썸네일 */}
@@ -162,10 +181,10 @@ const KopicPanel = () => {
 
                 {/* 정보 */}
                 <div className='px-3 py-4'>
-                  <h3 className='text-[18px] font-semibold text-gray-900 mb-3'>
+                  <h3 className='text-[18px] font-semibold text-gray-900 mb-4'>
                     {theme.name}
                   </h3>
-                  <p className='text-[13px] text-gray-500 mb-3'>{theme.description}</p>
+                  <p className='text-[13px] text-gray-500 mb-4'>{theme.description}</p>
                   <p className='text-[13px] text-gray-400'>
                     2 minute · 16 section
                   </p>
@@ -175,6 +194,14 @@ const KopicPanel = () => {
           </div>
         )}
       </div>
+
+      {/* 확인 모달 */}
+      <ThemeConfirmModal
+        isOpen={isConfirmModalOpen}
+        themeName={currentThemeName}
+        onClose={handleCloseModal}
+        onConfirm={handleConfirmStart}
+      />
     </section>
   )
 }
