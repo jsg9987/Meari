@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { createRoom } from '../../api/rooms.api';
 import { getThemes, type Theme } from '../../api/contents.api';
@@ -19,6 +20,23 @@ const CreateRoomButton = () => {
   useEffect(() => {
     if (isOpen) {
       loadThemes();
+    }
+  }, [isOpen]);
+
+  // 모달이 열릴 때 스크롤 방지
+  useEffect(() => {
+    if (isOpen) {
+      const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollBarWidth}px`;
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
     }
   }, [isOpen]);
 
@@ -81,8 +99,6 @@ const CreateRoomButton = () => {
         theme_id: selectedThemeId
       });
 
-      console.log(response)
-
       if (!response.data.success) {
         setErrorMessage(response.data.error?.message ?? '방 생성에 실패했습니다.');
         return;
@@ -105,16 +121,16 @@ const CreateRoomButton = () => {
   };
 
   return (
-    <div>
+    <>
       <button
-        className='bg-(--color-bg-button) rounded-(--radius-button) px-8 py-3 text-white font-medium cursor-pointer'
+        className='bg-(--color-bg-button) rounded-(--radius-button) px-9 py-[10px] text-white font-medium cursor-pointer'
         type="button"
         onClick={handleOpen}
       >
         방 생성
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-1000 p-4"
           onClick={handleClose}
@@ -122,54 +138,54 @@ const CreateRoomButton = () => {
           <div
             role="dialog"
             aria-modal="true"
-            className="bg-white rounded-xl p-6 w-full max-w-125 max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col gap-3"
+            className="bg-white rounded-xl p-7 w-full max-w-125 max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col gap-[13px]"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="text-xl font-semibold m-0">방 만들기</h2>
+            <h2 className="text-[1.375rem] font-semibold m-0 transition-none">방 만들기</h2>
 
-            <label className="font-semibold">
+            <label className="font-semibold text-[16px]">
               테마 선택 <span className="text-red-600">*</span>
             </label>
             {isLoadingThemes ? (
               <div className="grid grid-cols-2 gap-3">
                 {[1, 2, 3, 4].map((index) => (
                   <div key={index} className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white">
-                    <div className="w-full h-25 bg-gray-300 animate-pulse" />
-                    <div className="p-3">
-                      <div className="h-3.5 bg-gray-300 rounded mb-2 animate-pulse" />
-                      <div className="h-2.5 bg-gray-300 rounded mb-1 animate-pulse" />
-                      <div className="h-2.5 bg-gray-300 rounded w-[70%] animate-pulse" />
+                    <div className="w-full h-[110px] bg-gray-300 animate-pulse" />
+                    <div className="p-[13px]">
+                      <div className="h-[15px] bg-gray-300 rounded mb-2 animate-pulse" />
+                      <div className="h-[11px] bg-gray-300 rounded mb-1 animate-pulse" />
+                      <div className="h-[11px] bg-gray-300 rounded w-[70%] animate-pulse" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-[13px]">
                 {themes.map((theme) => (
                   <button
                     key={theme.theme_id}
                     type="button"
                     onClick={() => setSelectedThemeId(theme.theme_id)}
                     className={`border-2 rounded-lg p-0 cursor-pointer bg-white transition-all overflow-hidden text-left ${selectedThemeId === theme.theme_id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
                       }`}
                   >
                     <img
                       src={theme.theme_url}
                       alt={theme.name}
-                      className="w-full h-25 object-cover"
+                      className="w-full h-[110px] object-cover"
                     />
-                    <div className="p-3">
-                      <h3 className="m-0 text-sm font-semibold mb-1">{theme.name}</h3>
-                      <p className="m-0 text-xs text-gray-600 leading-snug">{theme.description}</p>
+                    <div className="p-[13px]">
+                      <h3 className="m-0 text-[16px] font-semibold mb-1">{theme.name}</h3>
+                      <p className="m-0 text-[13px] text-gray-600 leading-snug">{theme.description}</p>
                     </div>
                   </button>
                 ))}
               </div>
             )}
 
-            <label className="font-semibold">
+            <label className="font-semibold text-[16px]">
               방 제목 <span className="text-red-600">*</span>
             </label>
             <input
@@ -177,7 +193,7 @@ const CreateRoomButton = () => {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="예: 같이 카페 대화 연습해요!"
-              className="px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500"
+              className="px-[13px] py-[11px] rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 text-[16px]"
             />
 
             <label className="flex items-center gap-2 cursor-pointer">
@@ -195,16 +211,16 @@ const CreateRoomButton = () => {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="비밀번호 입력"
-              className={`px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 ${!usePassword ? 'bg-gray-100' : ''
+              className={`px-[13px] py-[11px] rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 text-[16px] ${!usePassword ? 'bg-gray-100' : ''
                 }`}
               disabled={!usePassword}
             />
 
-            <label className="font-semibold">최대 인원</label>
+            <label className="font-semibold text-[16px]">최대 인원</label>
             <select
               value={maxPeople}
               onChange={(event) => setMaxPeople(Number(event.target.value))}
-              className="px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+              className="px-[13px] py-[11px] rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer text-[16px]"
             >
               {[1, 2, 3, 4].map((count) => (
                 <option key={count} value={count}>
@@ -213,14 +229,14 @@ const CreateRoomButton = () => {
               ))}
             </select>
 
-            {errorMessage && <p className="text-red-600 m-0 text-sm">{errorMessage}</p>}
+            {errorMessage && <p className="text-red-600 m-0 text-[16px]">{errorMessage}</p>}
 
-            <div className="flex justify-end gap-2 mt-2">
+            <div className="flex justify-end gap-[9px] mt-2">
               <button
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-[18px] py-[9px] rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 취소
               </button>
@@ -228,15 +244,16 @@ const CreateRoomButton = () => {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-[18px] py-[9px] rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isSubmitting ? '생성 중...' : '생성'}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 };
 

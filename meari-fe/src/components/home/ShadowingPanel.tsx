@@ -4,11 +4,14 @@ import RoomCard from './RoomCard'
 import PasswordModal from './PasswordModal'
 import CreateRoomButton from './CreateRoomButton'
 import { getRooms, joinRoom, type RoomItem } from '../../api/rooms.api'
+import { getThemes, type Theme } from '../../api/contents.api'
 
-const themes = ['전체', '일상회화', '비즈니스', '뉴스', '여행'] as const
+// 테마 목록은 API를 통해 가져옵니다.
 
 const ShadowingPanel = () => {
   const navigate = useNavigate()
+  const [themes, setThemes] = useState<string[]>(['전체'])
+  const [themeData, setThemeData] = useState<Theme[]>([])
   const [selectedTheme, setSelectedTheme] = useState<string>('전체')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [rooms, setRooms] = useState<RoomItem[]>([])
@@ -33,8 +36,9 @@ const ShadowingPanel = () => {
     }
 
     try {
-      const themeMap: Record<string, number> = { '일상회화': 1, '비즈니스': 2, '뉴스': 3, '여행': 4 };
-      const themeId = selectedTheme === '전체' ? undefined : themeMap[selectedTheme];
+      // 선택된 테마 이름에 맞는 theme_id 찾기
+      const targetTheme = themeData.find(t => t.name === selectedTheme);
+      const themeId = selectedTheme === '전체' ? undefined : targetTheme?.theme_id;
 
       const response = await getRooms({
         themeId: themeId,
@@ -58,7 +62,24 @@ const ShadowingPanel = () => {
       setIsInitialLoading(false)
       setIsFetchingNextPage(false)
     }
-  }, [selectedTheme, nextCursor, hasNext, isFetchingNextPage])
+  }, [selectedTheme, themeData, nextCursor, hasNext, isFetchingNextPage])
+
+  // 초기 테마 로드
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        const response = await getThemes()
+        if (response.data.success && response.data.data) {
+          const fetchedThemes = response.data.data
+          setThemeData(fetchedThemes)
+          setThemes(['전체', ...fetchedThemes.map(t => t.name)])
+        }
+      } catch (error) {
+        console.error('Failed to load themes:', error)
+      }
+    }
+    loadThemes()
+  }, [])
 
   // 테마/검색어 변경 시 초기화
   useEffect(() => {
@@ -115,31 +136,29 @@ const ShadowingPanel = () => {
 
   return (
     <section>
-      {/* 타이틀 */}
-      <div className='mb-6'>
-        <h1 className='text-2xl font-bold text-gray-900 mb-2'>
-          쉐도잉 (Shadowing)
-        </h1>
-        <p className='text-sm text-gray-600'>
-          한국인의 음성을 실시간으로 따라하며 발음 정확도를 교정 받으세요.
-        </p>
-      </div>
-
-      {/* 방 생성 버튼 */}
-      <div className='flex justify-end mb-4'>
+      {/* 타이틀 및 방 생성 버튼 */}
+      <div className='flex items-end justify-between mb-10'>
+        <div>
+          <h1 className='text-[1.65rem] font-bold text-gray-900 mb-2'>
+            쉐도잉 (Shadowing)
+          </h1>
+          <p className='text-[16px] text-gray-600'>
+            한국인의 음성을 실시간으로 따라하며 발음 정확도를 교정 받으세요.
+          </p>
+        </div>
         <CreateRoomButton />
       </div>
 
       {/* 필터 및 검색 */}
-      <div className='flex items-center justify-between mb-6'>
+      <div className='flex items-center justify-between mb-4'>
         {/* 테마 필터 */}
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-[8px]'>
           {themes.map((theme) => (
             <button
               key={theme}
               type='button'
               onClick={() => setSelectedTheme(theme)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${selectedTheme === theme
+              className={`px-[18px] py-[7px] rounded-full text-[13px] font-medium transition-colors ${selectedTheme === theme
                 ? 'border-2 border-[#2D9CDB] text-[#2D9CDB] bg-white'
                 : 'border border-gray-300 text-gray-600 bg-white hover:border-[#2D9CDB] hover:text-[#2D9CDB]'
                 }`}
@@ -156,12 +175,12 @@ const ShadowingPanel = () => {
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
             placeholder='search'
-            className='w-48 px-4 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2D9CDB] focus:border-transparent'
+            className='w-[250px] px-[18px] py-[7px] pr-11 border border-gray-300 rounded-full text-[13px] focus:outline-none focus:ring-2 focus:ring-[#2D9CDB] focus:border-transparent'
           />
           <svg
             className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400'
-            width="16"
-            height="16"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -179,7 +198,7 @@ const ShadowingPanel = () => {
       ) : rooms.length === 0 ? (
         <div className='text-center py-20 text-gray-500'>방이 없습니다.</div>
       ) : (
-        <div className='grid grid-cols-4 gap-4'>
+        <div className='grid grid-cols-4 gap-x-[18px] gap-y-[24px]'>
           {rooms.map((room, index) => (
             <RoomCard
               key={`${room.room_id}-${index}`}
