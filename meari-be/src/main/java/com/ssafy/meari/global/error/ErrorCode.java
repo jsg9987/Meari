@@ -59,6 +59,7 @@ public enum ErrorCode {
     NOT_FOUND_CONTENT(HttpStatus.NOT_FOUND, "존재하지 않는 콘텐츠입니다."),
     NOT_FOUND_ROLE(HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."),
     NOT_FOUND_MEMBER_ROOM(HttpStatus.NOT_FOUND, "방에 참여하지 않은 사용자입니다."),
+    OPENVIDU_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "OpenVidu 세션을 찾을 수 없습니다."),
 
 	// Method Not Allowed Error: 405
 	METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메소드입니다."),
@@ -76,14 +77,26 @@ public enum ErrorCode {
     CONTENT_NOT_SELECTED(HttpStatus.CONFLICT, "동영상이 선택되지 않았습니다."),
     CONTENT_MISMATCH(HttpStatus.CONFLICT, "선택된 동영상과 일치하지 않습니다."),
     CONTENT_SELECT_ONLY_WAITING(HttpStatus.CONFLICT, "동영상은 대기 중일 때만 선택할 수 있습니다."),
-    
-	
+
+    // Chat Error: 500
+    CHAT_SAVE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 저장에 실패했습니다."),
+    CHAT_BROADCAST_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 브로드캐스트에 실패했습니다."),
+
+    ROOM_ALREADY_STARTED(HttpStatus.CONFLICT, "이미 학습이 시작된 방입니다."),
+    ROOM_ALREADY_CLOSED(HttpStatus.CONFLICT, "이미 종료된 방입니다."),
+
+
 	// Unsupported Media Type: 415
-	
-	
+
+
     // Internal Server Error: 500
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 에러입니다."),
     FILE_READ_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "파일을 읽어들이다 에러 발생"),
+    OPENVIDU_SESSION_CREATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 생성에 실패했습니다."),
+    OPENVIDU_CONNECTION_CREATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 연결(토큰) 생성에 실패했습니다."),
+    OPENVIDU_SESSION_CLOSE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 종료에 실패했습니다."),
+    OPENVIDU_DISCONNECT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 연결 강제 종료에 실패했습니다."),
+    OPENVIDU_FETCH_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 정보 조회에 실패했습니다."),
 
     // External Server Error(BAD_GATEWAY): 502
 	EXTERNAL_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "서버 외부 에러입니다.");

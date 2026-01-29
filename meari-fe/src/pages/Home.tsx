@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Header, { type HomeTab } from '../components/common/Header'
 import ShadowingPanel from '../components/home/ShadowingPanel'
-import CopikPanel from '../components/home/CopikPanel'
+import CopikPanel from '../components/home/KopicPanel'
 import DailyStudyPanel from '../components/home/DailyStudyPanel'
 
 const Home = () => {
@@ -23,7 +23,7 @@ const Home = () => {
         <Header activeTab={activeTab} onTabChange={setActiveTab} />
       </header>
 
-      <main className='mx-auto w-full max-w-[1200px] px-6 py-10'>
+      <main className='mx-auto w-full max-w-300 px-6 py-10'>
         {renderContent()}
       </main>
     </div>

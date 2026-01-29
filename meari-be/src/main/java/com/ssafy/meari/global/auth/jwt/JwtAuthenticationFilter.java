@@ -33,7 +33,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String requestURI = request.getRequestURI();
-        log.debug("[JwtAuthenticationFilter] 요청 URI: {}, 메서드: {}", requestURI, request.getMethod());
 
         // JWT 검증 스킵할 경로들
         if ("/api/v1/auth/login".equals(requestURI) ||
@@ -41,18 +40,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/v1/auth/email/check".equals(requestURI) ||
             "/api/v1/auth/nickname/check".equals(requestURI) ||
             "/api/v1/auth/refresh".equals(requestURI) ||
-            requestURI.startsWith("/api/v1/nlp")) {
-            log.debug("[JwtAuthenticationFilter] JWT 검증 스킵 - 공개 경로: {}", requestURI);
+            requestURI.startsWith("/swagger-ui") ||    // swagger-ui 관련 모든 리소스
+            requestURI.startsWith("/v3/api-docs") ||   // OpenAPI3 스펙 경로
+            requestURI.startsWith("/api-docs")         // 기존 api-docs 경로
+		////////////////// chat-test.html 테스트를 위한 접근제한 해제 /////////////
+			//            || requestURI.startsWith("/api/v1/auth") ||
+			//            requestURI.startsWith("/ws") ||
+			//            requestURI.endsWith(".html") ||
+			//            requestURI.endsWith(".js") ||
+			//            requestURI.endsWith(".css") ||
+			//            requestURI.endsWith(".ico") ||
+			//            requestURI.endsWith(".png") ||
+			//            requestURI.endsWith(".jpg")
+		) {
+            log.debug("JwtAuthentication 스킵");
             filterChain.doFilter(request, response);
             return;
         }
 
         String authorizationHeader = request.getHeader("Authorization");
-        log.debug("[JwtAuthenticationFilter] Authorization 헤더: {}", authorizationHeader);
 
         // 1. "Authorization" 헤더가 없거나 "Bearer "로 시작하지 않으면 skip
         if (!StringUtils.hasText(authorizationHeader) || !authorizationHeader.startsWith("Bearer ")) {
-            log.error("[JwtAuthenticationFilter] 유효하지 않은 헤더 - URI: {}", requestURI);
             throw new BusinessException(ErrorCode.INVALID_HEADER_ERROR);
         }
 

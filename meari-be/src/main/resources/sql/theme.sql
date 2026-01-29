@@ -1,0 +1,4 @@
+INSERT INTO public.theme (theme_id, created_at, updated_at, description, name, theme_url) VALUES (1, '2026-01-28 15:14:02', '2026-01-28 15:14:11', '생활', 'Daily_Life', '/static/content/thumbnails/life.jpg');
+INSERT INTO public.theme (theme_id, created_at, updated_at, description, name, theme_url) VALUES (2, '2026-01-28 15:15:51', '2026-01-28 15:15:53', '공공행정', 'Public', '/static/content/thumbnails/news.jpg');
+INSERT INTO public.theme (theme_id, created_at, updated_at, description, name, theme_url) VALUES (3, '2026-01-28 15:16:33', '2026-01-28 15:16:35', '직장', 'Work', '/static/content/thumbnails/public.jpg');
+INSERT INTO public.theme (theme_id, created_at, updated_at, description, name, theme_url) VALUES (4, '2026-01-28 15:16:53', '2026-01-28 15:16:55', '뉴스', 'News', '/static/content/thumbnails/work.jpg');
