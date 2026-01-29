@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2, UserCircle } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
@@ -119,11 +119,10 @@ export default function ShadowingRoom() {
     },
     onRoleAssigned: (message) => {
       console.log('Role assigned:', message);
-      // 역할 선점 성공 시 선택된 역할 ID 저장
+      // 역할 선점 성공 시 선택된 역할 ID 저장 (아직 확정은 아님)
       if (message.role_id && message.member_id) {
         setMySelectedRole(message.role_id);
         setMemberRole(message.member_id, message.role_id);
-        setIsRoleAssigned(true); // 역할 선택 완료
         setToastMessage('역할이 등록되었습니다');
       }
     },
@@ -484,6 +483,7 @@ export default function ShadowingRoom() {
       if (response.data.success) {
         setToastMessage('역할 선택이 확정되었습니다');
         setIsRoleSelectOpen(false);
+        setIsRoleAssigned(true); // 역할 확정 완료 - 이제 캐릭터 선택 버튼 숨김
       } else {
         setToastMessage('역할 확정에 실패했어요');
       }

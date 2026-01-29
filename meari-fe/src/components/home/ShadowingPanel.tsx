@@ -15,6 +15,7 @@ const ShadowingPanel = () => {
   const [themeData, setThemeData] = useState<Theme[]>([])
   const [selectedTheme, setSelectedTheme] = useState<string>('전체')
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState('')
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isFetchingNextPage, setIsFetchingNextPage] = useState(false)
@@ -22,6 +23,7 @@ const ShadowingPanel = () => {
   const [hasNext, setHasNext] = useState(true)
 
   const observerTarget = useRef<HTMLDivElement>(null)
+  const minLoadingTimeRef = useRef<number | null>(null)
 
   // 비밀번호 모달 상태
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
@@ -29,9 +31,10 @@ const ShadowingPanel = () => {
 
   // 방 목록 불러오기 함수
   const fetchRooms = useCallback(async (isFirstPage: boolean = false) => {
-
     if (isFirstPage) {
       setIsInitialLoading(true)
+      // 스켈레톤 최소 노출 시간 시작
+      minLoadingTimeRef.current = Date.now()
     } else {
       if (!hasNext || isFetchingNextPage) return
       setIsFetchingNextPage(true)
@@ -50,6 +53,17 @@ const ShadowingPanel = () => {
 
       if (response.data.success && response.data.data) {
         const newRooms = response.data.data.contents;
+
+        // 첫 페이지 로딩 시 최소 300ms 보장
+        if (isFirstPage && minLoadingTimeRef.current) {
+          const elapsedTime = Date.now() - minLoadingTimeRef.current
+          const remainingTime = Math.max(0, 300 - elapsedTime)
+
+          if (remainingTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, remainingTime))
+          }
+        }
+
         if (isFirstPage) {
           setRooms(newRooms);
         } else {
@@ -63,6 +77,7 @@ const ShadowingPanel = () => {
     } finally {
       setIsInitialLoading(false)
       setIsFetchingNextPage(false)
+      minLoadingTimeRef.current = null
     }
   }, [selectedTheme, themeData, nextCursor, hasNext, isFetchingNextPage])
 
@@ -83,12 +98,21 @@ const ShadowingPanel = () => {
     loadThemes()
   }, [])
 
-  // 테마/검색어 변경 시 초기화
+  // 검색어 디바운싱 (500ms)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchKeyword(searchKeyword)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchKeyword])
+
+  // 테마/디바운스된 검색어 변경 시 초기화
   useEffect(() => {
     setNextCursor(null)
     setHasNext(true)
     fetchRooms(true)
-  }, [selectedTheme, searchKeyword])
+  }, [selectedTheme, debouncedSearchKeyword])
 
   // 무한 스크롤 Observer 설정
   useEffect(() => {
@@ -201,7 +225,23 @@ const ShadowingPanel = () => {
 
       {/* 방 목록 그리드 */}
       {isInitialLoading ? (
-        <div className='text-center py-20 text-gray-500'>로딩 중...</div>
+        <div className='grid grid-cols-4 gap-x-[18px] gap-y-[24px]'>
+          {[...Array(4)].map((_, index) => (
+            <div key={index} className='bg-white rounded-lg overflow-hidden shadow-md border border-gray-100'>
+              {/* 썸네일 스켈레톤 */}
+              <div className='aspect-video animate-shimmer' />
+              {/* 정보 스켈레톤 */}
+              <div className='p-4 space-y-3'>
+                <div className='h-5 animate-shimmer rounded' />
+                <div className='h-4 animate-shimmer rounded w-4/5' />
+                <div className='flex items-center justify-between pt-2'>
+                  <div className='h-4 animate-shimmer rounded w-16' />
+                  <div className='h-4 animate-shimmer rounded w-12' />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : rooms.length === 0 ? (
         <div className='text-center py-20 text-gray-500'>방이 없습니다.</div>
       ) : (
