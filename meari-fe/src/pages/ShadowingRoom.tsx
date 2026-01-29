@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2, UserCircle } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
+import { useAuthStore } from "../store/auth.store";
 import VideoControls from "../components/webrtc/VideoControls";
 import ChatPanel from "../components/webrtc/ChatPanel";
 import MediaCheckScreen from "../components/webrtc/MediaCheckScreen";
@@ -25,8 +26,9 @@ type LayoutMode = "narrow" | "grid" | "wide";
 export default function ShadowingRoom() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const isOwner = location.state?.isOwner === true;
+  const { userInfo } = useAuthStore();
+  const roomOwnerId = useRoomStore((state) => state.roomData?.owner_id);
+  const isOwner = userInfo?.member_id === roomOwnerId;
   const { roomData, setRoomData, clearRoomData } = useRoomStore();
   const {
     availableRoles,
@@ -71,7 +73,7 @@ export default function ShadowingRoom() {
   const [currentSubtitle, setCurrentSubtitle] = useState<string>("");
   const [subtitles, setSubtitles] = useState<Array<{ start: number; end: number; text: string }>>([]);
 
-  const nickname = "User";
+  const nickname = userInfo?.nickname || "User";
 
   // 더미 역할 데이터
   const dummyRoles: Role[] = [
@@ -209,7 +211,7 @@ export default function ShadowingRoom() {
     };
 
     fetchRoomDetail();
-  }, [roomId, navigate, setRoomData, isOwner]);
+  }, [roomId, navigate, setRoomData]);
 
   // 방 퇴장 처리 (컴포넌트 언마운트 시)
   useEffect(() => {
@@ -949,22 +951,20 @@ export default function ShadowingRoom() {
           <div className="flex gap-2 flex-1">
             <button
               onClick={() => setSidebarTab("video")}
-              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
-                sidebarTab === "video"
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
-              }`}
+              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${sidebarTab === "video"
+                ? "bg-blue-600 text-white shadow-md"
+                : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+                }`}
             >
               <Users size={18} />
               <span>참여자</span>
             </button>
             <button
               onClick={() => setSidebarTab("chat")}
-              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
-                sidebarTab === "chat"
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
-              }`}
+              className={`flex-1 flex items-center cursor-pointer justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${sidebarTab === "chat"
+                ? "bg-blue-600 text-white shadow-md"
+                : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
+                }`}
             >
               <MessageCircle size={18} />
               <span>채팅</span>
@@ -993,9 +993,8 @@ export default function ShadowingRoom() {
                     <button
                       key={mode}
                       onClick={() => handleLayoutChange(mode)}
-                      className={`flex items-center gap-3 px-4 py-3 w-full hover:bg-gray-50 transition-colors text-left ${
-                        layoutMode === mode ? "bg-blue-50 text-blue-600" : "text-gray-700"
-                      }`}
+                      className={`flex items-center gap-3 px-4 py-3 w-full hover:bg-gray-50 transition-colors text-left ${layoutMode === mode ? "bg-blue-50 text-blue-600" : "text-gray-700"
+                        }`}
                     >
                       <Icon size={18} />
                       <span className="text-sm">{config.label}</span>
@@ -1010,9 +1009,8 @@ export default function ShadowingRoom() {
         {/* 탭 콘텐츠 */}
         <div className="flex-1 overflow-hidden bg-white">
           {sidebarTab === "video" && (
-            <div className={`h-full overflow-y-auto p-3 ${
-              layoutMode === "grid" ? "grid grid-cols-2 gap-3 auto-rows-min" : "space-y-3"
-            }`}>
+            <div className={`h-full overflow-y-auto p-3 ${layoutMode === "grid" ? "grid grid-cols-2 gap-3 auto-rows-min" : "space-y-3"
+              }`}>
               {status === "connected" && tiles.length > 0 ? (
                 tiles.map((t) => (
                   <VideoTile

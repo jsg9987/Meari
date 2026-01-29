@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Clock } from "lucide-react";
 import { getThemeContents, type Content } from "../../api/contents.api";
 
@@ -35,13 +36,25 @@ export default function ContentSelectModal({ themeId, onClose, onSelect }: Conte
     loadContents();
   }, [themeId]);
 
+  // 모달이 열릴 때 스크롤 방지
+  useEffect(() => {
+    const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollBarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+  }, []);
+
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-1000 p-4"
       onClick={onClose}
@@ -122,6 +135,7 @@ export default function ContentSelectModal({ themeId, onClose, onSelect }: Conte
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
