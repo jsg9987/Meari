@@ -27,37 +27,35 @@ export const getThemesMock = async (): Promise<GetThemesResponse> => {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
-        data: {
-          success: true,
-          data: [
-            {
-              theme_id: 1,
-              name: '일상회화',
-              description: '한국인들이 일상에서 자주 사용하는 회화 표현 연습',
-              theme_url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
-            },
-            {
-              theme_id: 2,
-              name: '비즈니스',
-              description: '회사에서 사용하는 업무 관련 전문 대화 연습',
-              theme_url: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
-            },
-            {
-              theme_id: 3,
-              name: '뉴스',
-              description: '시사 뉴스 리포트를 따라하며 정확한 발음 연습',
-              theme_url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
-            },
-            {
-              theme_id: 4,
-              name: '여행',
-              description: '가이드와 관광객의 대화를 통한 상황별 회화 연습',
-              theme_url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
-            },
-          ],
-          error: null,
-        }
-      } as GetThemesResponse);
+        success: true,
+        data: [
+          {
+            theme_id: 1,
+            name: '일상회화',
+            description: '일상에서 자주 사용하는 회화 표현을 중심으로 자연스럽게 말하는 연습',
+            theme_url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
+          },
+          {
+            theme_id: 2,
+            name: '비즈니스',
+            description: '회사에서 사용하는 업무 관련 대화를 상황별로 익히는 실전 연습',
+            theme_url: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
+          },
+          {
+            theme_id: 3,
+            name: '뉴스',
+            description: '시사 뉴스 리포트를 따라하며 발음과 억양을 함께 다듬는 연습',
+            theme_url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
+          },
+          {
+            theme_id: 4,
+            name: '여행',
+            description: '가이드와 관광객의 대화를 통해 다양한 여행 상황 회화를 연습',
+            theme_url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
+          },
+        ],
+        error: null,
+      });
     }, 400);
   });
 };
