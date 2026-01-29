@@ -3,7 +3,6 @@ package com.ssafy.meari.global.auth.service;
 import org.springframework.stereotype.Service;
 
 import com.ssafy.meari.domain.member.entity.Member;
-import com.ssafy.meari.domain.member.mapper.MemberMapper;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
 import com.ssafy.meari.global.auth.jwt.JwtUtil;
@@ -21,7 +20,6 @@ public class AuthService {
 	private final JwtUtil jwtUtil;
 	private final RefreshTokenService refreshTokenService;
 	private final TokenBlacklistService tokenBlacklistService;
-	private final MemberMapper memberMapper;
 	private final MemberRepository memberRepository;
 
 	// Refresh Token으로 Access Token 재발급
