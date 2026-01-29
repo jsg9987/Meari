@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getThemes, type Theme } from '../../api/contents.api'
 
 // 설명 카드 이미지 (SVG)
 import newsClickImg from '../../assets/images/copik/learning-preparation.svg'
@@ -43,45 +44,30 @@ const stepCards = [
   },
 ]
 
-// 테마 데이터 (더미)
-const themes = [
-  {
-    theme_id: 1,
-    name: '일상회화',
-    description: '한국인들이 일상에서 자주 사용하는 표현을 중심으로 다양한 상황의 회화 연습을 진행합니다.',
-    duration: '2 minute',
-    sections: 16,
-    theme_url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
-  },
-  {
-    theme_id: 2,
-    name: '비즈니스',
-    description: '회사와 업무 환경에서 자주 쓰이는 전문 표현을 통해 실무 중심의 대화 능력을 향상시킵니다.',
-    duration: '2 minute',
-    sections: 16,
-    theme_url: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
-  },
-  {
-    theme_id: 3,
-    name: '뉴스',
-    description: '시사 뉴스와 다양한 사회 이슈를 따라 말하며 정확한 발음과 표현력을 함께 연습합니다.',
-    duration: '2 minute',
-    sections: 16,
-    theme_url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
-  },
-  {
-    theme_id: 4,
-    name: '여행',
-    description: '여행지에서 자주 마주치는 상황을 바탕으로 실전에서 바로 쓰는 회화 표현을 익힙니다.',
-    duration: '2 minute',
-    sections: 16,
-    theme_url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400',
-  },
-]
+// 테마 데이터는 API를 통해 동적으로 가져옵니다.
 
 const KopicPanel = () => {
   const navigate = useNavigate()
+  const [themes, setThemes] = useState<Theme[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [selectedTheme, setSelectedTheme] = useState<number | null>(null)
+
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        setIsLoading(true)
+        const response = await getThemes()
+        if (response.data.success && response.data.data) {
+          setThemes(response.data.data)
+        }
+      } catch (error) {
+        console.error('Failed to load themes:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadThemes()
+  }, [])
 
   const handleStartEvaluation = () => {
     if (selectedTheme) {
@@ -133,8 +119,8 @@ const KopicPanel = () => {
 
             {/* 텍스트 */}
             <div className='relative z-10 max-w-[60%]'>
-              <p className='text-[15px] text-gray-500 leading-tight'>{card.title}</p>
-              <p className='text-[15px] font-semibold text-gray-900 leading-tight'>{card.subtitle}</p>
+              <p className='text-[14px] text-gray-500 leading-tight'>{card.title}</p>
+              <p className='text-[14px] font-semibold text-gray-900 leading-tight'>{card.subtitle}</p>
             </div>
 
             {/* 이미지 영역 - 절대 배치로 우측 하단 고정 및 확대 */}
@@ -142,7 +128,7 @@ const KopicPanel = () => {
               <img
                 src={card.image}
                 alt={card.badge}
-                className='object-contain transition-transform w-40 h-40 translate-x-4 translate-y-4'
+                className='object-contain transition-transform w-36 h-36 translate-x-4 translate-y-4'
               />
             </div>
           </div>
@@ -152,36 +138,42 @@ const KopicPanel = () => {
       {/* 테마 선택 영역 */}
       <div>
         <h2 className='text-xl font-bold text-gray-900 mb-[18px]'>테마 선택</h2>
-        <div className='grid grid-cols-4 gap-[18px]'>
-          {themes.map((theme) => (
-            <div
-              key={theme.theme_id}
-              onClick={() => setSelectedTheme(theme.theme_id)}
-              className={`bg-white rounded-lg overflow-hidden shadow-md cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${selectedTheme === theme.theme_id ? 'ring-2 ring-[#2D9CDB] ring-offset-2' : ''
-                }`}
-            >
-              {/* 썸네일 */}
-              <div className='aspect-4/3 bg-gray-100'>
-                <img
-                  src={theme.theme_url}
-                  alt={theme.name}
-                  className='w-full h-full object-cover'
-                />
-              </div>
+        {isLoading ? (
+          <div className='text-center py-20 text-gray-500'>로딩 중...</div>
+        ) : themes.length === 0 ? (
+          <div className='text-center py-20 text-gray-500'>테마 정보를 불러올 수 없습니다.</div>
+        ) : (
+          <div className='grid grid-cols-4 gap-[18px]'>
+            {themes.map((theme) => (
+              <div
+                key={theme.theme_id}
+                onClick={() => setSelectedTheme(theme.theme_id)}
+                className={`bg-white rounded-lg overflow-hidden shadow-md cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${selectedTheme === theme.theme_id ? 'ring-2 ring-[#2D9CDB] ring-offset-2' : ''
+                  }`}
+              >
+                {/* 썸네일 */}
+                <div className='aspect-4/3 bg-gray-100'>
+                  <img
+                    src={theme.theme_url}
+                    alt={theme.name}
+                    className='w-full h-full object-cover'
+                  />
+                </div>
 
-              {/* 정보 */}
-              <div className='px-3 py-4'>
-                <h3 className='text-[18px] font-semibold text-gray-900 mb-3'>
-                  {theme.name}
-                </h3>
-                <p className='text-[13px] text-gray-500 mb-3'>{theme.description}</p>
-                <p className='text-[13px] text-gray-400'>
-                  {theme.duration} · {theme.sections} section
-                </p>
+                {/* 정보 */}
+                <div className='px-3 py-4'>
+                  <h3 className='text-[18px] font-semibold text-gray-900 mb-3'>
+                    {theme.name}
+                  </h3>
+                  <p className='text-[13px] text-gray-500 mb-3'>{theme.description}</p>
+                  <p className='text-[13px] text-gray-400'>
+                    2 minute · 16 section
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )

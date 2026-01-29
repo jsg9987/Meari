@@ -4,11 +4,14 @@ import RoomCard from './RoomCard'
 import PasswordModal from './PasswordModal'
 import CreateRoomButton from './CreateRoomButton'
 import { getRooms, joinRoom, type RoomItem } from '../../api/rooms.api'
+import { getThemes, type Theme } from '../../api/contents.api'
 
-const themes = ['전체', '일상회화', '비즈니스', '뉴스', '여행'] as const
+// 테마 목록은 API를 통해 가져옵니다.
 
 const ShadowingPanel = () => {
   const navigate = useNavigate()
+  const [themes, setThemes] = useState<string[]>(['전체'])
+  const [themeData, setThemeData] = useState<Theme[]>([])
   const [selectedTheme, setSelectedTheme] = useState<string>('전체')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [rooms, setRooms] = useState<RoomItem[]>([])
@@ -33,8 +36,9 @@ const ShadowingPanel = () => {
     }
 
     try {
-      const themeMap: Record<string, number> = { '일상회화': 1, '비즈니스': 2, '뉴스': 3, '여행': 4 };
-      const themeId = selectedTheme === '전체' ? undefined : themeMap[selectedTheme];
+      // 선택된 테마 이름에 맞는 theme_id 찾기
+      const targetTheme = themeData.find(t => t.name === selectedTheme);
+      const themeId = selectedTheme === '전체' ? undefined : targetTheme?.theme_id;
 
       const response = await getRooms({
         themeId: themeId,
@@ -58,7 +62,24 @@ const ShadowingPanel = () => {
       setIsInitialLoading(false)
       setIsFetchingNextPage(false)
     }
-  }, [selectedTheme, nextCursor, hasNext, isFetchingNextPage])
+  }, [selectedTheme, themeData, nextCursor, hasNext, isFetchingNextPage])
+
+  // 초기 테마 로드
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        const response = await getThemes()
+        if (response.data.success && response.data.data) {
+          const fetchedThemes = response.data.data
+          setThemeData(fetchedThemes)
+          setThemes(['전체', ...fetchedThemes.map(t => t.name)])
+        }
+      } catch (error) {
+        console.error('Failed to load themes:', error)
+      }
+    }
+    loadThemes()
+  }, [])
 
   // 테마/검색어 변경 시 초기화
   useEffect(() => {

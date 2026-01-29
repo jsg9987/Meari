@@ -74,8 +74,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     checkAuth: () => {
         const token = localStorage.getItem('access_token');
         if (token) {
-            // TODO: 토큰 유효성 검증 API 호출 필요. 현재는 존재 여부로만 판단.
-            set({ isAuthenticated: true, user: { email: 'user@gmail.com' } }); // 임시 사용자 정보 복원
+            // 토큰 존재 시 인증된 상태로 설정하되, 실제 사용자 정보는 fetchUserInfo에서 가져옴
+            set({ isAuthenticated: true });
         }
     },
 

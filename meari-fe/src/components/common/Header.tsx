@@ -69,8 +69,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
 
   // 표시용 사용자 정보 (로딩 중 기본값 처리)
   const displayInfo = {
-    nickname: userInfo?.nickname || 'User',
-    email: userInfo?.email || 'user@example.com',
+    nickname: userInfo?.nickname || (useAuthStore.getState().isAuthenticated ? 'Loading...' : 'Guest'),
+    email: userInfo?.email || '',
     profileImage: userInfo?.profile_url && userInfo.profile_url !== 'http://' ? userInfo.profile_url : null
   }
 
@@ -204,8 +204,8 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                       )}
                     </div>
                     <div className='flex-1'>
-                      <p className='font-semibold text-gray-900'>{displayInfo.nickname}</p>
-                      <p className='text-sm text-gray-500'>{displayInfo.email}</p>
+                      <p className='font-semibold text-gray-900'>{userInfo?.nickname || '사용자'}</p>
+                      <p className='text-sm text-gray-500'>{userInfo?.email || ''}</p>
                     </div>
                   </div>
                 </div>

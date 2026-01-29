@@ -104,6 +104,7 @@ const signupReal = async (credentials: SignupCredentials) => {
 
 // --- Get User Info ---
 export interface UserInfo {
+    member_id: number;
     email: string;
     profile_url: string;
     nickname: string;
