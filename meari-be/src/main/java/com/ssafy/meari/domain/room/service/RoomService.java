@@ -562,11 +562,17 @@ public class RoomService {
         long serverTime = System.currentTimeMillis();
         roomSessionService.setRoundStartTime(roomId, serverTime);
 
+        // 타임아웃 시간 계산 및 저장 (영상 길이 + 40초)
+        int videoDurationSeconds = content.getTotalDuration().intValue();
+        long timeoutMillis = serverTime + (videoDurationSeconds * 1000L) + 40000L;
+        roomSessionService.setRoundTimeout(roomId, round, timeoutMillis);
+
         // ROUND_START 브로드캐스트
         RoomStateMessage message = RoomStateMessage.roundStart(newPhase, round, serverTime, segments);
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
-        log.info("Round 시작 완료: roomId={}, round={}, phase={}", roomId, round, newPhase);
+        log.info("Round 시작 완료: roomId={}, round={}, phase={}, 타임아웃={}초",
+                roomId, round, newPhase, videoDurationSeconds + 40);
     }
 
     /**
@@ -640,9 +646,17 @@ public class RoomService {
         // 문장 녹음 완료 마킹
         roomSessionService.markRecordingComplete(roomId, round, message.getMemberId(), message.getSentenceId());
 
+        // 타임아웃 체크
+        if (checkAndHandleRecordingTimeout(roomId, round, currentPhase)) {
+            return; // 타임아웃 처리됨
+        }
+
         // 모든 멤버의 모든 문장이 완료되었는지 확인
         if (roomSessionService.isAllRecordingsComplete(roomId, round)) {
             log.info("모든 멤버 녹음 완료: roomId={}, round={}", roomId, round);
+
+            // 완료 플래그 설정 (중복 처리 방지)
+            roomSessionService.markRoundCompleted(roomId, round);
 
             RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
             messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
@@ -728,5 +742,38 @@ public class RoomService {
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
         log.info("게임 종료 완료, 준비 단계로 복귀: roomId={}", roomId);
+    }
+
+    /**
+     * 녹음 완료 타임아웃 체크
+     * @return true: 타임아웃 처리됨, false: 타임아웃 아님
+     */
+    private boolean checkAndHandleRecordingTimeout(Long roomId, Integer round, GamePhase currentPhase) {
+        // 이미 완료 처리되었는지 확인
+        if (roomSessionService.isRoundCompleted(roomId, round)) {
+            return true;
+        }
+
+        Long timeoutMillis = roomSessionService.getRoundTimeout(roomId, round);
+        if (timeoutMillis == null) {
+            return false;
+        }
+
+        long currentTime = System.currentTimeMillis();
+        if (currentTime > timeoutMillis) {
+            log.warn("녹음 완료 타임아웃: roomId={}, round={}, 경과시간={}ms",
+                    roomId, round, currentTime - (timeoutMillis - 40000));
+
+            // 완료 플래그 설정 (중복 처리 방지)
+            roomSessionService.markRoundCompleted(roomId, round);
+
+            // 강제로 완료 처리
+            RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
+            messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+
+            return true;
+        }
+
+        return false;
     }
 }
