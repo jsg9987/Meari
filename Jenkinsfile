@@ -130,6 +130,10 @@ pipeline {
                             echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
                             echo "OPENVIDU_DOMAIN=localhost" >> .env
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
+                            # --- JWT 설정 (기본값 주입) ---
+                            # 만약 application.yml의 변수명이 다르면 아래 이름을 수정하세요.
+                            echo "JWT_ACCESS_TOKEN_EXPIRE_PERIOD=43200000" >> .env
+                            echo "JWT_REFRESH_TOKEN_EXPIRE_PERIOD=1209600000" >> .env
 
                             # 이제 meari-fastapi 이미지가 생성되었으므로 정상적으로 실행됩니다.
                             docker-compose up -d --force-recreate frontend spring-api fastapi
