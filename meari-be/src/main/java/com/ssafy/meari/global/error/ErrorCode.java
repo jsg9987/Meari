@@ -25,6 +25,11 @@ public enum ErrorCode {
     DUPLICATED_USER(HttpStatus.BAD_REQUEST, "중복된 사용자입니다."),
     DUPLICATED_USER_NICKNAME(HttpStatus.BAD_REQUEST, "중복된 사용자 닉네임입니다."),
     NO_FILE_EXTENSION(HttpStatus.BAD_REQUEST, "파일에 확장자가 없습니다."),
+    CSV_PARSE_ERROR(HttpStatus.BAD_REQUEST, "CSV 파일 파싱 중 오류가 발생했습니다."),
+    CSV_INVALID_FORMAT(HttpStatus.BAD_REQUEST, "CSV 파일 형식이 올바르지 않습니다."),
+    CSV_INVALID_HEADER(HttpStatus.BAD_REQUEST, "CSV 헤더가 올바르지 않습니다."),
+    CSV_INVALID_DATA_TYPE(HttpStatus.BAD_REQUEST, "CSV 데이터 타입이 올바르지 않습니다."),
+    CSV_EMPTY_FILE(HttpStatus.BAD_REQUEST, "빈 CSV 파일입니다."),
 
     // Unauthorized Error: 401
     UNAUTHORIZED_MEMBER(HttpStatus.UNAUTHORIZED, "인증되지 않은 사용자입니다."),
