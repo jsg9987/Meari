@@ -1,7 +1,7 @@
 package com.ssafy.meari.domain.nlp.controller;
 
-import com.ssafy.meari.domain.nlp.dto.MorphemeAnalysisResponseDto;
-import com.ssafy.meari.domain.nlp.service.NlpService;
+import com.ssafy.meari.global.pipeline.videosaving.nlp.dto.MorphemeAnalysisResponseDto;
+import com.ssafy.meari.global.pipeline.videosaving.nlp.service.NlpService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
