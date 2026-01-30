@@ -1148,7 +1148,7 @@ export default function ShadowingRoom() {
                   <>
                     {/* 비디오 배경 (blur 처리) */}
                     {selectedContent && videoUrl && (
-                      <div className="absolute inset-0">
+                      <div className="absolute inset-0 overflow-hidden">
                         <video
                           src={videoUrl}
                           className="w-full h-full object-cover"
@@ -1412,6 +1412,7 @@ export default function ShadowingRoom() {
                 messages={chatMessages}
                 onSendMessage={sendChatMessage}
                 nickname={nickname}
+                currentUserId={userInfo?.member_id || 0}
               />
             </div>
           )}

@@ -5,9 +5,10 @@ interface ChatPanelProps {
   messages: ChatMessage[];
   onSendMessage: (message: string, nickname: string) => void;
   nickname: string;
+  currentUserId: number;
 }
 
-export default function ChatPanel({ messages, onSendMessage, nickname }: ChatPanelProps) {
+export default function ChatPanel({ messages, onSendMessage, nickname, currentUserId }: ChatPanelProps) {
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -38,22 +39,36 @@ export default function ChatPanel({ messages, onSendMessage, nickname }: ChatPan
             채팅을 시작해보세요
           </p>
         ) : (
-          messages.map((msg, index) => (
-            <div key={index} className="flex flex-col">
-              <div className="flex items-baseline gap-2">
-                <span className="text-xs font-semibold text-gray-700">
-                  {msg.nickname}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {new Date(msg.timestamp).toLocaleTimeString('ko-KR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
+          messages.map((msg, index) => {
+            const isMyMessage = msg.sender_id === currentUserId;
+            return (
+              <div
+                key={index}
+                className={`flex flex-col ${isMyMessage ? 'items-end' : 'items-start'}`}
+              >
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs font-semibold text-gray-700">
+                    {msg.nickname}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(msg.timestamp).toLocaleTimeString('ko-KR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+                <div
+                  className={`mt-1 px-3 py-2 rounded-lg max-w-[70%] ${
+                    isMyMessage
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-900'
+                  }`}
+                >
+                  <p className="text-sm break-words">{msg.message}</p>
+                </div>
               </div>
-              <p className="text-sm text-gray-900 mt-1">{msg.message}</p>
-            </div>
-          ))
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>

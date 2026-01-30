@@ -439,10 +439,16 @@ export function useRoomWebSocket({
     }
 
     try {
-      const payload: Omit<ChatMessage, 'timestamp'> = {
+      // 로컬 시간을 ISO 8601 형식으로 변환 (타임존 오프셋 적용)
+      const now = new Date();
+      const offset = now.getTimezoneOffset() * 60000; // 분 단위를 밀리초로 변환
+      const localISOTime = new Date(now.getTime() - offset).toISOString().slice(0, -1); // Z 제거
+
+      const payload: ChatMessage = {
         sender_id: memberId,
         nickname,
         message,
+        timestamp: localISOTime,
       };
 
       clientRef.current.publish({
