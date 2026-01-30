@@ -318,11 +318,16 @@ public class RoomService {
         room.updateStatus(RoomStatus.IN_PROGRESS);
         roomSessionService.setPhase(roomId, GamePhase.WATCHING);
 
-        // 게임 시작 알림 브로드캐스트 (contentId + phase)
-        RoomStateMessage message = RoomStateMessage.gameStart(contentId, GamePhase.WATCHING);
+        // 전체 스크립트(자막) 조회 및 segments 생성
+        List<Sentence> sentences = sentenceRepository.findByContent_ContentId(contentId);
+        List<MemberSegmentInfo> scriptSegments = buildScriptSegments(sentences);
+
+        // 게임 시작 알림 브로드캐스트 (contentId + phase + 전체 자막)
+        RoomStateMessage message = RoomStateMessage.gameStart(contentId, GamePhase.WATCHING, scriptSegments);
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
-        log.info("게임 시작 완료: roomId={}, contentId={}", roomId, contentId);
+        log.info("게임 시작 완료: roomId={}, contentId={}, 전체 스크립트 segments 수={}",
+                roomId, contentId, scriptSegments.size());
     }
 
     /**
@@ -499,12 +504,20 @@ public class RoomService {
 
         List<Sentence> sentences = sentenceRepository.findByContent_ContentId(contentId);
         Map<Long, String> roleAssignments = roomSessionService.getAllRoles(roomId);
-        List<MemberSegmentInfo> segments = buildMemberSegments(memberRooms, roleAssignments, sentences);
+
+        log.debug("역할 확정 - memberRooms 수: {}, roleAssignments: {}", memberRooms.size(), roleAssignments);
+
+        // 모든 역할(할당된 역할 + 시스템 역할)의 segments 생성
+        List<MemberSegmentInfo> segments = buildAllRoleSegments(roleAssignments, sentences);
+
+        log.debug("생성된 segments 수: {}, memberIds: {}",
+                segments.size(),
+                segments.stream().map(MemberSegmentInfo::getMemberId).collect(java.util.stream.Collectors.toList()));
 
         RoomStateMessage message = RoomStateMessage.rolesConfirmed(segments);
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
-        log.info("역할 확정 완료 및 segments 브로드캐스트: roomId={}", roomId);
+        log.info("역할 확정 완료 및 segments 브로드캐스트: roomId={}, segments 수={} (시스템 역할 포함)", roomId, segments.size());
     }
 
     /**
@@ -717,6 +730,109 @@ public class RoomService {
             }
         }
         return null;
+    }
+
+    /**
+     * 역할 할당 정보에서 특정 roleId에 할당된 memberId 찾기
+     * @return memberId 또는 null (시스템 역할인 경우)
+     */
+    private Long findMemberIdByRoleId(Map<Long, String> roleAssignments, Long roleId) {
+        if (roleAssignments == null) {
+            return null;
+        }
+        String value = roleAssignments.get(roleId);
+        if (value == null || "SYSTEM".equals(value)) {
+            return null;
+        }
+        return Long.parseLong(value);
+    }
+
+    /**
+     * 전체 스크립트 세그먼트 구성 (영상 시청용, 역할 할당 없음)
+     * 모든 역할의 memberId는 null로 설정
+     */
+    private List<MemberSegmentInfo> buildScriptSegments(List<Sentence> sentences) {
+        // roleId → List<Sentence> 매핑
+        Map<Long, List<Sentence>> sentencesByRole = sentences.stream()
+                .collect(Collectors.groupingBy(s -> s.getRole().getRoleId()));
+
+        return sentencesByRole.entrySet().stream()
+                .map(entry -> {
+                    Long roleId = entry.getKey();
+                    List<Sentence> roleSentences = entry.getValue();
+
+                    // Role 정보 조회
+                    Role role = roleSentences.get(0).getRole();
+
+                    // 문장 정보 생성
+                    List<SentenceSegmentInfo> segmentInfos = roleSentences.stream()
+                            .map(s -> SentenceSegmentInfo.builder()
+                                    .sentenceId(s.getSentenceId())
+                                    .sequence(s.getSequence())
+                                    .startTime(s.getStartTime().doubleValue())
+                                    .endTime(s.getEndTime().doubleValue())
+                                    .textKo(s.getTextKo())
+                                    .textVn(s.getTextVn())
+                                    .build())
+                            .sorted(Comparator.comparingInt(SentenceSegmentInfo::getSequence))
+                            .collect(Collectors.toList());
+
+                    return MemberSegmentInfo.builder()
+                            .memberId(null)  // 영상 시청 단계에서는 역할 미할당
+                            .roleId(roleId)
+                            .roleName(role.getName())
+                            .sentences(segmentInfos)
+                            .build();
+                })
+                .sorted(Comparator.comparing(MemberSegmentInfo::getRoleId))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 모든 역할에 대한 세그먼트 구성 (할당된 역할 + 시스템 역할 모두 포함)
+     * 프론트엔드에서 모든 타임스탬프 정보를 처리하기 위해 사용
+     */
+    private List<MemberSegmentInfo> buildAllRoleSegments(
+            Map<Long, String> roleAssignments,
+            List<Sentence> sentences
+    ) {
+        // roleId → List<Sentence> 매핑
+        Map<Long, List<Sentence>> sentencesByRole = sentences.stream()
+                .collect(Collectors.groupingBy(s -> s.getRole().getRoleId()));
+
+        return sentencesByRole.entrySet().stream()
+                .map(entry -> {
+                    Long roleId = entry.getKey();
+                    List<Sentence> roleSentences = entry.getValue();
+
+                    // Role 정보 조회 (첫 번째 문장에서 가져옴)
+                    Role role = roleSentences.get(0).getRole();
+
+                    // 할당된 memberId 찾기 (없으면 null = 시스템 역할)
+                    Long memberId = findMemberIdByRoleId(roleAssignments, roleId);
+
+                    // 문장 정보 생성
+                    List<SentenceSegmentInfo> segmentInfos = roleSentences.stream()
+                            .map(s -> SentenceSegmentInfo.builder()
+                                    .sentenceId(s.getSentenceId())
+                                    .sequence(s.getSequence())
+                                    .startTime(s.getStartTime().doubleValue())
+                                    .endTime(s.getEndTime().doubleValue())
+                                    .textKo(s.getTextKo())
+                                    .textVn(s.getTextVn())
+                                    .build())
+                            .sorted(Comparator.comparingInt(SentenceSegmentInfo::getSequence))
+                            .collect(Collectors.toList());
+
+                    return MemberSegmentInfo.builder()
+                            .memberId(memberId)  // null이면 시스템 역할
+                            .roleId(roleId)
+                            .roleName(role.getName())
+                            .sentences(segmentInfos)
+                            .build();
+                })
+                .sorted(Comparator.comparing(MemberSegmentInfo::getRoleId))
+                .collect(Collectors.toList());
     }
 
     /**
