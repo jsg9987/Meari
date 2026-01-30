@@ -80,6 +80,7 @@ public class MemberServiceImpl implements MemberService {
 		Member member = memberRepository.findById(memberId)
 			.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
 		return new MemberInfoResponseDto(
+			member.getMemberId(),
 			member.getEmail(),
 			member.getProfileUrl(),
 			member.getNickname()
