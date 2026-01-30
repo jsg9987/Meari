@@ -39,17 +39,34 @@ class RabbitMQConsumer:
             )
             self.connection = pika.BlockingConnection(parameters)
             self.channel = self.connection.channel()
-
-            # Queue 선언 (멱등성 보장)
-            self.channel.queue_declare(
-                queue=settings.REQUEST_QUEUE,
+            
+            # 1. Exchange 선언
+            self.channel.exchange_declare(
+                exchange=settings.ANALYSIS_EXCHANGE,
+                exchange_type='direct',
                 durable=True
             )
 
-            # QoS 설정: 한 번에 하나의 메시지만 처리
+            # 2. Queue 선언 (요청/결과 큐 모두)
+            self.channel.queue_declare(queue=settings.REQUEST_QUEUE, durable=True)
+            self.channel.queue_declare(queue=settings.RESULT_QUEUE, durable=True)
+
+            # 3. Queue와 Exchange 바인딩
+            self.channel.queue_bind(
+                exchange=settings.ANALYSIS_EXCHANGE,
+                queue=settings.REQUEST_QUEUE,
+                routing_key=settings.REQUEST_ROUTING_KEY
+            )
+            self.channel.queue_bind(
+                exchange=settings.ANALYSIS_EXCHANGE,
+                queue=settings.RESULT_QUEUE,
+                routing_key=settings.RESULT_ROUTING_KEY
+            )
+
+            # 4. QoS 설정: 한 번에 하나의 메시지만 처리
             self.channel.basic_qos(prefetch_count=1)
 
-            logger.info("RabbitMQ Consumer 연결 성공")
+            logger.info("RabbitMQ Consumer 연결 및 토폴로지 설정 성공")
         except Exception as e:
             logger.error(f"RabbitMQ 연결 실패: {e}")
             raise

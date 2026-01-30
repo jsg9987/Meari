@@ -1,6 +1,6 @@
 """
 ML 모델 로더
-Wav2Vec2 및 MDD 모델을 전역으로 로드
+Wav2Vec2 ASR 모델을 전역으로 로드
 """
 import logging
 import torch
@@ -25,27 +25,34 @@ def load_models():
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"사용 디바이스: {device}")
 
-        # Wav2Vec2 Processor 로드
-        logger.info("Wav2Vec2 Processor 로드 중...")
+        # Wav2Vec2 Processor 로드 (HuggingFace Hub에서 자동 다운로드)
+        logger.info(f"Wav2Vec2 Processor 로드 중... ({settings.WAV2VEC2_MODEL_PATH})")
         processor = Wav2Vec2Processor.from_pretrained(settings.WAV2VEC2_MODEL_PATH)
         logger.info("Wav2Vec2 Processor 로드 완료")
 
         # Wav2Vec2 ASR 모델 로드
-        logger.info("Wav2Vec2 ASR 모델 로드 중...")
+        logger.info(f"Wav2Vec2 ASR 모델 로드 중... ({settings.WAV2VEC2_MODEL_PATH})")
         asr_model = Wav2Vec2ForCTC.from_pretrained(settings.WAV2VEC2_MODEL_PATH)
         asr_model.to(device)
         asr_model.eval()
         logger.info("Wav2Vec2 ASR 모델 로드 완료")
 
-        # MDD 모델 로드 (커스텀 모델이므로 별도 구현 필요)
-        logger.info("MDD 모델 로드 중...")
-        mdd_model = load_mdd_model(settings.MDD_MODEL_PATH)
-        logger.info("MDD 모델 로드 완료")
+        # MDD 모델 로드 (선택사항 - 실패해도 ASR 기반 분석은 가능)
+        try:
+            logger.info("MDD 모델 로드 시도 중...")
+            mdd_model = load_mdd_model(settings.MDD_MODEL_PATH)
+            if mdd_model is not None:
+                logger.info("MDD 모델 로드 완료")
+            else:
+                logger.warning("MDD 모델 없음 - ASR 기반 분석만 사용")
+        except Exception as mdd_err:
+            logger.warning(f"MDD 모델 로드 실패 (ASR만 사용): {mdd_err}")
+            mdd_model = None
 
-        logger.info("모든 모델 로드 성공")
+        logger.info("모델 로드 완료 (ASR 분석 준비됨)")
 
     except Exception as e:
-        logger.error(f"모델 로드 실패: {e}", exc_info=True)
+        logger.error(f"필수 모델 로드 실패: {e}", exc_info=True)
         raise
 
 
