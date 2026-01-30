@@ -26,7 +26,11 @@ pipeline {
                                         string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PW'),
                                         string(credentialsId: 'FRONTEND_URL', variable: 'FE_URL'),
                                         string(credentialsId: 'OPENVIDU_URL', variable: 'OV_URL'),
-                                        string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET')
+                                        string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET'),
+                                        string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
+                                        string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
+                                        string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
+                                        string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY')
                                     ]) {
                                         sh '''
                                         docker build \
@@ -36,6 +40,10 @@ pipeline {
                                           --build-arg FRONTEND_URL="${FE_URL}" \
                                           --build-arg OPENVIDU_URL="${OV_URL}" \
                                           --build-arg OPENVIDU_SECRET="${OV_SECRET}" \
+                                          --build-arg AWS_ACCESS_KEY="${AWS_KEY}" \
+                                          --build-arg AWS_SECRET_KEY="${AWS_SECRET}" \
+                                          --build-arg AWS_S3_BUCKET="${S3_BUCKET}" \
+                                          --build-arg GEMINI_API_KEY="${GEMINI_KEY}" \
                                           -t backend-image:latest .
                                         '''
                                     }
@@ -63,7 +71,7 @@ pipeline {
                                           --build-arg VITE_USE_MOCK_AUTH=false \
                                           --build-arg VITE_USE_MOCK_ROOMS=false \
                                           --build-arg VITE_USE_MOCK_WEBRTC=false \
-                                          --build-arg VITE_USE_MOCK_CONTENTS=true \
+                                          --build-arg VITE_USE_MOCK_CONTENTS=false \
                                           -t frontend-image:latest .
                                         '''
                                     }
@@ -134,9 +142,13 @@ pipeline {
                             echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
                             echo "OPENVIDU_DOMAIN=localhost" >> .env
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
+                            # --- JWT 설정 (기본값 주입) ---
+                            # 만약 application.yml의 변수명이 다르면 아래 이름을 수정하세요.
+                            echo "JWT_ACCESS_TOKEN_EXPIRE_PERIOD=43200000" >> .env
+                            echo "JWT_REFRESH_TOKEN_EXPIRE_PERIOD=1209600000" >> .env
 
                             # 이제 meari-fastapi 이미지가 생성되었으므로 정상적으로 실행됩니다.
-                            docker-compose up -d --force-recreate frontend spring-api fastapi
+                            docker compose up -d --force-recreate frontend spring-api fastapi
                         '''
                         sh 'docker image prune -f'
                     }
