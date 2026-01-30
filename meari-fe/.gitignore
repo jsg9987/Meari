@@ -28,6 +28,7 @@ dist-ssr
 src/assets/video/*
 # build
 dist/
+.env.example
 
 # AI Agent
 .claude/

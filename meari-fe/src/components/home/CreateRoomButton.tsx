@@ -44,7 +44,7 @@ const CreateRoomButton = () => {
     setIsLoadingThemes(true);
     try {
       const response = await getThemes();
-      if (response.data.success && response.data.data.length > 0) {
+      if (response.data.success && response.data.data && response.data.data.length > 0) {
         setThemes(response.data.data);
         setSelectedThemeId(response.data.data[0].theme_id);
       }
@@ -138,7 +138,7 @@ const CreateRoomButton = () => {
           <div
             role="dialog"
             aria-modal="true"
-            className="bg-white rounded-xl p-7 w-full max-w-125 max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col gap-[13px]"
+            className="bg-white rounded-xl p-7 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col gap-[13px]"
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-[1.375rem] font-semibold m-0 transition-none">방 만들기</h2>
@@ -147,20 +147,20 @@ const CreateRoomButton = () => {
               테마 선택 <span className="text-red-600">*</span>
             </label>
             {isLoadingThemes ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 {[1, 2, 3, 4].map((index) => (
                   <div key={index} className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white">
-                    <div className="w-full h-[110px] bg-gray-300 animate-pulse" />
-                    <div className="p-[13px]">
-                      <div className="h-[15px] bg-gray-300 rounded mb-2 animate-pulse" />
-                      <div className="h-[11px] bg-gray-300 rounded mb-1 animate-pulse" />
-                      <div className="h-[11px] bg-gray-300 rounded w-[70%] animate-pulse" />
+                    <div className="w-full h-20 animate-shimmer" />
+                    <div className="p-3">
+                      <div className="h-4 animate-shimmer rounded mb-2" />
+                      <div className="h-3 animate-shimmer rounded mb-1" />
+                      <div className="h-3 animate-shimmer rounded w-[70%]" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-[13px]">
+              <div className="grid grid-cols-4 gap-3">
                 {themes.map((theme) => (
                   <button
                     key={theme.theme_id}
@@ -174,11 +174,11 @@ const CreateRoomButton = () => {
                     <img
                       src={theme.theme_url}
                       alt={theme.name}
-                      className="w-full h-[110px] object-cover"
+                      className="w-full h-20 object-cover"
                     />
-                    <div className="p-[13px]">
-                      <h3 className="m-0 text-[16px] font-semibold mb-1">{theme.name}</h3>
-                      <p className="m-0 text-[13px] text-gray-600 leading-snug">{theme.description}</p>
+                    <div className="p-3">
+                      <h3 className="m-0 text-sm font-semibold mb-1">{theme.name}</h3>
+                      <p className="m-0 text-xs text-gray-600 leading-snug line-clamp-2">{theme.description}</p>
                     </div>
                   </button>
                 ))}

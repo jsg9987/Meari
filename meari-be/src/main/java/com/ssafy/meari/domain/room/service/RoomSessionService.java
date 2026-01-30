@@ -1,5 +1,6 @@
 package com.ssafy.meari.domain.room.service;
 
+import com.ssafy.meari.domain.room.entity.GamePhase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -31,9 +32,16 @@ public class RoomSessionService {
     private static final String KEY_MEMBERS = "room:%d:members";
     private static final String KEY_READY = "room:%d:ready";
     private static final String KEY_ROLES = "room:%d:roles";
+    private static final String KEY_ROLES_CONFIRMED = "room:%d:roles_confirmed";
     private static final String KEY_CONTENT = "room:%d:content_id";
     private static final String KEY_PHASE = "room:%d:phase";
     private static final String KEY_DISCONNECTED = "room:%d:disconnected";
+    private static final String KEY_MEMBER_ROOM = "member:%d:roomId";
+    private static final String KEY_ROUND_START_TIME = "room:%d:round_start_time";
+    private static final String KEY_MEMBER_RECORDINGS = "room:%d:round:%d:member:%d:recordings";
+    private static final String KEY_MEMBER_TOTAL_SENTENCES = "room:%d:round:%d:member:%d:total_sentences";
+    private static final String KEY_ROUND_TIMEOUT = "room:%d:round:%d:timeout";
+    private static final String KEY_ROUND_COMPLETED = "room:%d:round:%d:completed";
 
     // === 참여자 관리 ===
 
@@ -186,6 +194,25 @@ public class RoomSessionService {
     }
 
     /**
+     * 모든 역할 초기화
+     */
+    public void clearRoles(Long roomId) {
+        String key = String.format(KEY_ROLES, roomId);
+        redisTemplate.delete(key);
+        log.info("방 {} 모든 역할 초기화", roomId);
+    }
+
+    /**
+     * 역할 직접 할당 (확정 시 사용)
+     */
+    public void assignRole(Long roomId, Long roleId, Long memberId) {
+        String key = String.format(KEY_ROLES, roomId);
+        redisTemplate.opsForHash().put(key, roleId.toString(), memberId.toString());
+        setExpire(key);
+        log.info("방 {} 역할 할당: roleId={}, memberId={}", roomId, roleId, memberId);
+    }
+
+    /**
      * 특정 멤버가 선점한 역할 해제
      */
     public void releaseRoleByMember(Long roomId, Long memberId) {
@@ -249,6 +276,25 @@ public class RoomSessionService {
         return null;
     }
 
+    /**
+     * 역할 확정 상태 설정
+     */
+    public void setRolesConfirmed(Long roomId, boolean confirmed) {
+        String key = String.format(KEY_ROLES_CONFIRMED, roomId);
+        redisTemplate.opsForValue().set(key, String.valueOf(confirmed));
+        setExpire(key);
+        log.info("방 {} 역할 확정 상태 변경: confirmed={}", roomId, confirmed);
+    }
+
+    /**
+     * 역할 확정 여부 확인
+     */
+    public boolean isRolesConfirmed(Long roomId) {
+        String key = String.format(KEY_ROLES_CONFIRMED, roomId);
+        String value = redisTemplate.opsForValue().get(key);
+        return "true".equals(value);
+    }
+
     // === 콘텐츠 관리 ===
 
     /**
@@ -282,9 +328,9 @@ public class RoomSessionService {
     /**
      * 진행 단계 설정
      */
-    public void setPhase(Long roomId, String phase) {
+    public void setPhase(Long roomId, GamePhase phase) {
         String key = String.format(KEY_PHASE, roomId);
-        redisTemplate.opsForValue().set(key, phase);
+        redisTemplate.opsForValue().set(key, phase.name());
         setExpire(key);
         log.info("방 {} 진행 단계 변경: phase={}", roomId, phase);
     }
@@ -292,9 +338,13 @@ public class RoomSessionService {
     /**
      * 진행 단계 조회
      */
-    public String getPhase(Long roomId) {
+    public GamePhase getPhase(Long roomId) {
         String key = String.format(KEY_PHASE, roomId);
-        return redisTemplate.opsForValue().get(key);
+        String value = redisTemplate.opsForValue().get(key);
+        if (value == null) {
+            return null;
+        }
+        return com.ssafy.meari.domain.room.entity.GamePhase.valueOf(value);
     }
 
     // === 연결 끊김 관리 (Grace Period) ===
@@ -326,6 +376,128 @@ public class RoomSessionService {
         return redisTemplate.opsForHash().hasKey(key, memberId.toString());
     }
 
+    // === 멤버→방 매핑 관리 (WebSocket 연결 해제 시 roomId 조회용) ===
+
+    /**
+     * 멤버가 참여 중인 방 ID 저장
+     */
+    public void setMemberRoom(Long memberId, Long roomId) {
+        String key = String.format(KEY_MEMBER_ROOM, memberId);
+        redisTemplate.opsForValue().set(key, roomId.toString());
+        setExpire(key);
+    }
+
+    /**
+     * 멤버가 참여 중인 방 ID 조회
+     */
+    public Long getMemberRoom(Long memberId) {
+        String key = String.format(KEY_MEMBER_ROOM, memberId);
+        String value = redisTemplate.opsForValue().get(key);
+        return value != null ? Long.parseLong(value) : null;
+    }
+
+    /**
+     * 멤버→방 매핑 제거
+     */
+    public void clearMemberRoom(Long memberId) {
+        String key = String.format(KEY_MEMBER_ROOM, memberId);
+        redisTemplate.delete(key);
+    }
+
+    // === Round 시작 시각 관리 ===
+
+    /**
+     * Round 시작 시각 저장 (영상 동기화용)
+     */
+    public void setRoundStartTime(Long roomId, Long startTimeEpochMillis) {
+        String key = String.format(KEY_ROUND_START_TIME, roomId);
+        redisTemplate.opsForValue().set(key, startTimeEpochMillis.toString());
+        setExpire(key);
+        log.debug("방 {} Round 시작 시각 저장: {}", roomId, startTimeEpochMillis);
+    }
+
+    /**
+     * Round 시작 시각 조회
+     */
+    public Long getRoundStartTime(Long roomId) {
+        String key = String.format(KEY_ROUND_START_TIME, roomId);
+        String value = redisTemplate.opsForValue().get(key);
+        return value != null ? Long.parseLong(value) : null;
+    }
+
+    // === 문장별 녹음 완료 추적 ===
+
+    /**
+     * 멤버의 예상 문장수 저장
+     */
+    public void setMemberTotalSentences(Long roomId, Integer round, Long memberId, int totalSentences) {
+        String key = String.format(KEY_MEMBER_TOTAL_SENTENCES, roomId, round, memberId);
+        redisTemplate.opsForValue().set(key, String.valueOf(totalSentences));
+        setExpire(key);
+        log.debug("방 {} Round {} 멤버 {} 예상 문장수 저장: {}", roomId, round, memberId, totalSentences);
+    }
+
+    /**
+     * 멤버의 문장 녹음 완료 마킹
+     * @return true: 새로운 문장 완료, false: 이미 완료된 문장
+     */
+    public boolean markRecordingComplete(Long roomId, Integer round, Long memberId, Long sentenceId) {
+        String key = String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId);
+        Long added = redisTemplate.opsForSet().add(key, sentenceId.toString());
+        if (added != null && added > 0) {
+            setExpire(key);
+            log.debug("방 {} Round {} 멤버 {} 문장 {} 녹음 완료 마킹", roomId, round, memberId, sentenceId);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 모든 멤버의 모든 문장 녹음이 완료되었는지 확인
+     */
+    public boolean isAllRecordingsComplete(Long roomId, Integer round) {
+        Set<String> members = getMembers(roomId);
+        if (members == null || members.isEmpty()) {
+            return false;
+        }
+
+        for (String memberIdStr : members) {
+            Long memberId = Long.parseLong(memberIdStr);
+
+            // 예상 문장수 조회
+            String totalKey = String.format(KEY_MEMBER_TOTAL_SENTENCES, roomId, round, memberId);
+            String totalValue = redisTemplate.opsForValue().get(totalKey);
+            if (totalValue == null) {
+                return false;
+            }
+            int totalSentences = Integer.parseInt(totalValue);
+
+            // 완료된 문장수 조회
+            String recordingsKey = String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId);
+            Long completedCount = redisTemplate.opsForSet().size(recordingsKey);
+            if (completedCount == null || completedCount < totalSentences) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Round 관련 녹음 추적 데이터 초기화
+     */
+    public void clearRoundRecordings(Long roomId, Integer round) {
+        Set<String> members = getMembers(roomId);
+        if (members != null) {
+            for (String memberIdStr : members) {
+                Long memberId = Long.parseLong(memberIdStr);
+                redisTemplate.delete(String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId));
+                redisTemplate.delete(String.format(KEY_MEMBER_TOTAL_SENTENCES, roomId, round, memberId));
+            }
+        }
+        redisTemplate.delete(String.format(KEY_ROUND_START_TIME, roomId));
+        log.debug("방 {} Round {} 녹음 추적 데이터 초기화", roomId, round);
+    }
+
     // === 세션 정리 ===
 
     /**
@@ -335,10 +507,66 @@ public class RoomSessionService {
         redisTemplate.delete(String.format(KEY_MEMBERS, roomId));
         redisTemplate.delete(String.format(KEY_READY, roomId));
         redisTemplate.delete(String.format(KEY_ROLES, roomId));
+        redisTemplate.delete(String.format(KEY_ROLES_CONFIRMED, roomId));
         redisTemplate.delete(String.format(KEY_CONTENT, roomId));
         redisTemplate.delete(String.format(KEY_PHASE, roomId));
         redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
         log.info("방 {} 세션 전체 삭제", roomId);
+    }
+
+    /**
+     * 게임 상태만 초기화 (참여자 목록은 유지)
+     * Round 종료 후 준비 단계로 복귀할 때 사용
+     * WAITING 상태에서는 GamePhase가 없으므로 삭제
+     */
+    public void resetGameState(Long roomId) {
+        redisTemplate.delete(String.format(KEY_READY, roomId));
+        redisTemplate.delete(String.format(KEY_ROLES, roomId));
+        redisTemplate.delete(String.format(KEY_ROLES_CONFIRMED, roomId));
+        redisTemplate.delete(String.format(KEY_CONTENT, roomId));
+        redisTemplate.delete(String.format(KEY_PHASE, roomId));
+        redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
+        log.info("방 {} 게임 상태 초기화 (준비 단계로 복귀, phase 삭제)", roomId);
+    }
+
+    // === 타임아웃 관리 ===
+
+    /**
+     * 라운드 타임아웃 시간 설정
+     */
+    public void setRoundTimeout(Long roomId, Integer round, Long timeoutMillis) {
+        String key = String.format(KEY_ROUND_TIMEOUT, roomId, round);
+        redisTemplate.opsForValue().set(key, String.valueOf(timeoutMillis));
+        setExpire(key);
+        log.debug("라운드 타임아웃 설정: roomId={}, round={}, timeout={}", roomId, round, timeoutMillis);
+    }
+
+    /**
+     * 라운드 타임아웃 시간 조회
+     */
+    public Long getRoundTimeout(Long roomId, Integer round) {
+        String key = String.format(KEY_ROUND_TIMEOUT, roomId, round);
+        String value = redisTemplate.opsForValue().get(key);
+        return value != null ? Long.parseLong(value) : null;
+    }
+
+    /**
+     * 라운드 완료 플래그 설정
+     */
+    public void markRoundCompleted(Long roomId, Integer round) {
+        String key = String.format(KEY_ROUND_COMPLETED, roomId, round);
+        redisTemplate.opsForValue().set(key, "true");
+        setExpire(key);
+        log.debug("라운드 완료 마킹: roomId={}, round={}", roomId, round);
+    }
+
+    /**
+     * 라운드가 완료되었는지 확인
+     */
+    public boolean isRoundCompleted(Long roomId, Integer round) {
+        String key = String.format(KEY_ROUND_COMPLETED, roomId, round);
+        String value = redisTemplate.opsForValue().get(key);
+        return "true".equals(value);
     }
 
     // === 유틸리티 ===

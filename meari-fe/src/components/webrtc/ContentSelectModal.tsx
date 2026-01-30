@@ -20,7 +20,7 @@ export default function ContentSelectModal({ themeId, onClose, onSelect }: Conte
       setError(null);
       try {
         const response = await getThemeContents(themeId);
-        if (response.data.success) {
+        if (response.data.success && response.data.data) {
           setContents(response.data.data);
         } else {
           setError(response.data.error?.message || '컨텐츠를 불러오는데 실패했습니다.');
