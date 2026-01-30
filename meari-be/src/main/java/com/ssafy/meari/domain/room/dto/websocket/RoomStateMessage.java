@@ -82,11 +82,12 @@ public class RoomStateMessage {
                 .build();
     }
 
-    public static RoomStateMessage gameStart(Long contentId, GamePhase phase) {
+    public static RoomStateMessage gameStart(Long contentId, GamePhase phase, List<MemberSegmentInfo> segments) {
         return RoomStateMessage.builder()
                 .type("GAME_START")
                 .contentId(contentId)
                 .phase(phase)
+                .segments(segments)
                 .build();
     }
 
