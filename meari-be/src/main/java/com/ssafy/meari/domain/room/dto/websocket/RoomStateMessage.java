@@ -115,4 +115,10 @@ public class RoomStateMessage {
                 .segments(segments)
                 .build();
     }
+
+    public static RoomStateMessage gameFinished() {
+        return RoomStateMessage.builder()
+                .type("GAME_FINISHED")
+                .build();
+    }
 }

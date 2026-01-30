@@ -865,11 +865,11 @@ public class RoomService {
         // 방 상태를 WAITING으로 변경
         room.updateStatus(RoomStatus.WAITING);
 
-        // Redis 게임 상태 초기화
+        // Redis 게임 상태 초기화 (phase 삭제 포함)
         roomSessionService.resetGameState(roomId);
 
-        // 브로드캐스트
-        RoomStateMessage message = RoomStateMessage.phaseChange(null); // phase null = WAITING
+        // 게임 종료 브로드캐스트 (프론트엔드에서 준비 단계로 복귀)
+        RoomStateMessage message = RoomStateMessage.gameFinished();
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
         log.info("게임 종료 완료, 준비 단계로 복귀: roomId={}", roomId);
