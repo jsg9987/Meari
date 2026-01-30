@@ -129,7 +129,7 @@ pipeline {
                     string(credentialsId: 'OPENVIDU_URL', variable: 'OV_URL'),
                     string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET'),
                     string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL'),
-                    string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY')
+                    string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
                     string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
                     string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
                     string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET')
