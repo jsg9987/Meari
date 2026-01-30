@@ -12,7 +12,7 @@ import PasswordModal from "../components/webrtc/PasswordModal";
 import Toast from "../components/common/Toast";
 import RoleSelectModal from "../components/webrtc/RoleSelectModal";
 import { useVideoRoom } from "../hooks/useVideoRoom";
-import { useRoomWebSocket, type Role, type RoleSegment, type Sentence } from "../hooks/useRoomWebSocket";
+import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type ChatMessage } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
 import { selectRoomContent, getContentRoles, type ContentRole } from "../api/contents.api";
 import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
@@ -38,6 +38,7 @@ export default function ShadowingRoom() {
     setMySelectedRole,
     setMemberRole,
     getConfirmData,
+    clearRoles,
   } = useRoleStore();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("video");
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -82,12 +83,27 @@ export default function ShadowingRoom() {
   }
   const [currentSubtitles, setCurrentSubtitles] = useState<SubtitleItem[]>([]);
   const [roleSegments, setRoleSegments] = useState<RoleSegment[]>([]);
+
+  // 시간대별로 재가공된 자막 데이터 (빠른 조회용)
+  interface TimeIndexedSubtitle {
+    sentence_id: number;
+    start_time: number;
+    end_time: number;
+    role_id: number;
+    role_name: string;
+    text_ko: string;
+    text_vn: string;
+  }
+  const timeIndexedSubtitlesRef = useRef<TimeIndexedSubtitle[]>([]);
   const [roundStartTime, setRoundStartTime] = useState<number | null>(null);
   const [timeUntilStart, setTimeUntilStart] = useState<number | null>(null);
   const currentRecordingSentenceIdRef = useRef<number | null>(null);
   const presignedUrlsRef = useRef<Map<number, string>>(new Map());
 
   const nickname = userInfo?.nickname || "User";
+
+  // 채팅 메시지 상태
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   // 녹음 핸들러
   const handleRecordingComplete = async (audioBlob: Blob, sentenceId: number) => {
@@ -144,6 +160,7 @@ export default function ShadowingRoom() {
   const {
     toggleReady: wsToggleReady,
     assignRole,
+    sendChatMessage,
   } = useRoomWebSocket({
     roomId: Number(roomId),
     memberId,
@@ -223,6 +240,32 @@ export default function ShadowingRoom() {
     },
     onGameStart: (message) => {
       console.log('Game starting:', message);
+
+      // segments 데이터를 시간대별로 재가공
+      if (message.segments) {
+        const allSubtitles: TimeIndexedSubtitle[] = [];
+
+        message.segments.forEach((segment) => {
+          segment.sentences.forEach((sentence) => {
+            allSubtitles.push({
+              sentence_id: sentence.sentence_id,
+              start_time: sentence.start_time,
+              end_time: sentence.end_time,
+              role_id: segment.role_id,
+              role_name: segment.role_name,
+              text_ko: sentence.text_ko,
+              text_vn: sentence.text_vn,
+            });
+          });
+        });
+
+        // 시작 시간순으로 정렬
+        allSubtitles.sort((a, b) => a.start_time - b.start_time);
+        timeIndexedSubtitlesRef.current = allSubtitles;
+
+        console.log('Time-indexed subtitles prepared:', allSubtitles);
+      }
+
       // 게임 시작 시 즉시 영상 재생
       if (message.phase === 'WATCHING') {
         setIsPlaying(true);
@@ -238,6 +281,29 @@ export default function ShadowingRoom() {
       // 대본 데이터 저장
       if (message.segments) {
         setRoleSegments(message.segments);
+
+        // Round 모드용 시간대별 전처리 (모든 역할의 대본 포함)
+        const allSubtitles: TimeIndexedSubtitle[] = [];
+
+        message.segments.forEach((segment) => {
+          segment.sentences.forEach((sentence) => {
+            allSubtitles.push({
+              sentence_id: sentence.sentence_id,
+              start_time: sentence.start_time,
+              end_time: sentence.end_time,
+              role_id: segment.role_id,
+              role_name: segment.role_name,
+              text_ko: sentence.text_ko,
+              text_vn: sentence.text_vn,
+            });
+          });
+        });
+
+        // 시작 시간순으로 정렬
+        allSubtitles.sort((a, b) => a.start_time - b.start_time);
+        timeIndexedSubtitlesRef.current = allSubtitles;
+
+        console.log('Time-indexed subtitles prepared for Round:', allSubtitles);
         setToastMessage('역할이 확정되었습니다');
       }
     },
@@ -284,6 +350,12 @@ export default function ShadowingRoom() {
       setParticipantsReady({});
       currentRecordingSentenceIdRef.current = null;
       presignedUrlsRef.current.clear();
+      timeIndexedSubtitlesRef.current = [];
+
+      // Store 초기화
+      setContentId(null);
+      clearRoles();
+
       resetToWaitingState();
       setToastMessage('게임이 종료되었습니다');
     },
@@ -299,6 +371,10 @@ export default function ShadowingRoom() {
     },
     onError: (error) => {
       console.error('WebSocket error:', error);
+    },
+    onChatMessage: (message) => {
+      console.log('Chat message received:', message);
+      setChatMessages(prev => [...prev, message]);
     },
   });
 
@@ -435,35 +511,34 @@ export default function ShadowingRoom() {
     }
   }, [timeUntilStart, currentRound]);
 
-  // 영상 시간에 따른 자막 업데이트 (Round 모드: 모든 역할의 대본 표시)
+  // 영상 시간에 따른 자막 업데이트 (WATCHING 및 Round 모드 공통)
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || roleSegments.length === 0) {
-      console.log('Subtitle update skipped - video:', !!video, 'roleSegments length:', roleSegments.length);
+    if (!video || timeIndexedSubtitlesRef.current.length === 0) {
+      console.log('Subtitle update skipped - video:', !!video,
+        'timeIndexed:', timeIndexedSubtitlesRef.current.length);
       return;
     }
 
-    console.log('Setting up subtitle update with roleSegments:', roleSegments);
+    console.log('Setting up subtitle update');
 
     const updateSubtitle = () => {
       const currentTime = video.currentTime;
       const subtitles: SubtitleItem[] = [];
 
-      // 모든 세그먼트의 문장들을 순회하며 현재 시간에 맞는 모든 문장 찾기
-      for (const segment of roleSegments) {
-        const sentence = segment.sentences.find(
-          (s: Sentence) => currentTime >= s.start_time && currentTime <= s.end_time
-        );
+      // timeIndexedSubtitles 사용 (WATCHING 및 Round 모드 공통)
+      const activeSubtitles = timeIndexedSubtitlesRef.current.filter(
+        (sub) => currentTime >= sub.start_time && currentTime <= sub.end_time
+      );
 
-        if (sentence) {
-          subtitles.push({
-            roleName: segment.role_name,
-            roleId: segment.role_id,
-            text: sentence.text_ko, // TODO: selectedNationality에 따라 text_vn 선택
-            isMyRole: segment.role_id === mySelectedRoleId,
-          });
-        }
-      }
+      activeSubtitles.forEach((sub) => {
+        subtitles.push({
+          roleName: sub.role_name,
+          roleId: sub.role_id,
+          text: sub.text_ko, // TODO: selectedNationality에 따라 text_vn 선택
+          isMyRole: currentRound >= 1 && sub.role_id === mySelectedRoleId, // Round 모드에서만 내 역할 표시
+        });
+      });
 
       if (subtitles.length > 0) {
         console.log(`Subtitles at ${currentTime}s:`, subtitles);
@@ -473,7 +548,7 @@ export default function ShadowingRoom() {
 
     video.addEventListener('timeupdate', updateSubtitle);
     return () => video.removeEventListener('timeupdate', updateSubtitle);
-  }, [roleSegments, mySelectedRoleId, isPlaying]);
+  }, [mySelectedRoleId, isPlaying, currentRound]);
 
   // 녹음 스케줄링 (Round 진행 중, 내 역할의 문장에 대해서만)
   useEffect(() => {
@@ -1044,8 +1119,8 @@ export default function ShadowingRoom() {
                       }}
                     />
 
-                    {/* 대본 표시 (Round 1 진행 중) */}
-                    {currentRound >= 1 && currentSubtitles.length > 0 && (
+                    {/* 대본 표시 (WATCHING 및 Round 모드) */}
+                    {currentSubtitles.length > 0 && (
                       <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-4xl px-4">
                         <div className="space-y-2">
                           {currentSubtitles.map((subtitle, index) => (
@@ -1201,8 +1276,8 @@ export default function ShadowingRoom() {
               </button>
             )}
 
-            {/* 컨텐츠 변경 버튼 (방장만) - 영상 재생 중이 아니고 게임 시작 전일 때만 표시 */}
-            {status === "connected" && isHost && !isPlaying && !isGameStarting && countdown === null && (
+            {/* 컨텐츠 변경 버튼 (방장만) - 게임 시작 전에만 표시 */}
+            {status === "connected" && isHost && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && (
               <button
                 onClick={() => setIsContentSelectOpen(true)}
                 className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
@@ -1333,7 +1408,11 @@ export default function ShadowingRoom() {
           )}
           {sidebarTab === "chat" && (
             <div className="h-full">
-              <ChatPanel roomId={roomId} />
+              <ChatPanel
+                messages={chatMessages}
+                onSendMessage={sendChatMessage}
+                nickname={nickname}
+              />
             </div>
           )}
         </div>

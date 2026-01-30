@@ -77,6 +77,14 @@ export interface RoomMember {
   role_id: number | null;
 }
 
+// 채팅 메시지
+export interface ChatMessage {
+  sender_id: number;
+  nickname: string;
+  message: string;
+  timestamp: string;
+}
+
 interface UseRoomWebSocketOptions {
   roomId: number;
   memberId: number;
@@ -91,6 +99,7 @@ interface UseRoomWebSocketOptions {
   onRolesConfirmed?: (message: WebSocketMessage) => void;
   onRoundStart?: (message: WebSocketMessage) => void;
   onGameFinished?: (message: WebSocketMessage) => void;
+  onChatMessage?: (message: ChatMessage) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
@@ -110,6 +119,7 @@ export function useRoomWebSocket({
   onRolesConfirmed,
   onRoundStart,
   onGameFinished,
+  onChatMessage,
   onConnect,
   onDisconnect,
   onError,
@@ -126,6 +136,18 @@ export function useRoomWebSocket({
     const wsBaseUrl = baseUrl.replace('/api/v1', '');
     return `${wsBaseUrl}/ws`;
   }, []);
+
+  // 채팅 메시지 핸들러
+  const handleChatMessage = useCallback((message: IMessage) => {
+    try {
+      const chatMessage: ChatMessage = JSON.parse(message.body);
+      console.log('[WebSocket] Received chat message:', chatMessage);
+      onChatMessage?.(chatMessage);
+    } catch (error) {
+      console.error('[WebSocket] Failed to parse chat message:', error);
+      console.error('[WebSocket] Raw message:', message.body);
+    }
+  }, [onChatMessage]);
 
   // 메시지 핸들러
   const handleMessage = useCallback((message: IMessage) => {
@@ -262,8 +284,16 @@ export function useRoomWebSocket({
           );
           subscriptionsRef.current.push(stateSub);
 
+          // 3. 채팅 메시지 구독
+          const chatSub = client.subscribe(
+            `/topic/room/${roomId}/chat`,
+            handleChatMessage
+          );
+          subscriptionsRef.current.push(chatSub);
+
           console.log('[WebSocket] Subscribed to /topic/rooms/' + roomId);
           console.log('[WebSocket] Subscribed to /topic/room/' + roomId + '/state');
+          console.log('[WebSocket] Subscribed to /topic/room/' + roomId + '/chat');
         } catch (error) {
           console.error('[WebSocket] Subscription failed:', error);
           onError?.(error as Error);
@@ -297,7 +327,7 @@ export function useRoomWebSocket({
 
     clientRef.current = client;
     client.activate();
-  }, [roomId, memberId, getWebSocketUrl, handleMessage, onConnect, onDisconnect, onError]);
+  }, [roomId, memberId, getWebSocketUrl, handleMessage, handleChatMessage, onConnect, onDisconnect, onError]);
 
   // 웹소켓 연결 해제
   const disconnect = useCallback(() => {
@@ -401,6 +431,32 @@ export function useRoomWebSocket({
     }
   }, [roomId, memberId, onError]);
 
+  // 채팅 메시지 전송
+  const sendChatMessage = useCallback((message: string, nickname: string) => {
+    if (!clientRef.current?.connected) {
+      console.warn('[WebSocket] Not connected, cannot send chat message');
+      return;
+    }
+
+    try {
+      const payload: Omit<ChatMessage, 'timestamp'> = {
+        sender_id: memberId,
+        nickname,
+        message,
+      };
+
+      clientRef.current.publish({
+        destination: `/app/room/${roomId}/chat`,
+        body: JSON.stringify(payload),
+      });
+
+      console.log('[WebSocket] Sent chat message:', message);
+    } catch (error) {
+      console.error('[WebSocket] Failed to send chat message:', error);
+      onError?.(error as Error);
+    }
+  }, [roomId, memberId, onError]);
+
   // 컴포넌트 마운트 시 연결, 언마운트 시 해제
   useEffect(() => {
     connect();
@@ -419,5 +475,6 @@ export function useRoomWebSocket({
     toggleReady,
     assignRole,
     releaseRole,
+    sendChatMessage,
   };
 }

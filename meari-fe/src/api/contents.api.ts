@@ -186,7 +186,7 @@ export const getThemeContents = async (themeId: number): Promise<GetThemeContent
   if (useMock) {
     return await getThemeContentsMock(themeId);
   }
-  const response = await axiosInstance.get<ApiResponse<Content[]>>(`/themes/${themeId}/contents`);
+  const response = await axiosInstance.get<ApiResponse<Content[]>>(`/contents/${themeId}`);
   return response;
 };
 

@@ -49,6 +49,7 @@ export const useRoleStore = create<RoleStore>((set, get) => ({
 
   clearRoles: () =>
     set({
+      availableRoles: [],
       selectedRoles: {},
       mySelectedRoleId: undefined,
     }),
