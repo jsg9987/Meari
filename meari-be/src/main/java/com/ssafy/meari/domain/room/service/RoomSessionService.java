@@ -528,6 +528,7 @@ public class RoomSessionService {
     /**
      * 게임 상태만 초기화 (참여자 목록은 유지)
      * Round 종료 후 준비 단계로 복귀할 때 사용
+     * WAITING 상태에서는 GamePhase가 없으므로 삭제
      */
     public void resetGameState(Long roomId) {
         redisTemplate.delete(String.format(KEY_READY, roomId));
@@ -536,7 +537,7 @@ public class RoomSessionService {
         redisTemplate.delete(String.format(KEY_CONTENT, roomId));
         redisTemplate.delete(String.format(KEY_PHASE, roomId));
         redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
-        log.info("방 {} 게임 상태 초기화 (준비 단계로 복귀)", roomId);
+        log.info("방 {} 게임 상태 초기화 (준비 단계로 복귀, phase 삭제)", roomId);
     }
 
     // === 타임아웃 관리 ===

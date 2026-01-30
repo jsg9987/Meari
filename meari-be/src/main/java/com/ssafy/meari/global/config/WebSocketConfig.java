@@ -20,6 +20,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         // 클라이언트가 구독할 목적지 prefix
+        // SimpleBroker 사용 (인메모리 메시지 브로커)
         // /topic: 1:N 브로드캐스트
         // /queue: 1:1 메시지
         registry.enableSimpleBroker("/topic", "/queue");
@@ -27,7 +28,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // 클라이언트가 메시지를 보낼 때 사용할 prefix
         registry.setApplicationDestinationPrefixes("/app");
 
-        log.info("WebSocket 메시지 브로커 설정 완료");
+        log.info("SimpleBroker 설정 완료 - /topic, /queue");
     }
 
     @Override
