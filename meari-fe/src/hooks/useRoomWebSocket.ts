@@ -12,7 +12,8 @@ export type WebSocketMessageType =
   | 'GAME_START'
   | 'PHASE_CHANGE'
   | 'ROLES_CONFIRMED'
-  | 'ROUND_START';
+  | 'ROUND_START'
+  | 'GAME_FINISHED';
 
 // 역할(캐릭터) 정보
 export interface Role {
@@ -89,6 +90,7 @@ interface UseRoomWebSocketOptions {
   onPhaseWaiting?: (message: WebSocketMessage) => void;
   onRolesConfirmed?: (message: WebSocketMessage) => void;
   onRoundStart?: (message: WebSocketMessage) => void;
+  onGameFinished?: (message: WebSocketMessage) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
@@ -107,6 +109,7 @@ export function useRoomWebSocket({
   onPhaseWaiting,
   onRolesConfirmed,
   onRoundStart,
+  onGameFinished,
   onConnect,
   onDisconnect,
   onError,
@@ -190,6 +193,10 @@ export function useRoomWebSocket({
           console.log('[WebSocket] Segments:', payload.segments);
           onRoundStart?.(payload);
           break;
+        case 'GAME_FINISHED':
+          console.log('[WebSocket] Handling GAME_FINISHED');
+          onGameFinished?.(payload);
+          break;
         default:
           console.warn('[WebSocket] Unknown message type:', payload.type);
       }
@@ -197,7 +204,7 @@ export function useRoomWebSocket({
       console.error('[WebSocket] Failed to parse message:', error);
       console.error('[WebSocket] Raw message:', message.body);
     }
-  }, [onMessage, onMemberJoin, onReady, onRolePick, onRoleAssigned, onRoleReleased, onGameStart, onPhaseWaiting, onRolesConfirmed, onRoundStart]);
+  }, [onMessage, onMemberJoin, onReady, onRolePick, onRoleAssigned, onRoleReleased, onGameStart, onPhaseWaiting, onRolesConfirmed, onRoundStart, onGameFinished]);
 
   // 웹소켓 연결
   const connect = useCallback(() => {

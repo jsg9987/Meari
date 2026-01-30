@@ -389,4 +389,44 @@ export const getContentVideoUrl = async (contentId: number): Promise<ContentVide
   return response;
 };
 
+// --- Get Presigned URL for Recording Upload (녹음 파일 업로드용 Presigned URL) ---
+export interface GetPresignedUrlRequest {
+  room_id: number;
+  round: number;
+  member_id: number;
+  sentence_id: number;
+}
+
+export interface PresignedUrlData {
+  upload_url: string;
+  s3_key: string;
+  expires_in: number;
+}
+
+export type PresignedUrlResponse = AxiosResponse<ApiResponse<PresignedUrlData>>;
+
+export const getPresignedUrl = async (
+  payload: GetPresignedUrlRequest
+): Promise<PresignedUrlResponse> => {
+  const response = await axiosInstance.post<ApiResponse<PresignedUrlData>>(
+    '/s3/presigned-url',
+    payload
+  );
+  return response;
+};
+
+// --- Upload Recording to S3 (S3에 녹음 파일 업로드) ---
+export const uploadRecordingToS3 = async (
+  presignedUrl: string,
+  audioBlob: Blob
+): Promise<void> => {
+  await fetch(presignedUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'audio/wav',
+    },
+    body: audioBlob,
+  });
+};
+
 console.log(`[RoomsAPI] Initialized. Mode: ${useMock ? 'MOCK' : 'REAL'}`);
