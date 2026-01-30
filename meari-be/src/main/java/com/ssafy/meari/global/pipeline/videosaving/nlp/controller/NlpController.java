@@ -1,4 +1,4 @@
-package com.ssafy.meari.domain.nlp.controller;
+package com.ssafy.meari.global.pipeline.videosaving.nlp.controller;
 
 import com.ssafy.meari.global.pipeline.videosaving.nlp.dto.MorphemeAnalysisResponseDto;
 import com.ssafy.meari.global.pipeline.videosaving.nlp.service.NlpService;

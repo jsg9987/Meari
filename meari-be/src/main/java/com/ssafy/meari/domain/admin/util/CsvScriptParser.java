@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PushbackReader;
+import java.io.Reader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -46,9 +48,10 @@ public class CsvScriptParser {
 		validateFile(file);
 
 		try (
-			BufferedReader reader = new BufferedReader(
+			BufferedReader bufferedReader = new BufferedReader(
 				new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8)
 			);
+			Reader reader = skipBom(bufferedReader);
 			CSVParser csvParser = CSVFormat.DEFAULT
 				.withFirstRecordAsHeader()
 				.withIgnoreHeaderCase()
@@ -100,7 +103,8 @@ public class CsvScriptParser {
 		validateFilePath(filePath);
 
 		try (
-			BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.UTF_8);
+			BufferedReader bufferedReader = Files.newBufferedReader(filePath, StandardCharsets.UTF_8);
+			Reader reader = skipBom(bufferedReader);
 			CSVParser csvParser = CSVFormat.DEFAULT
 				.withFirstRecordAsHeader()
 				.withIgnoreHeaderCase()
@@ -244,5 +248,21 @@ public class CsvScriptParser {
 
 		// 순수 숫자 형식 (예: "1.30")
 		return new BigDecimal(timeStr);
+	}
+
+	/**
+	 * UTF-8 BOM(Byte Order Mark)을 건너뛰는 Reader 반환
+	 *
+	 * @param reader 원본 Reader
+	 * @return BOM이 제거된 Reader
+	 * @throws IOException 읽기 오류 발생 시
+	 */
+	private Reader skipBom(Reader reader) throws IOException {
+		PushbackReader pushbackReader = new PushbackReader(reader, 1);
+		int firstChar = pushbackReader.read();
+		if (firstChar != -1 && firstChar != '\uFEFF') {
+			pushbackReader.unread(firstChar);
+		}
+		return pushbackReader;
 	}
 }

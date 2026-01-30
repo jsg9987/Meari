@@ -13,6 +13,7 @@ import com.ssafy.meari.domain.word.entity.SentenceWord;
 import com.ssafy.meari.domain.word.entity.Word;
 import com.ssafy.meari.domain.word.repository.SentenceWordRepository;
 import com.ssafy.meari.global.pipeline.videosaving.dto.HomonymWordDto;
+import com.ssafy.meari.global.pipeline.videosaving.dto.WordMatchingResultDto;
 import com.ssafy.meari.global.pipeline.videosaving.openai.service.OpenAiService;
 
 import lombok.RequiredArgsConstructor;
@@ -48,15 +49,17 @@ public class HomonymDisambiguationService {
 	 *
 	 * @param homonymList 동음이의어 리스트
 	 * @param fullScript 전체 스크립트 (맥락 파악용)
-	 * @return 처리된 동음이의어 수
+	 * @return 매칭 결과 리스트
 	 */
 	@Transactional
-	public int processHomonyms(List<HomonymWordDto> homonymList, String fullScript) {
+	public List<WordMatchingResultDto> processHomonyms(List<HomonymWordDto> homonymList, String fullScript) {
 		log.info("[Homonym] 동음이의어 처리 시작 - {}개", homonymList.size());
+
+		List<WordMatchingResultDto> matchingResults = new ArrayList<>();
 
 		if (homonymList.isEmpty()) {
 			log.info("[Homonym] 처리할 동음이의어 없음");
-			return 0;
+			return matchingResults;
 		}
 
 		// 사용자 프롬프트 생성
@@ -69,7 +72,7 @@ public class HomonymDisambiguationService {
 
 		if (response == null || response.isBlank()) {
 			log.warn("[Homonym] LLM 응답이 비어있음");
-			return 0;
+			return new ArrayList<>();
 		}
 
 		// 응답에서 선택 배열 파싱
@@ -116,6 +119,17 @@ public class HomonymDisambiguationService {
 							.build();
 					sentenceWordRepository.save(sentenceWord);
 
+					// 매칭 결과 수집
+					matchingResults.add(WordMatchingResultDto.builder()
+							.sentenceSequence(homonymDto.getSentence().getSequence())
+							.sentenceTextKo(homonymDto.getSentence().getTextKo())
+							.wordKr(selectedWord.getWordKr())
+							.definitionKr(selectedWord.getDefinitionKr())
+							.wordVn(selectedWord.getWordVn())
+							.definitionVn(selectedWord.getDefinitionVn())
+							.matchType("HOMONYM")
+							.build());
+
 					processedCount++;
 				} else {
 					log.warn("[Homonym] 선택 범위 초과 - wordKr: {}, 선택: {}, 후보 수: {}",
@@ -130,7 +144,7 @@ public class HomonymDisambiguationService {
 		log.info("[Homonym] 동음이의어 처리 완료 - {}개 중 {}개 처리",
 				homonymList.size(), processedCount);
 
-		return processedCount;
+		return matchingResults;
 	}
 
 	/**

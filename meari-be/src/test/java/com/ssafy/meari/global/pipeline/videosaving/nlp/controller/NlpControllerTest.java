@@ -1,7 +1,7 @@
-package com.ssafy.meari.domain.nlp.controller;
+package com.ssafy.meari.global.pipeline.videosaving.nlp.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ssafy.meari.domain.nlp.service.NlpService;
+import com.ssafy.meari.global.pipeline.videosaving.nlp.service.NlpService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

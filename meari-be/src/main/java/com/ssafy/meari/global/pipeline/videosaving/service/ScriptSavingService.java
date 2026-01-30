@@ -15,17 +15,26 @@ import com.ssafy.meari.domain.word.repository.WordRepository;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
 import com.ssafy.meari.global.pipeline.videosaving.dto.HomonymWordDto;
+import com.ssafy.meari.global.pipeline.videosaving.dto.WordMatchingResultDto;
 import com.ssafy.meari.global.pipeline.videosaving.homonym.service.HomonymDisambiguationService;
 import com.ssafy.meari.global.pipeline.videosaving.nlp.dto.MorphemeAnalysisResponseDto;
 import com.ssafy.meari.global.pipeline.videosaving.nlp.service.NlpService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -43,57 +52,74 @@ public class ScriptSavingService {
 	private final WordRepository wordRepository;
 	private final SentenceWordRepository sentenceWordRepository;
 
-	// 동음이의어 리스트
-	private List<HomonymWordDto> homonymList = new ArrayList<>();
+	@Value("${pipeline.report.output-dir:./reports}")
+	private String reportOutputDir;
 
 	/**
 	 * CSV 파일을 파싱하여 문장을 저장하고 형태소 분석을 수행하는 파이프라인
 	 *
 	 * @param file CSV 파일 (MultipartFile)
-	 * @return 저장된 문장 수
+	 * @return 결과 CSV 파일 경로
 	 */
 	@Transactional
-	public int processCsvFile(MultipartFile file) {
+	public String processCsvFile(MultipartFile file) {
 		log.debug("[Pipeline] CSV 파일 처리 시작 - 파일명: {}", file.getOriginalFilename());
 
 		// 1. CSV 파싱
 		List<ScriptCsvRowDto> rows = csvScriptParser.parse(file);
 		log.info("[Pipeline] CSV 파싱 완료 - {}개 행", rows.size());
 
-		// 2. Sentence 저장 및 형태소 분석
-		List<Sentence> savedSentences = saveSentencesWithMorphemeAnalysis(rows);
-		log.info("[Pipeline] 문장 저장 및 형태소 분석 완료 - {}개 문장", savedSentences.size());
+		// 2. Sentence 저장 및 형태소 분석 (매칭 결과 수집)
+		List<WordMatchingResultDto> matchingResults = new ArrayList<>();
+		List<Sentence> savedSentences = saveSentencesWithMorphemeAnalysis(rows, matchingResults);
+		log.info("[Pipeline] 문장 저장 및 형태소 분석 완료 - {}개 문장, {}개 단어 매칭",
+				savedSentences.size(), matchingResults.size());
 
-		return savedSentences.size();
+		// 3. 매칭 결과 CSV 저장
+		String csvPath = saveMatchingResultsCsv(matchingResults, file.getOriginalFilename());
+		log.info("[Pipeline] 매칭 결과 CSV 저장 완료 - {}", csvPath);
+
+		return csvPath;
 	}
 
 	/**
 	 * 파일 시스템의 CSV 파일을 처리하는 파이프라인
 	 *
 	 * @param filePath CSV 파일 경로
-	 * @return 저장된 문장 수
+	 * @return 결과 CSV 파일 경로
 	 */
 	@Transactional
-	public int processCsvFile(Path filePath) {
+	public String processCsvFile(Path filePath) {
 		log.info("[Pipeline] CSV 파일 처리 시작 - 경로: {}", filePath);
 
 		// 1. CSV 파싱
 		List<ScriptCsvRowDto> rows = csvScriptParser.parseFile(filePath);
 		log.info("[Pipeline] CSV 파싱 완료 - {}개 행", rows.size());
 
-		// 2. Sentence 저장 및 형태소 분석
-		List<Sentence> savedSentences = saveSentencesWithMorphemeAnalysis(rows);
-		log.info("[Pipeline] 문장 저장 및 형태소 분석 완료 - {}개 문장", savedSentences.size());
+		// 2. Sentence 저장 및 형태소 분석 (매칭 결과 수집)
+		List<WordMatchingResultDto> matchingResults = new ArrayList<>();
+		List<Sentence> savedSentences = saveSentencesWithMorphemeAnalysis(rows, matchingResults);
+		log.info("[Pipeline] 문장 저장 및 형태소 분석 완료 - {}개 문장, {}개 단어 매칭",
+				savedSentences.size(), matchingResults.size());
 
-		return savedSentences.size();
+		// 3. 매칭 결과 CSV 저장
+		String csvPath = saveMatchingResultsCsv(matchingResults, filePath.getFileName().toString());
+		log.info("[Pipeline] 매칭 결과 CSV 저장 완료 - {}", csvPath);
+
+		return csvPath;
 	}
 
 	/**
 	 * ScriptCsvRowDto 리스트를 Sentence로 변환하여 저장하고 형태소 분석 수행
+	 *
+	 * @param rows CSV 데이터 리스트
+	 * @param matchingResults 매칭 결과를 수집할 리스트 (출력 파라미터)
+	 * @return 저장된 Sentence 리스트
 	 */
-	private List<Sentence> saveSentencesWithMorphemeAnalysis(List<ScriptCsvRowDto> rows) {
+	private List<Sentence> saveSentencesWithMorphemeAnalysis(List<ScriptCsvRowDto> rows,
+															 List<WordMatchingResultDto> matchingResults) {
 		List<Sentence> savedSentences = new ArrayList<>();
-		homonymList.clear(); // 동음이의어 리스트 초기화
+		List<HomonymWordDto> homonymList = new ArrayList<>();
 
 		// 전체 스크립트 생성 (동음이의어 맥락 파악용)
 		String fullScript = buildFullScript(rows);
@@ -138,7 +164,7 @@ public class ScriptSavingService {
 					morphemeResult.getMorphemes().size());
 
 			// 형태소 분석 결과로 Word 조회 및 SentenceWord 연결
-			linkWordsToSentence(savedSentence, morphemeResult);
+			linkWordsToSentence(savedSentence, morphemeResult, matchingResults, homonymList);
 		}
 
 		// 동음이의어 LLM 처리
@@ -152,9 +178,13 @@ public class ScriptSavingService {
 						dto.getSentence().getTextKo());
 			}
 			log.info("[Pipeline] LLM 처리 시작");
-			int processedCount = homonymDisambiguationService.processHomonyms(homonymList, fullScript);
-			log.info("[Pipeline] 동음이의어 LLM 처리 완료 - {}개 처리됨", processedCount);
+			List<WordMatchingResultDto> homonymResults = homonymDisambiguationService.processHomonyms(homonymList, fullScript);
+			matchingResults.addAll(homonymResults);
+			log.info("[Pipeline] 동음이의어 LLM 처리 완료 - {}개 처리됨", homonymResults.size());
 		}
+
+		// 문장 순서로 정렬
+		matchingResults.sort(Comparator.comparingInt(WordMatchingResultDto::getSentenceSequence));
 
 		return savedSentences;
 	}
@@ -171,8 +201,15 @@ public class ScriptSavingService {
 	/**
 	 * 형태소 분석 결과로 Word를 조회하고 SentenceWord로 연결
 	 * 동음이의어(2개 이상)는 homonymList에 보관
+	 *
+	 * @param sentence 저장된 문장
+	 * @param morphemeResult 형태소 분석 결과
+	 * @param matchingResults 매칭 결과를 수집할 리스트
+	 * @param homonymList 동음이의어를 수집할 리스트
 	 */
-	private void linkWordsToSentence(Sentence sentence, MorphemeAnalysisResponseDto morphemeResult) {
+	private void linkWordsToSentence(Sentence sentence, MorphemeAnalysisResponseDto morphemeResult,
+									 List<WordMatchingResultDto> matchingResults,
+									 List<HomonymWordDto> homonymList) {
 		List<MorphemeAnalysisResponseDto.Morpheme> morphemes = morphemeResult.getMorphemes();
 
 		for (int i = 0; i < morphemes.size(); i++) {
@@ -199,6 +236,17 @@ public class ScriptSavingService {
 				sentenceWordRepository.save(sentenceWord);
 				log.debug("[Pipeline] SentenceWord 연결 - sentenceId: {}, wordId: {}, wordKr: {}",
 						sentence.getSentenceId(), word.getWordId(), wordKr);
+
+				// 매칭 결과 수집
+				matchingResults.add(WordMatchingResultDto.builder()
+						.sentenceSequence(sentence.getSequence())
+						.sentenceTextKo(sentence.getTextKo())
+						.wordKr(word.getWordKr())
+						.definitionKr(word.getDefinitionKr())
+						.wordVn(word.getWordVn())
+						.definitionVn(word.getDefinitionVn())
+						.matchType("SINGLE")
+						.build());
 			} else {
 				// 2개 이상(동음이의어)이면 리스트에 보관
 				HomonymWordDto homonymDto = HomonymWordDto.builder()
@@ -215,9 +263,66 @@ public class ScriptSavingService {
 	}
 
 	/**
-	 * 동음이의어 리스트 반환 (수동 처리용)
+	 * 매칭 결과를 CSV 파일로 저장
+	 *
+	 * @param matchingResults 매칭 결과 리스트
+	 * @param sourceFileName 원본 파일명
+	 * @return 저장된 CSV 파일 경로
 	 */
-	public List<HomonymWordDto> getHomonymList() {
-		return homonymList;
+	private String saveMatchingResultsCsv(List<WordMatchingResultDto> matchingResults, String sourceFileName) {
+		try {
+			// 출력 디렉토리 생성
+			Path outputDir = Paths.get(reportOutputDir);
+			Files.createDirectories(outputDir);
+
+			// 파일명 생성: 원본파일명_matching_result_yyyyMMdd_HHmmss.csv
+			String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+			String baseName = sourceFileName != null ? sourceFileName.replaceAll("\\.[^.]+$", "") : "script";
+			String fileName = String.format("%s_matching_result_%s.csv", baseName, timestamp);
+			Path filePath = outputDir.resolve(fileName);
+
+			// CSV 작성
+			try (FileWriter writer = new FileWriter(filePath.toFile(), java.nio.charset.StandardCharsets.UTF_8)) {
+				// BOM 추가 (Excel 호환)
+				writer.write('\uFEFF');
+
+				// 헤더
+				writer.write("sentence_sequence,sentence_text_ko,word_kr,definition_kr,word_vn,definition_vn,match_type\n");
+
+				// 데이터
+				for (WordMatchingResultDto result : matchingResults) {
+					writer.write(String.format("%d,%s,%s,%s,%s,%s,%s\n",
+							result.getSentenceSequence(),
+							escapeCsv(result.getSentenceTextKo()),
+							escapeCsv(result.getWordKr()),
+							escapeCsv(result.getDefinitionKr()),
+							escapeCsv(result.getWordVn()),
+							escapeCsv(result.getDefinitionVn()),
+							result.getMatchType()
+					));
+				}
+			}
+
+			log.info("[Pipeline] 매칭 결과 CSV 저장 완료 - 경로: {}, 항목 수: {}", filePath, matchingResults.size());
+			return filePath.toAbsolutePath().toString();
+
+		} catch (IOException e) {
+			log.error("[Pipeline] CSV 저장 실패: {}", e.getMessage());
+			throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * CSV 필드 이스케이프 처리
+	 */
+	private String escapeCsv(String value) {
+		if (value == null) {
+			return "";
+		}
+		// 쉼표, 따옴표, 줄바꿈이 포함된 경우 따옴표로 감싸기
+		if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+			return "\"" + value.replace("\"", "\"\"") + "\"";
+		}
+		return value;
 	}
 }
