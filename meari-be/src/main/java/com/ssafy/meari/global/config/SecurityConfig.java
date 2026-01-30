@@ -77,6 +77,14 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()
 
+                ////////////////// chat-test.html 테스트를 위한 접근제한 해제 /////////////
+               // .requestMatchers("/**/*.html").permitAll()
+               // .requestMatchers("/**/*.js").permitAll()
+               // .requestMatchers("/**/*.css").permitAll()
+               // .requestMatchers("/**/*.ico").permitAll()
+               // .requestMatchers("/**/*.png").permitAll()
+               // .requestMatchers("/**/*.jpg").permitAll()
+
 
                 // Swagger UI 접근 허용
                 .requestMatchers("/swagger", "/swagger-ui.html", "/swagger-ui/**", "/api-docs", "/api-docs/**", "/v3/api-docs/**").permitAll()
