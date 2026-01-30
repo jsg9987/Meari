@@ -148,7 +148,7 @@ pipeline {
                             echo "JWT_REFRESH_TOKEN_EXPIRE_PERIOD=1209600000" >> .env
 
                             # 이제 meari-fastapi 이미지가 생성되었으므로 정상적으로 실행됩니다.
-                            docker-compose up -d --force-recreate frontend spring-api fastapi
+                            docker compose up -d --force-recreate frontend spring-api fastapi
                         '''
                         sh 'docker image prune -f'
                     }
