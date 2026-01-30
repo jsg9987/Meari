@@ -29,7 +29,7 @@ export default function ShadowingRoom() {
   const navigate = useNavigate();
   const { userInfo } = useAuthStore();
   const roomOwnerId = useRoomStore((state) => state.roomData?.owner_id);
-  const isOwner = userInfo?.member_id === roomOwnerId;
+  const isOwner = userInfo?.memberId === roomOwnerId;
   const { roomData, setRoomData, setContentId, clearRoomData } = useRoomStore();
   const {
     availableRoles,
@@ -95,7 +95,6 @@ export default function ShadowingRoom() {
     text_vn: string;
   }
   const timeIndexedSubtitlesRef = useRef<TimeIndexedSubtitle[]>([]);
-  const [roundStartTime, setRoundStartTime] = useState<number | null>(null);
   const [timeUntilStart, setTimeUntilStart] = useState<number | null>(null);
   const currentRecordingSentenceIdRef = useRef<number | null>(null);
   const presignedUrlsRef = useRef<Map<number, string>>(new Map());
@@ -327,7 +326,6 @@ export default function ShadowingRoom() {
 
       // server_time까지 대기
       if (message.server_time) {
-        setRoundStartTime(message.server_time);
         const currentTime = Date.now();
         const timeLeft = message.server_time - currentTime;
 
@@ -1412,7 +1410,7 @@ export default function ShadowingRoom() {
                 messages={chatMessages}
                 onSendMessage={sendChatMessage}
                 nickname={nickname}
-                currentUserId={userInfo?.member_id || 0}
+                currentUserId={userInfo?.memberId || 0}
               />
             </div>
           )}

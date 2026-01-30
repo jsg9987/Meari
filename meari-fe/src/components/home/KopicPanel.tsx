@@ -51,6 +51,7 @@ const KopicPanel = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTheme, setSelectedTheme] = useState<number | null>(null)
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+  const minLoadingTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
     const loadThemes = async () => {
