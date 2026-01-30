@@ -41,10 +41,10 @@ public class RoomWebSocketController {
     private final RoomService roomService;
     private final ChatRepository chatRepository;
 
-    private static final String TOPIC_STATE = "/topic/room.%d.state";
-    private static final String TOPIC_CHAT = "/topic/room.%d.chat";
+    private static final String TOPIC_STATE = "/topic/room/%d/state";
+    private static final String TOPIC_CHAT = "/topic/room/%d/chat";
     private static final int MAX_CHAT_COUNT = 100;
-
+    
     /**
      * 준비 상태 토글
      * 클라이언트: /app/room/{roomId}/ready
