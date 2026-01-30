@@ -334,6 +334,10 @@ gradle-app.setting
 # Java heap dump
 *.hprof
 
+### .env파일 조심
+.env
+.env.example
+
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,linux,java,gradle,intellij,eclipse,visualstudiocode
 
 설명

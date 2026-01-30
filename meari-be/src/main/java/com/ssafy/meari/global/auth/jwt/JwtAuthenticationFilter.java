@@ -45,7 +45,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 requestURI.startsWith("/v3/api-docs") ||   // OpenAPI3 스펙 경로
                 requestURI.startsWith("/api-docs") ||      // 기존 api-docs 경로
                 requestURI.startsWith("/ws")
-           ) {
+        ////////////////// chat-test.html 테스트를 위한 접근제한 해제 /////////////
+            //            || requestURI.startsWith("/api/v1/auth") ||
+            //            requestURI.startsWith("/ws") ||
+            //            requestURI.endsWith(".html") ||
+            //            requestURI.endsWith(".js") ||
+            //            requestURI.endsWith(".css") ||
+            //            requestURI.endsWith(".ico") ||
+            //            requestURI.endsWith(".png") ||
+            //            requestURI.endsWith(".jpg")
+        ) {
             log.debug("JwtAuthentication 스킵: {}", requestURI);
             filterChain.doFilter(request, response);
             return;

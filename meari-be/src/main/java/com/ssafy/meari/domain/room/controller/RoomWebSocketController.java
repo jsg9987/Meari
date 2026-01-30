@@ -1,8 +1,10 @@
 package com.ssafy.meari.domain.room.controller;
 
-import java.time.LocalDateTime;
-import java.util.List;
-
+import com.ssafy.meari.domain.room.dto.websocket.*;
+import com.ssafy.meari.domain.room.service.RoomService;
+import com.ssafy.meari.domain.room.service.RoomSessionService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -134,8 +136,9 @@ public class RoomWebSocketController {
             @DestinationVariable Long roomId,
             @Payload ChatMessage message
     ) {
-        log.info("채팅 메시지 서버수신: roomId={}, senderId={}, nickname={}, message={}",
-                roomId, message.getSenderId(), message.getNickname(), message.getMessage());
+        log.info("채팅 메시지: roomId={}, memberId={}, message={}",
+                roomId, message.getMemberId(), message.getContent());
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
         try {
             // Redis에 채팅 메시지 저장
@@ -159,6 +162,33 @@ public class RoomWebSocketController {
         } catch (Exception e) {
             log.error("채팅 메시지 저장/브로드캐스트 실패: roomId={}, senderId={}", roomId, message.getSenderId(), e);
             // 추후 채팅 전송 실패 시 에러 메시지를 발신자에게만 전송하는 기능 추가를 고려할 수 있다.
+        }
+    }
+
+    /**
+     * 문장별 녹음 완료
+     * 클라이언트: /app/room/{roomId}/recording/complete
+     */
+    @MessageMapping("/room/{roomId}/recording/complete")
+    public void recordingComplete(
+            @DestinationVariable Long roomId,
+            @Payload RecordingCompleteMessage message
+    ) {
+        log.info("녹음 완료 메시지 수신: roomId={}, memberId={}, sentenceId={}",
+                roomId, message.getMemberId(), message.getSentenceId());
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
+
+        roomService.recordingComplete(roomId, message);
+    }
+
+    /**
+     * 재연결 시 disconnected 마킹 해제
+     * WebSocket 메시지 핸들러에서 호출하여 Grace Period 내 재연결 감지
+     */
+    private void clearDisconnectedIfNeeded(Long roomId, Long memberId) {
+        if (roomSessionService.isDisconnected(roomId, memberId)) {
+            roomSessionService.clearDisconnected(roomId, memberId);
+            log.info("재연결 감지, disconnected 마킹 해제: roomId={}, memberId={}", roomId, memberId);
         }
     }
 
