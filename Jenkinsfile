@@ -146,7 +146,8 @@ pipeline {
                             # 만약 application.yml의 변수명이 다르면 아래 이름을 수정하세요.
                             echo "JWT_ACCESS_TOKEN_EXPIRE_PERIOD=43200000" >> .env
                             echo "JWT_REFRESH_TOKEN_EXPIRE_PERIOD=1209600000" >> .env
-
+                            echo "GEMINI_MODEL=gemini-2.5-flash" >> .env
+                            echo "GEMINI_BASE_URL=https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta" >> .env
                             # 이제 meari-fastapi 이미지가 생성되었으므로 정상적으로 실행됩니다.
                             docker compose up -d --force-recreate frontend spring-api fastapi
                         '''
