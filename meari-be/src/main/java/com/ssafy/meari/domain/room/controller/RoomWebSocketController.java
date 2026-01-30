@@ -11,6 +11,20 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
+import com.ssafy.meari.domain.room.dto.websocket.ChatMessage;
+import com.ssafy.meari.domain.room.dto.websocket.ReadyMessage;
+import com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage;
+import com.ssafy.meari.domain.room.dto.websocket.RoleReleaseMessage;
+import com.ssafy.meari.domain.room.dto.websocket.RoleSelectMessage;
+import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
+import com.ssafy.meari.domain.room.entity.Chat;
+import com.ssafy.meari.domain.room.repository.ChatRepository;
+import com.ssafy.meari.domain.room.service.RoomService;
+import com.ssafy.meari.domain.room.service.RoomSessionService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Room WebSocket 메시지 핸들러
  *
@@ -25,10 +39,12 @@ public class RoomWebSocketController {
     private final SimpMessagingTemplate messagingTemplate;
     private final RoomSessionService roomSessionService;
     private final RoomService roomService;
+    private final ChatRepository chatRepository;
 
     private static final String TOPIC_STATE = "/topic/room/%d/state";
     private static final String TOPIC_CHAT = "/topic/room/%d/chat";
-
+    private static final int MAX_CHAT_COUNT = 100;
+    
     /**
      * 준비 상태 토글
      * 클라이언트: /app/room/{roomId}/ready
@@ -124,8 +140,56 @@ public class RoomWebSocketController {
                 roomId, message.getMemberId(), message.getContent());
         clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
-        // 전체 참여자에게 브로드캐스트
-        broadcast(roomId, TOPIC_CHAT, message);
+        try {
+            // Redis에 채팅 메시지 저장
+            Chat chat = Chat.builder()
+                    .roomId(roomId)
+                    .senderId(message.getSenderId())
+                    .nickname(message.getNickname())
+                    .message(message.getMessage())
+                    .timestamp(LocalDateTime.now())
+                    .build();
+            chatRepository.save(chat);
+
+            // 100개 초과 시 오래된 메시지 삭제
+            trimOldMessages(roomId);
+
+            // 전체 참여자에게 브로드캐스트
+            broadcast(roomId, TOPIC_CHAT, message);
+
+            log.debug("채팅 메시지 브로드캐스트 완료: roomId={}", roomId);
+
+        } catch (Exception e) {
+            log.error("채팅 메시지 저장/브로드캐스트 실패: roomId={}, senderId={}", roomId, message.getSenderId(), e);
+            // 추후 채팅 전송 실패 시 에러 메시지를 발신자에게만 전송하는 기능 추가를 고려할 수 있다.
+        }
+    }
+
+    /**
+     * 문장별 녹음 완료
+     * 클라이언트: /app/room/{roomId}/recording/complete
+     */
+    @MessageMapping("/room/{roomId}/recording/complete")
+    public void recordingComplete(
+            @DestinationVariable Long roomId,
+            @Payload RecordingCompleteMessage message
+    ) {
+        log.info("녹음 완료 메시지 수신: roomId={}, memberId={}, sentenceId={}",
+                roomId, message.getMemberId(), message.getSentenceId());
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
+
+        roomService.recordingComplete(roomId, message);
+    }
+
+    /**
+     * 재연결 시 disconnected 마킹 해제
+     * WebSocket 메시지 핸들러에서 호출하여 Grace Period 내 재연결 감지
+     */
+    private void clearDisconnectedIfNeeded(Long roomId, Long memberId) {
+        if (roomSessionService.isDisconnected(roomId, memberId)) {
+            roomSessionService.clearDisconnected(roomId, memberId);
+            log.info("재연결 감지, disconnected 마킹 해제: roomId={}, memberId={}", roomId, memberId);
+        }
     }
 
     /**
@@ -169,5 +233,19 @@ public class RoomWebSocketController {
         String destination = String.format(topicPattern, roomId);
         messagingTemplate.convertAndSend(destination, message);
         log.debug("브로드캐스트: destination={}", destination);
+    }
+
+    /**
+     * 방의 채팅 메시지가 MAX_CHAT_COUNT를 초과하면 오래된 순으로 삭제
+     */
+    private void trimOldMessages(Long roomId) {
+        List<Chat> chats = chatRepository.findByRoomIdOrderByTimestampAsc(roomId);
+
+        if (chats.size() > MAX_CHAT_COUNT) {
+            int deleteCount = chats.size() - MAX_CHAT_COUNT;
+            List<Chat> oldChats = chats.subList(0, deleteCount);
+            chatRepository.deleteAll(oldChats);
+            log.debug("오래된 채팅 메시지 삭제: roomId={}, 삭제 개수={}", roomId, deleteCount);
+        }
     }
 }
