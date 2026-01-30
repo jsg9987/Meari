@@ -130,6 +130,9 @@ pipeline {
                     string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET'),
                     string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL'),
                     string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY')
+                    string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
+                    string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
+                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET')
                 ]) {
                     script {
                         sh '''
@@ -150,6 +153,10 @@ pipeline {
                             echo "GEMINI_API_KEY=${GEMINI_KEY}" >> .env
                             echo "GEMINI_MODEL=gemini-2.5-flash" >> .env
                             echo "GEMINI_BASE_URL=https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta" >> .env
+                            echo "AWS_ACCESS_KEY=${AWS_KEY}" >> .env
+                            echo "AWS_SECRET_KEY=${AWS_SECRET}" >> .env
+                            echo "AWS_S3_BUCKET=${S3_BUCKET}" >> .env
+                            echo "AWS_REGION=ap-northeast-2" >> .env
                             # 이제 meari-fastapi 이미지가 생성되었으므로 정상적으로 실행됩니다.
                             docker compose up -d --force-recreate frontend spring-api fastapi
                         '''
