@@ -318,11 +318,16 @@ public class RoomService {
         room.updateStatus(RoomStatus.IN_PROGRESS);
         roomSessionService.setPhase(roomId, GamePhase.WATCHING);
 
-        // 게임 시작 알림 브로드캐스트 (contentId + phase)
-        RoomStateMessage message = RoomStateMessage.gameStart(contentId, GamePhase.WATCHING);
+        // 전체 스크립트(자막) 조회 및 segments 생성
+        List<Sentence> sentences = sentenceRepository.findByContent_ContentId(contentId);
+        List<MemberSegmentInfo> scriptSegments = buildScriptSegments(sentences);
+
+        // 게임 시작 알림 브로드캐스트 (contentId + phase + 전체 자막)
+        RoomStateMessage message = RoomStateMessage.gameStart(contentId, GamePhase.WATCHING, scriptSegments);
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
-        log.info("게임 시작 완료: roomId={}, contentId={}", roomId, contentId);
+        log.info("게임 시작 완료: roomId={}, contentId={}, 전체 스크립트 segments 수={}",
+                roomId, contentId, scriptSegments.size());
     }
 
     /**
@@ -492,7 +497,27 @@ public class RoomService {
         // 4. 확정 플래그 설정
         roomSessionService.setRolesConfirmed(roomId, true);
 
-        log.info("역할 확정 완료: roomId={}", roomId);
+        // 5. 전체 segments 정보 생성 및 브로드캐스트
+        Long contentId = roomSessionService.getContentId(roomId);
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_CONTENT));
+
+        List<Sentence> sentences = sentenceRepository.findByContent_ContentId(contentId);
+        Map<Long, String> roleAssignments = roomSessionService.getAllRoles(roomId);
+
+        log.debug("역할 확정 - memberRooms 수: {}, roleAssignments: {}", memberRooms.size(), roleAssignments);
+
+        // 모든 역할(할당된 역할 + 시스템 역할)의 segments 생성
+        List<MemberSegmentInfo> segments = buildAllRoleSegments(roleAssignments, sentences);
+
+        log.debug("생성된 segments 수: {}, memberIds: {}",
+                segments.size(),
+                segments.stream().map(MemberSegmentInfo::getMemberId).collect(java.util.stream.Collectors.toList()));
+
+        RoomStateMessage message = RoomStateMessage.rolesConfirmed(segments);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
+        log.info("역할 확정 완료 및 segments 브로드캐스트: roomId={}, segments 수={} (시스템 역할 포함)", roomId, segments.size());
     }
 
     /**
@@ -558,15 +583,24 @@ public class RoomService {
             roomSessionService.setMemberTotalSentences(roomId, round, segment.getMemberId(), segment.getSentences().size());
         }
 
-        // Round 시작 시각 저장
-        long serverTime = System.currentTimeMillis();
-        roomSessionService.setRoundStartTime(roomId, serverTime);
+        // Round 시작 시각 저장 (타임아웃 계산용)
+        long currentTime = System.currentTimeMillis();
+        roomSessionService.setRoundStartTime(roomId, currentTime);
 
-        // ROUND_START 브로드캐스트
-        RoomStateMessage message = RoomStateMessage.roundStart(newPhase, round, serverTime, segments);
+        // 실제 재생 시작 시간 (현재 시간 + 2초)
+        long playStartTime = currentTime + 2000L;
+
+        // 타임아웃 시간 계산 및 저장 (재생 시작 시간 + 영상 길이 + 40초)
+        int videoDurationSeconds = content.getTotalDuration().intValue();
+        long timeoutMillis = playStartTime + (videoDurationSeconds * 1000L) + 40000L;
+        roomSessionService.setRoundTimeout(roomId, round, timeoutMillis);
+
+        // ROUND_START 브로드캐스트 (재생 시작 시간 전달)
+        RoomStateMessage message = RoomStateMessage.roundStart(newPhase, round, playStartTime, segments);
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
-        log.info("Round 시작 완료: roomId={}, round={}, phase={}", roomId, round, newPhase);
+        log.info("Round 시작 완료: roomId={}, round={}, phase={}, 재생시작={}ms 후, 타임아웃={}초",
+                roomId, round, newPhase, 2, videoDurationSeconds + 40);
     }
 
     /**
@@ -640,9 +674,17 @@ public class RoomService {
         // 문장 녹음 완료 마킹
         roomSessionService.markRecordingComplete(roomId, round, message.getMemberId(), message.getSentenceId());
 
+        // 타임아웃 체크
+        if (checkAndHandleRecordingTimeout(roomId, round, currentPhase)) {
+            return; // 타임아웃 처리됨
+        }
+
         // 모든 멤버의 모든 문장이 완료되었는지 확인
         if (roomSessionService.isAllRecordingsComplete(roomId, round)) {
             log.info("모든 멤버 녹음 완료: roomId={}, round={}", roomId, round);
+
+            // 완료 플래그 설정 (중복 처리 방지)
+            roomSessionService.markRoundCompleted(roomId, round);
 
             RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
             messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
@@ -691,6 +733,109 @@ public class RoomService {
     }
 
     /**
+     * 역할 할당 정보에서 특정 roleId에 할당된 memberId 찾기
+     * @return memberId 또는 null (시스템 역할인 경우)
+     */
+    private Long findMemberIdByRoleId(Map<Long, String> roleAssignments, Long roleId) {
+        if (roleAssignments == null) {
+            return null;
+        }
+        String value = roleAssignments.get(roleId);
+        if (value == null || "SYSTEM".equals(value)) {
+            return null;
+        }
+        return Long.parseLong(value);
+    }
+
+    /**
+     * 전체 스크립트 세그먼트 구성 (영상 시청용, 역할 할당 없음)
+     * 모든 역할의 memberId는 null로 설정
+     */
+    private List<MemberSegmentInfo> buildScriptSegments(List<Sentence> sentences) {
+        // roleId → List<Sentence> 매핑
+        Map<Long, List<Sentence>> sentencesByRole = sentences.stream()
+                .collect(Collectors.groupingBy(s -> s.getRole().getRoleId()));
+
+        return sentencesByRole.entrySet().stream()
+                .map(entry -> {
+                    Long roleId = entry.getKey();
+                    List<Sentence> roleSentences = entry.getValue();
+
+                    // Role 정보 조회
+                    Role role = roleSentences.get(0).getRole();
+
+                    // 문장 정보 생성
+                    List<SentenceSegmentInfo> segmentInfos = roleSentences.stream()
+                            .map(s -> SentenceSegmentInfo.builder()
+                                    .sentenceId(s.getSentenceId())
+                                    .sequence(s.getSequence())
+                                    .startTime(s.getStartTime().doubleValue())
+                                    .endTime(s.getEndTime().doubleValue())
+                                    .textKo(s.getTextKo())
+                                    .textVn(s.getTextVn())
+                                    .build())
+                            .sorted(Comparator.comparingInt(SentenceSegmentInfo::getSequence))
+                            .collect(Collectors.toList());
+
+                    return MemberSegmentInfo.builder()
+                            .memberId(null)  // 영상 시청 단계에서는 역할 미할당
+                            .roleId(roleId)
+                            .roleName(role.getName())
+                            .sentences(segmentInfos)
+                            .build();
+                })
+                .sorted(Comparator.comparing(MemberSegmentInfo::getRoleId))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 모든 역할에 대한 세그먼트 구성 (할당된 역할 + 시스템 역할 모두 포함)
+     * 프론트엔드에서 모든 타임스탬프 정보를 처리하기 위해 사용
+     */
+    private List<MemberSegmentInfo> buildAllRoleSegments(
+            Map<Long, String> roleAssignments,
+            List<Sentence> sentences
+    ) {
+        // roleId → List<Sentence> 매핑
+        Map<Long, List<Sentence>> sentencesByRole = sentences.stream()
+                .collect(Collectors.groupingBy(s -> s.getRole().getRoleId()));
+
+        return sentencesByRole.entrySet().stream()
+                .map(entry -> {
+                    Long roleId = entry.getKey();
+                    List<Sentence> roleSentences = entry.getValue();
+
+                    // Role 정보 조회 (첫 번째 문장에서 가져옴)
+                    Role role = roleSentences.get(0).getRole();
+
+                    // 할당된 memberId 찾기 (없으면 null = 시스템 역할)
+                    Long memberId = findMemberIdByRoleId(roleAssignments, roleId);
+
+                    // 문장 정보 생성
+                    List<SentenceSegmentInfo> segmentInfos = roleSentences.stream()
+                            .map(s -> SentenceSegmentInfo.builder()
+                                    .sentenceId(s.getSentenceId())
+                                    .sequence(s.getSequence())
+                                    .startTime(s.getStartTime().doubleValue())
+                                    .endTime(s.getEndTime().doubleValue())
+                                    .textKo(s.getTextKo())
+                                    .textVn(s.getTextVn())
+                                    .build())
+                            .sorted(Comparator.comparingInt(SentenceSegmentInfo::getSequence))
+                            .collect(Collectors.toList());
+
+                    return MemberSegmentInfo.builder()
+                            .memberId(memberId)  // null이면 시스템 역할
+                            .roleId(roleId)
+                            .roleName(role.getName())
+                            .sentences(segmentInfos)
+                            .build();
+                })
+                .sorted(Comparator.comparing(MemberSegmentInfo::getRoleId))
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 게임 종료 및 준비 단계로 복귀 (방장 전용)
      * Round2 종료 후 호출
      */
@@ -720,13 +865,46 @@ public class RoomService {
         // 방 상태를 WAITING으로 변경
         room.updateStatus(RoomStatus.WAITING);
 
-        // Redis 게임 상태 초기화
+        // Redis 게임 상태 초기화 (phase 삭제 포함)
         roomSessionService.resetGameState(roomId);
 
-        // 브로드캐스트
-        RoomStateMessage message = RoomStateMessage.phaseChange(null); // phase null = WAITING
+        // 게임 종료 브로드캐스트 (프론트엔드에서 준비 단계로 복귀)
+        RoomStateMessage message = RoomStateMessage.gameFinished();
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
         log.info("게임 종료 완료, 준비 단계로 복귀: roomId={}", roomId);
+    }
+
+    /**
+     * 녹음 완료 타임아웃 체크
+     * @return true: 타임아웃 처리됨, false: 타임아웃 아님
+     */
+    private boolean checkAndHandleRecordingTimeout(Long roomId, Integer round, GamePhase currentPhase) {
+        // 이미 완료 처리되었는지 확인
+        if (roomSessionService.isRoundCompleted(roomId, round)) {
+            return true;
+        }
+
+        Long timeoutMillis = roomSessionService.getRoundTimeout(roomId, round);
+        if (timeoutMillis == null) {
+            return false;
+        }
+
+        long currentTime = System.currentTimeMillis();
+        if (currentTime > timeoutMillis) {
+            log.warn("녹음 완료 타임아웃: roomId={}, round={}, 경과시간={}ms",
+                    roomId, round, currentTime - (timeoutMillis - 40000));
+
+            // 완료 플래그 설정 (중복 처리 방지)
+            roomSessionService.markRoundCompleted(roomId, round);
+
+            // 강제로 완료 처리
+            RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
+            messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+
+            return true;
+        }
+
+        return false;
     }
 }

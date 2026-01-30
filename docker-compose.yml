@@ -2,30 +2,6 @@ version: '3.8'
 
 services:
   # ============================================================
-  # Jenkins - CI/CD 서버 (localhost:9090만 접근 가능)
-  # ============================================================
-  jenkins:
-    image: jenkins/jenkins:lts
-    container_name: meari-jenkins
-    user: root
-    ports:
-      - "127.0.0.1:9090:8080"   # localhost에서만 접근
-      - "127.0.0.1:50000:50000" # Jenkins 에이전트
-    volumes:
-      - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock  # Docker 명령어 사용
-    environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
-      - TZ=Asia/Seoul
-    networks:
-      - meari-network
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-
-  # ============================================================
   # 1. PostgreSQL - 메인 데이터베이스
   # ============================================================
   postgres:
@@ -53,7 +29,7 @@ services:
       retries: 5
 
   # ============================================================
-  # 2. Redis - 캐시 및 세션 관리
+  # 2. Redis - 패스워드 유무에 상관없이 돌아가도록 수정됨
   # ============================================================
   redis:
     image: redis:alpine
@@ -62,7 +38,9 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --save 60 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    # 패스워드가 없어도 문법 에러가 나지 않도록 처리
+    command: >
+      sh -c "redis-server --save 60 1 --loglevel warning ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}"
     networks:
       - meari-network
     restart: unless-stopped
@@ -71,7 +49,8 @@ services:
         limits:
           memory: 512M
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      # 패스워드가 있으면 인증하고, 없으면 그냥 ping 체크
+      test: ["CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a $REDIS_PASSWORD} ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -156,20 +135,16 @@ services:
     container_name: meari-spring
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      # PostgreSQL 연결 정보
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meari_db
       SPRING_DATASOURCE_USERNAME: ssafy
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      # Redis 연결 정보
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
-      # RabbitMQ 연결 정보
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ssafy
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      # OpenVidu 연결 정보
       OPENVIDU_URL: https://openvidu:4443
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
     ports:
@@ -190,17 +165,14 @@ services:
           memory: 2G
 
   # ============================================================
-  # 7. FastAPI - AI 분석 서버
+  # 7. FastAPI - AI 분석 서버 (환경변수 대응 수정됨)
   # ============================================================
   fastapi:
     image: meari-fastapi:latest
     container_name: meari-fastapi
     environment:
-      # PostgreSQL 연결 URL
       DATABASE_URL: postgresql://ssafy:${DB_PASSWORD}@postgres:5432/meari_db
-      # Redis 연결 URL
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      # RabbitMQ 연결 URL
+      REDIS_URL: "redis://${REDIS_PASSWORD:+:$REDIS_PASSWORD@}redis:6379"
       RABBITMQ_URL: amqp://ssafy:${RABBITMQ_PASSWORD}@rabbitmq:5672
     ports:
       - "8000:8000"
@@ -220,18 +192,12 @@ services:
           memory: 2G
 
 # ============================================================
-# 네트워크 설정
+# 네트워크 및 볼륨 설정
 # ============================================================
 networks:
   meari-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
 
-# ============================================================
-# 볼륨 설정
-# ============================================================
 volumes:
   jenkins_home:
   postgres_data:

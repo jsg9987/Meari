@@ -9,8 +9,17 @@ RUN npm install -g pnpm
 COPY package*.json ./
 RUN pnpm install
 
-# 소스 코드 복사 및 빌드
+# 소스 코드 복사
 COPY . .
+
+# 👇 빌드 시 환경변수 주입
+ARG VITE_BASE_SERVER_URL=http://localhost:8080/api/v1
+ARG VITE_USE_MOCK_API=false
+
+ENV VITE_BASE_SERVER_URL=${VITE_BASE_SERVER_URL}
+ENV VITE_USE_MOCK_API=${VITE_USE_MOCK_API}
+
+# 빌드 실행
 RUN pnpm run build
 
 # Production stage
