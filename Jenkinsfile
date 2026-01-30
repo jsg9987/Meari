@@ -143,7 +143,7 @@ pipeline {
                             echo "OPENVIDU_DOMAIN=localhost" >> .env
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
                             # --- JWT 설정 (기본값 주입) ---
-                            # 만약 application.yml의 변수명이 다르면 아래 이름을 수정하세요.
+                            # 만약 application.yml의 변수명이 다르면 아래 이름을 수정하세요
                             echo "JWT_ACCESS_TOKEN_EXPIRE_PERIOD=43200000" >> .env
                             echo "JWT_REFRESH_TOKEN_EXPIRE_PERIOD=1209600000" >> .env
                             echo "GEMINI_MODEL=gemini-2.5-flash" >> .env
