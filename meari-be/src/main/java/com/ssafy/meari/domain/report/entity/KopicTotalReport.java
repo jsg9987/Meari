@@ -10,7 +10,8 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "kopic_total_report", indexes = {
-    @Index(name = "idx_kopic_total_report_member_id", columnList = "member_id")
+    @Index(name = "idx_kopic_total_report_member_id", columnList = "member_id"),
+    @Index(name = "idx_kopic_member_isread", columnList = "member_id, is_read")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -49,6 +50,9 @@ public class KopicTotalReport extends BaseEntity {
     @Column(name = "status", nullable = false, length = 50)
     private ReportStatus status;
 
+    @Column(name = "is_read", nullable = false)
+    private Boolean isRead = false;
+
     @Builder
     public KopicTotalReport(Member member, Theme theme, ReportStatus status) {
         this.member = member;
@@ -69,5 +73,10 @@ public class KopicTotalReport extends BaseEntity {
         this.sentenceCount = sentenceCount;
         this.reportData = reportData;
         this.status = ReportStatus.COMPLETED;
+    }
+
+    // 도메인 메서드: 리포트 읽음 처리
+    public void markAsRead() {
+        this.isRead = true;
     }
 }
