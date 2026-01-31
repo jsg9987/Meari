@@ -1,5 +1,8 @@
 package com.ssafy.meari.domain.report.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ssafy.meari.domain.report.dto.response.DetailedAnalysis;
 import com.ssafy.meari.domain.report.dto.response.ReportDetailResponse;
 import com.ssafy.meari.domain.report.dto.response.ReportResponse;
 import com.ssafy.meari.domain.report.entity.ShadowingReport;
@@ -21,6 +24,7 @@ import java.util.stream.Collectors;
 public class ReportService {
 
     private final ShadowingReportRepository shadowingReportRepository;
+    private final ObjectMapper objectMapper;
 
     /**
      * 방 ID로 리포트 목록 조회
@@ -90,6 +94,9 @@ public class ReportService {
      * ShadowingReport → ReportDetailResponse 변환
      */
     private ReportDetailResponse toReportDetailResponse(ShadowingReport report) {
+        // JSONB 문자열을 DetailedAnalysis 객체로 파싱
+        DetailedAnalysis detailedAnalysis = parseDetailedAnalysis(report.getDetailedAnalysis());
+
         return ReportDetailResponse.builder()
                 .shadowingReportId(report.getShadowingReportId())
                 .memberId(report.getMember().getMemberId())
@@ -103,10 +110,35 @@ public class ReportService {
                 .roleName(report.getRole().getName())
                 .accuracy(report.getAccuracy())
                 .intonation(report.getIntonation())
-                .detailedAnalysis(report.getDetailedAnalysis())
+                .detailedAnalysis(detailedAnalysis)
                 .status(report.getStatus())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * JSONB 문자열을 DetailedAnalysis 객체로 파싱
+     */
+    private DetailedAnalysis parseDetailedAnalysis(String jsonString) {
+        if (jsonString == null || jsonString.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(jsonString, DetailedAnalysis.class);
+        } catch (JsonProcessingException e) {
+            log.error("DetailedAnalysis 파싱 실패: {}", e.getMessage());
+            // 파싱 실패 시 빈 객체 반환 (또는 예외를 던질 수도 있음)
+            return DetailedAnalysis.builder()
+                    .sentences(List.of())
+                    .summary(DetailedAnalysis.Summary.builder()
+                            .totalSentences(0)
+                            .analyzedSentences(0)
+                            .averageAccuracy(0)
+                            .averageConfidence(0.0)
+                            .build())
+                    .build();
+        }
     }
 }

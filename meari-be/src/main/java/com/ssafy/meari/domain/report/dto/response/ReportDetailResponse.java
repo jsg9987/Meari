@@ -50,8 +50,8 @@ public class ReportDetailResponse {
     @Schema(description = "억양 점수 (0-100)", example = "90")
     private final Integer intonation;
 
-    @Schema(description = "상세 분석 결과 (JSON)", example = "{\"errors\": []}")
-    private final String detailedAnalysis;
+    @Schema(description = "상세 분석 결과")
+    private final DetailedAnalysis detailedAnalysis;
 
     @Schema(description = "분석 상태", example = "COMPLETED")
     private final ReportStatus status;
@@ -68,7 +68,7 @@ public class ReportDetailResponse {
                                 Long contentId, String contentTitle,
                                 Long roleId, String roleName,
                                 Integer accuracy, Integer intonation,
-                                String detailedAnalysis, ReportStatus status,
+                                DetailedAnalysis detailedAnalysis, ReportStatus status,
                                 LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.shadowingReportId = shadowingReportId;
         this.memberId = memberId;
