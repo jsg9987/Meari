@@ -62,7 +62,6 @@ export function useVideoRoom({
       }
       arr.push({ id: s.stream.streamId, streamManager: s, label: name });
     });
-    console.log(arr)
     return arr;
   }, [publisher, subscribers, nickname]);
 
