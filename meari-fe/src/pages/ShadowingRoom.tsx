@@ -1400,7 +1400,7 @@ export default function ShadowingRoom() {
                 messages={chatMessages}
                 onSendMessage={sendChatMessage}
                 nickname={nickname}
-                currentUserId={userInfo?.memberId || 0}
+                currentUserId={memberId}
               />
             </div>
           )}

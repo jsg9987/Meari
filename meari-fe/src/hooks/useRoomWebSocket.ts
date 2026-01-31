@@ -140,7 +140,13 @@ export function useRoomWebSocket({
   // 채팅 메시지 핸들러
   const handleChatMessage = useCallback((message: IMessage) => {
     try {
-      const chatMessage: ChatMessage = JSON.parse(message.body);
+      const parsedMessage = JSON.parse(message.body);
+      const chatMessage: ChatMessage = {
+        sender_id: Number(parsedMessage.sender_id),
+        nickname: parsedMessage.nickname,
+        message: parsedMessage.message,
+        timestamp: parsedMessage.timestamp,
+      };
       console.log('[WebSocket] Received chat message:', chatMessage);
       onChatMessage?.(chatMessage);
     } catch (error) {
