@@ -16,7 +16,7 @@ public class SentenceAnalysisInfo {
     @Schema(description = "문장 ID", example = "1")
     private Long sentenceId;
 
-    @Schema(description = "오디오 파일 URL", example = "s3://meari-bucket/recordings/room123/round1/member1/sentence1.wav")
+    @Schema(description = "오디오 파일 URL", example = "s3://bucket/recordings/room123/round1/member1/sentence1.wav")
     private String audioUrl;
 
     @Schema(description = "한국어 텍스트", example = "안녕하세요")

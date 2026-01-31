@@ -40,6 +40,7 @@ public class RoomSessionService {
     private static final String KEY_ROUND_START_TIME = "room:%d:round_start_time";
     private static final String KEY_MEMBER_RECORDINGS = "room:%d:round:%d:member:%d:recordings";
     private static final String KEY_MEMBER_TOTAL_SENTENCES = "room:%d:round:%d:member:%d:total_sentences";
+    private static final String KEY_MEMBER_AUDIO_URLS = "room:%d:round:%d:member:%d:audio_urls";
     private static final String KEY_ROUND_TIMEOUT = "room:%d:round:%d:timeout";
     private static final String KEY_ROUND_COMPLETED = "room:%d:round:%d:completed";
 
@@ -450,6 +451,25 @@ public class RoomSessionService {
             return true;
         }
         return false;
+    }
+
+    /**
+     * 문장 오디오 URL 저장
+     */
+    public void saveAudioUrl(Long roomId, Integer round, Long memberId, Long sentenceId, String audioUrl) {
+        String key = String.format(KEY_MEMBER_AUDIO_URLS, roomId, round, memberId);
+        redisTemplate.opsForHash().put(key, sentenceId.toString(), audioUrl);
+        setExpire(key);
+        log.debug("방 {} Round {} 멤버 {} 문장 {} 오디오 URL 저장", roomId, round, memberId, sentenceId);
+    }
+
+    /**
+     * 문장 오디오 URL 조회
+     */
+    public String getAudioUrl(Long roomId, Integer round, Long memberId, Long sentenceId) {
+        String key = String.format(KEY_MEMBER_AUDIO_URLS, roomId, round, memberId);
+        Object audioUrl = redisTemplate.opsForHash().get(key, sentenceId.toString());
+        return audioUrl != null ? audioUrl.toString() : null;
     }
 
     /**
