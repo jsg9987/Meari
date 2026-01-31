@@ -145,7 +145,7 @@ pipeline {
                             echo "FRONTEND_URL=${FE_URL}" >> .env
                             echo "OPENVIDU_URL=${OV_URL}" >> .env
                             echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
-                            echo "OPENVIDU_DOMAIN=meari-openvidu" >> .env
+                            echo "OPENVIDU_DOMAIN=i14c207.p.ssafy.io" >> .env
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
                             # --- JWT 설정 (기본값 주입) ---
                             # 만약 application.yml의 변수명이 다르면 아래 이름을 수정하세요
