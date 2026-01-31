@@ -7,9 +7,12 @@ import com.ssafy.meari.domain.content.repository.SentenceRepository;
 import com.ssafy.meari.domain.report.entity.ShadowingReport;
 import com.ssafy.meari.domain.report.repository.ShadowingReportRepository;
 import com.ssafy.meari.global.config.RabbitMQConfig;
+import com.ssafy.meari.global.error.ErrorCode;
+import com.ssafy.meari.global.error.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +33,9 @@ public class AnalysisProducer {
 
     private static final String KEY_MEMBER_RECORDINGS = "room:%d:round:%d:member:%d:recordings";
 
+    @Value("${cloud.aws.s3.bucket}")
+    private String bucket;
+
     /**
      * 특정 멤버의 발음 분석 요청 발행
      * Redis에서 녹음 완료된 문장 정보를 수집하여 RabbitMQ로 전송
@@ -39,18 +45,12 @@ public class AnalysisProducer {
         log.debug("멤버 {} 발음 분석 요청 시작 (방: {}, 라운드: {})", memberId, roomId, round);
 
         // 1. ShadowingReport 조회 (PROCESSING 상태 확인)
-        List<ShadowingReport> reports = shadowingReportRepository.findAll().stream()
-                .filter(r -> r.getRoom().getRoomId().equals(roomId)
-                        && r.getRound().equals(round)
-                        && r.getMember().getMemberId().equals(memberId))
-                .toList();
-
-        if (reports.isEmpty()) {
-            log.warn("ShadowingReport 없음: roomId={}, round={}, memberId={}", roomId, round, memberId);
-            return;
-        }
-
-        ShadowingReport report = reports.get(0);
+        ShadowingReport report = shadowingReportRepository
+                .findByRoom_RoomIdAndRoundAndMember_MemberId(roomId, round, memberId)
+                .orElseThrow(() -> {
+                    log.warn("ShadowingReport 없음: roomId={}, round={}, memberId={}", roomId, round, memberId);
+                    return new BusinessException(ErrorCode.NOT_FOUND_REPORT);
+                });
         Long contentId = report.getContent().getContentId();
         Long roleId = report.getRole().getRoleId();
 
@@ -68,10 +68,19 @@ public class AnalysisProducer {
         for (String sentenceIdStr : completedSentenceIds) {
             Long sentenceId = Long.parseLong(sentenceIdStr);
             Sentence sentence = sentenceRepository.findById(sentenceId)
-                    .orElseThrow(() -> new IllegalArgumentException("문장을 찾을 수 없습니다: " + sentenceId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_SENTENCE));
 
-            // S3 URL 생성 (실제 환경에서는 Redis에서 조회하거나 별도 저장)
-            String audioUrl = generateAudioUrl(roomId, round, memberId, sentenceId);
+            // Redis에서 실제 S3 URL 조회
+            String audioUrlsKey = String.format("room:%d:round:%d:member:%d:audio_urls", roomId, round, memberId);
+            Object audioUrlObj = redisTemplate.opsForHash().get(audioUrlsKey, sentenceId.toString());
+
+            if (audioUrlObj == null) {
+                log.error("Redis에 audioUrl 없음: roomId={}, round={}, memberId={}, sentenceId={}",
+                        roomId, round, memberId, sentenceId);
+                throw new BusinessException(ErrorCode.NOT_FOUND_AUDIO_URL);
+            }
+
+            String audioUrl = audioUrlObj.toString();
 
             SentenceAnalysisInfo info = SentenceAnalysisInfo.builder()
                     .sentenceId(sentenceId)
@@ -103,16 +112,5 @@ public class AnalysisProducer {
 
         log.info("발음 분석 요청 발행: roomId={}, round={}, memberId={}, sentences={}",
                 roomId, round, memberId, sentences.size());
-    }
-
-    /**
-     * S3 오디오 URL 생성
-     * 실제로는 RecordingCompleteMessage에서 받은 audioUrl을 Redis에 저장해두고 조회해야 함
-     */
-    private String generateAudioUrl(Long roomId, Integer round, Long memberId, Long sentenceId) {
-        // TODO: Redis에서 실제 audioUrl 조회
-        // 임시로 패턴 기반 URL 생성
-        return String.format("s3://meari-bucket/recordings/room%d/round%d/member%d/sentence%d.wav",
-                roomId, round, memberId, sentenceId);
     }
 }
