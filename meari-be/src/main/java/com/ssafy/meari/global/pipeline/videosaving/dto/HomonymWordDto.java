@@ -21,6 +21,7 @@ public class HomonymWordDto {
 
 	private Sentence sentence;
 	private Integer sentenceSequence;  // 문장 시퀀스 번호 (대본에서 몇 번째 문장인지)
+	private Integer wordSequence;      // 단어 시퀀스 번호 (문장 내에서 저장된 단어 중 몇 번째인지)
 	private String wordKr;
 	private List<Word> homonymWords;   // 동음이의어 목록 (definitionKr로 구분)
 }

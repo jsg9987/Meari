@@ -9,12 +9,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ssafy.meari.domain.word.entity.SentenceWord;
 import com.ssafy.meari.domain.word.entity.Word;
-import com.ssafy.meari.domain.word.repository.SentenceWordRepository;
+import com.ssafy.meari.global.pipeline.videosaving.anthropic.service.AnthropicService;
 import com.ssafy.meari.global.pipeline.videosaving.dto.HomonymWordDto;
-import com.ssafy.meari.global.pipeline.videosaving.dto.WordMatchingResultDto;
-import com.ssafy.meari.global.pipeline.videosaving.openai.service.OpenAiService;
+import com.ssafy.meari.global.pipeline.videosaving.dto.WordMatchingInfo;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,77 +22,96 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class HomonymDisambiguationService {
 
-	private final OpenAiService openAiService;
-	private final SentenceWordRepository sentenceWordRepository;
+	private final AnthropicService anthropicService;
 	private final ObjectMapper objectMapper;
 
 	private static final String SYSTEM_PROMPT = """
-			당신은 한국어 동음이의어를 구별하는 전문가입니다.
+			당신은 한국어 단어 매칭을 검증하는 전문가입니다.
+			제공된 뜻풀이(정의)는 신뢰성 높은 사전 데이터이지만, 형태소 분석 오류로 인해
+			잘못된 단어가 추출되었을 수 있습니다. 따라서 뜻풀이와 실제 문맥의 일치도를 엄격하게 검증하세요.
 
 			## 필수 분석 순서 (반드시 이 순서로 진행하세요)
 			1. **[1단계] 전체 스크립트 읽기**: 먼저 제공된 전체 스크립트를 처음부터 끝까지 읽고 전체적인 주제와 흐름을 파악하세요
 			2. **[2단계] 맥락 이해**: 스크립트가 어떤 상황을 다루는지 (뉴스, 대화, 설명 등) 전체 맥락을 이해하세요
-			3. **[3단계] 개별 단어 분석**: 각 동음이의어가 등장하는 문장을 다시 읽고, 전체 맥락 속에서 어떤 의미로 사용되었는지 판단하세요
+			3. **[3단계] 형태소 분석 검증**: 형태소 분석기가 정말 올바른 단어를 추출했는지 확인하세요
+			4. **[4단계] 뜻풀이 검증**: 각 후보의 뜻풀이가 실제 문맥과 일치하는지 엄격하게 검증하세요
 
-			## 단어 분석 기준
-			1. 해당 단어가 문장에서 **어떤 문법적 역할**을 하는가? (명사, 동사, 조사 등)
-			2. 전체 스크립트의 **주제와 상황**에 비추어 어떤 의미가 적절한가?
-			3. 앞뒤 문맥에서 단어가 **실제로 어떻게 사용**되는가?
-			4. 각 후보 뜻을 문장에 대입했을 때 **자연스럽고 논리적**인가?
+			## 단어 분석 기준 (순서대로 확인하세요)
+			1. **형태소 분석 오류 의심 사항 확인**:
+			   - "사는 게" → "게"(동물 뜻풀이)는 형태소 분석 오류일 가능성 높음
+			   - "준 건가요" → "걸다"(동사)는 형태소 분석 오류일 가능성 높음
+			   - 의존명사, 조사, 어미는 보통 형태소 분석기가 잘못 인식함
 
-			## 분석 예시
-			**예시 1:**
-			- 전체 맥락: 채소 가격 상승에 관한 뉴스
-			- 문장: "가격이 눈에 띄게 올랐습니다"
+			2. **뜻풀이와 문장의 일치도 검증**:
+			   - 후보 뜻을 문장에 대입했을 때 **말이 되는가?**
+			   - 문맥상 **완전히 무관한 뜻**은 없는가?
+			   - 예: "채소를 사는 게 부담" → "게"(동물)을 대입 → "채소를 사는 동물 부담" (말이 안 됨 → null)
+
+			3. **물리적 vs 추상적 의미 구분**:
+			   - "가격이 올랐습니다" → "올라" (물리적 이동) vs (수치 증가)
+			   - 가격은 물리적으로 이동할 수 없으므로 "수치 증가" 선택
+
+			4. **각 후보 뜻을 문장에 '실제로 대입'하여 검증**:
+			   - 최종 선택 전에 매 후보마다 이 과정을 거쳐야 함
+
+			## 분석 예시 (매우 상세함)
+			**예시 1: 뜻풀이 불일치로 인한 거부**
+			- 문장: "네, 상인들과 소비자 모두 가격 상승을 체감하고 있다고 말합니다"
+			- 단어: "가격"
+			- 후보 1: "손이나 주먹, 몽둥이 등으로 치거나 때림" ← 이건 뭐지? "때리다"의 뜻이 아닌가?
+			- 검증: "가격(때리다) 상승을 체감" → 문맥상 말이 안 됨 → null (거부)
+
+			**예시 2: 단순 형태소 분석 오류 감지**
+			- 문장: "예전보다 채소를 사는 게 부담스럽다"
+			- 단어: "게"
+			- 후보 1: "온몸이 단단한 껍질로 싸여 있으며 열 개의 발이 있는 동물"
+			- 형태소 분석 검증: "사는 게" 표현에서 "게"는 동물이 아니라 "것이"의 구어체
+			- 검증: "채소를 사는 동물 부담" → 말이 안 됨 → null (거부)
+
+			**예시 3: 올바른 선택**
+			- 문장: "장마가 길어지면서 채소 가격이 전반적으로 오른 모습입니다"
 			- 단어: "오르다"
-			- 후보: 1. 높은 곳으로 이동하다 (물리적), 2. 수치나 정도가 증가하다
-			- 분석: 가격은 물리적으로 이동할 수 없고, 뉴스 맥락상 "가격 상승"을 의미
-			- 선택: 2번 (증가하다)
+			- 후보 1: "높은 곳으로 이동하다"
+			- 후보 2: "값, 수치, 온도 등이 이전보다 많아지거나 높아지다"
+			- 검증: "가격이 오른" 문맥에서 후보 1을 대입 → "가격이 높은 곳으로 이동" (말이 안 됨)
+			- 검증: "가격이 오른" 문맥에서 후보 2를 대입 → "가격이 수치상 증가" (말이 됨) → 선택: 2
 
-			**예시 2:**
-			- 전체 맥락: 시장 취재 뉴스
-			- 문장: "장을 보러 나온 시민들"
-			- 단어: "나오다"
-			- 후보: 1. 밖으로 나가다, 외출하다, 2. 목적지가 보이다
-			- 분석: "장을 보러"는 목적을 나타내고, "나온"은 외출의 의미
-			- 선택: 1번 (외출하다)
-
-			## 중요: 응답 규칙
-			1. 반드시 JSON 배열로만 응답하세요
-			2. 배열의 길이는 반드시 동음이의어 개수와 동일해야 합니다
-			3. 각 숫자는 해당 동음이의어의 후보 번호입니다 (1부터 시작)
-			4. 설명, 마크다운, 추가 텍스트 없이 오직 JSON 배열만 출력하세요
+			## 매우 중요: 응답 규칙
+			1. 뜻풀이가 문맥과 **명백하게 불일치**하면 망설이지 말고 null로 거부하세요
+			2. 후보 뜻이 "완전히 다른 단어의 뜻"처럼 보이면 형태소 분석 오류일 가능성 높음 → null
+			3. 반드시 JSON 배열로만 응답하세요 (설명, 주석 없음)
+			4. 배열의 길이는 반드시 단어 개수와 동일해야 합니다
 
 			## 응답 예시
-			동음이의어가 5개라면: [2, 1, 3, 1, 2]
-			동음이의어가 3개라면: [1, 2, 1]
+			[2, null, 1, 3, null, 1]
 			""";
 
 	/**
-	 * 동음이의어 리스트를 처리하여 올바른 Word를 선택하고 SentenceWord 연결
+	 * 동음이의어 리스트를 처리하여 올바른 Word를 선택
 	 * 한 번의 API 호출로 모든 동음이의어를 처리
+	 * (즉시 저장하지 않고 WordMatchingInfo 리스트로 반환)
 	 *
 	 * @param homonymList 동음이의어 리스트
 	 * @param fullScript 전체 스크립트 (맥락 파악용)
-	 * @return 매칭 결과 리스트
+	 * @return WordMatchingInfo 리스트
 	 */
 	@Transactional
-	public List<WordMatchingResultDto> processHomonyms(List<HomonymWordDto> homonymList, String fullScript) {
+	public List<WordMatchingInfo> processHomonyms(List<HomonymWordDto> homonymList, String fullScript) {
 		log.info("[Homonym] 동음이의어 처리 시작 - {}개", homonymList.size());
 
-		List<WordMatchingResultDto> matchingResults = new ArrayList<>();
+		List<WordMatchingInfo> wordMatchingInfos = new ArrayList<>();
 
 		if (homonymList.isEmpty()) {
 			log.info("[Homonym] 처리할 동음이의어 없음");
-			return matchingResults;
+			return wordMatchingInfos;
 		}
 
 		// 사용자 프롬프트 생성
 		String userPrompt = buildUserPrompt(homonymList, fullScript);
 		log.debug("[Homonym] LLM 요청 - 동음이의어 {}개", homonymList.size());
 
-		// OpenAI API 호출 (한 번만)
-		String response = openAiService.chat(SYSTEM_PROMPT, userPrompt);
+		// Claude API 호출 (한 번만)
+		String response = anthropicService.chat(SYSTEM_PROMPT, userPrompt);
 		log.info("[Homonym] LLM 응답: {}", response);
 
 		if (response == null || response.isBlank()) {
@@ -117,12 +134,21 @@ public class HomonymDisambiguationService {
 		int processedCount = 0;
 
 		log.info("[Homonym] AI 선택 결과 ({}개 처리):", processableCount);
+		int skippedCount = 0;
 		for (int i = 0; i < processableCount; i++) {
 			HomonymWordDto homonymDto = homonymList.get(i);
-			int selectedIndex = selections.get(i);
+			Integer selectedIndex = selections.get(i);  // null 가능
 			List<Word> candidates = homonymDto.getHomonymWords();
 
 			try {
+				// null인 경우 스킵 (LLM이 문맥상 무관하다고 판단)
+				if (selectedIndex == null) {
+					log.info("  - '{}' → [SKIP] 문맥상 무관 (문장[{}])",
+							homonymDto.getWordKr(), homonymDto.getSentence().getSequence());
+					skippedCount++;
+					continue;
+				}
+
 				if (selectedIndex >= 1 && selectedIndex <= candidates.size()) {
 					Word selectedWord = candidates.get(selectedIndex - 1);
 
@@ -135,43 +161,37 @@ public class HomonymDisambiguationService {
 							candidatesLog.append(j + 1).append(". ").append(candidates.get(j).getDefinitionKr()).append(" / ");
 						}
 					}
-					log.info("  - '{}' → {} (문장[{}])",
-							homonymDto.getWordKr(), candidatesLog.toString().trim(), homonymDto.getSentence().getSequence());
 
-					// SentenceWord 연결
-					SentenceWord sentenceWord = SentenceWord.builder()
+					String type = candidates.size() == 1 ? "SINGLE" : "HOMONYM";
+					log.info("  - '{}' ({}) → {} (문장[{}])",
+							homonymDto.getWordKr(), type, candidatesLog.toString().trim(),
+							homonymDto.getSentence().getSequence());
+
+					// WordMatchingInfo 생성 (즉시 저장하지 않음)
+					WordMatchingInfo matchingInfo = WordMatchingInfo.builder()
 							.sentence(homonymDto.getSentence())
 							.word(selectedWord)
-							.sequence(homonymDto.getSentenceSequence())
+							.originalSequence(homonymDto.getWordSequence())
 							.build();
-					sentenceWordRepository.save(sentenceWord);
-
-					// 매칭 결과 수집
-					matchingResults.add(WordMatchingResultDto.builder()
-							.sentenceSequence(homonymDto.getSentence().getSequence())
-							.sentenceTextKo(homonymDto.getSentence().getTextKo())
-							.wordKr(selectedWord.getWordKr())
-							.definitionKr(selectedWord.getDefinitionKr())
-							.wordVn(selectedWord.getWordVn())
-							.definitionVn(selectedWord.getDefinitionVn())
-							.matchType("HOMONYM")
-							.build());
+					wordMatchingInfos.add(matchingInfo);
 
 					processedCount++;
 				} else {
 					log.warn("[Homonym] 선택 범위 초과 - wordKr: {}, 선택: {}, 후보 수: {}",
 							homonymDto.getWordKr(), selectedIndex, candidates.size());
+					skippedCount++;
 				}
 			} catch (Exception e) {
-				log.error("[Homonym] 동음이의어 처리 실패 - wordKr: {}, error: {}",
+				log.error("[Homonym] 단어 처리 실패 - wordKr: {}, error: {}",
 						homonymDto.getWordKr(), e.getMessage());
+				skippedCount++;
 			}
 		}
 
-		log.info("[Homonym] 동음이의어 처리 완료 - {}개 중 {}개 처리",
-				homonymList.size(), processedCount);
+		log.info("[Homonym] LLM 검증 완료 - 전체: {}개, 통과: {}개, 스킵: {}개",
+				homonymList.size(), processedCount, skippedCount);
 
-		return matchingResults;
+		return wordMatchingInfos;
 	}
 
 	/**
@@ -201,14 +221,14 @@ public class HomonymDisambiguationService {
 			sb.append("\n");
 		}
 
-		sb.append("위 ").append(homonymList.size()).append("개 동음이의어에 대해 선택한 번호를 JSON 배열로 응답하세요.");
-		sb.append("\n예시: [2, 1, 3]");
+		sb.append("위 ").append(homonymList.size()).append("개 단어에 대해 선택/검증 결과를 JSON 배열로 응답하세요.");
+		sb.append("\n예시: [2, null, 1, 3, 1, null]  (null은 문맥상 무관한 단어)");
 
 		return sb.toString();
 	}
 
 	/**
-	 * LLM 응답에서 JSON 배열 파싱
+	 * LLM 응답에서 JSON 배열 파싱 (null 값 허용)
 	 */
 	private List<Integer> parseResponse(String response) {
 		try {
@@ -222,6 +242,7 @@ public class HomonymDisambiguationService {
 			}
 
 			String jsonArray = response.substring(startIdx, endIdx + 1);
+			// null 값을 허용하는 List<Integer> 파싱
 			return objectMapper.readValue(jsonArray, new TypeReference<List<Integer>>() {});
 
 		} catch (JsonProcessingException e) {

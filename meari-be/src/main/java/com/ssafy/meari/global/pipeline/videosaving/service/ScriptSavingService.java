@@ -15,6 +15,7 @@ import com.ssafy.meari.domain.word.repository.WordRepository;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
 import com.ssafy.meari.global.pipeline.videosaving.dto.HomonymWordDto;
+import com.ssafy.meari.global.pipeline.videosaving.dto.WordMatchingInfo;
 import com.ssafy.meari.global.pipeline.videosaving.dto.WordMatchingResultDto;
 import com.ssafy.meari.global.pipeline.videosaving.homonym.service.HomonymDisambiguationService;
 import com.ssafy.meari.global.pipeline.videosaving.nlp.dto.MorphemeAnalysisResponseDto;
@@ -36,6 +37,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -119,7 +121,7 @@ public class ScriptSavingService {
 	private List<Sentence> saveSentencesWithMorphemeAnalysis(List<ScriptCsvRowDto> rows,
 															 List<WordMatchingResultDto> matchingResults) {
 		List<Sentence> savedSentences = new ArrayList<>();
-		List<HomonymWordDto> homonymList = new ArrayList<>();
+		List<HomonymWordDto> allWordList = new ArrayList<>();  // 모든 단어 (SINGLE + HOMONYM)
 
 		// 전체 스크립트 생성 (동음이의어 맥락 파악용)
 		String fullScript = buildFullScript(rows);
@@ -163,28 +165,74 @@ public class ScriptSavingService {
 					savedSentence.getSentenceId(),
 					morphemeResult.getMorphemes().size());
 
-			// 형태소 분석 결과로 Word 조회 및 SentenceWord 연결
-			linkWordsToSentence(savedSentence, morphemeResult, matchingResults, homonymList);
+			// 형태소 분석 결과로 Word 조회 (SINGLE도 LLM 검증 위해 리스트에 보관)
+			linkWordsToSentence(savedSentence, morphemeResult, allWordList);
 		}
 
-		// 동음이의어 LLM 처리
-		if (!homonymList.isEmpty()) {
-			log.info("[Pipeline] 동음이의어 {}개 발견 - 목록:", homonymList.size());
-			for (HomonymWordDto dto : homonymList) {
-				log.info("  - '{}' (후보 {}개) in 문장[{}]: {}",
-						dto.getWordKr(),
-						dto.getHomonymWords().size(),
-						dto.getSentence().getSequence(),
-						dto.getSentence().getTextKo());
-			}
+		// 모든 단어를 LLM 처리 (SINGLE 검증 + HOMONYM 선택)
+		List<WordMatchingInfo> validatedWords = new ArrayList<>();
+		if (!allWordList.isEmpty()) {
+			log.info("[Pipeline] LLM 검증 대상 단어 {}개 발견", allWordList.size());
+			int singleCount = (int) allWordList.stream()
+					.filter(dto -> dto.getHomonymWords().size() == 1)
+					.count();
+			int homonymCount = allWordList.size() - singleCount;
+			log.info("  - SINGLE 검증: {}개, HOMONYM 선택: {}개", singleCount, homonymCount);
+
 			log.info("[Pipeline] LLM 처리 시작");
-			List<WordMatchingResultDto> homonymResults = homonymDisambiguationService.processHomonyms(homonymList, fullScript);
-			matchingResults.addAll(homonymResults);
-			log.info("[Pipeline] 동음이의어 LLM 처리 완료 - {}개 처리됨", homonymResults.size());
+			validatedWords = homonymDisambiguationService.processHomonyms(allWordList, fullScript);
+			log.info("[Pipeline] LLM 처리 완료 - {}개 처리됨 ({}개 스킵됨)",
+					validatedWords.size(), allWordList.size() - validatedWords.size());
+		}
+
+		// 검증된 단어들을 정렬 후 저장
+		List<WordMatchingInfo> allWords = validatedWords;
+
+		// 문장별로 그룹화하고 originalSequence로 정렬
+		Map<Long, List<WordMatchingInfo>> wordsBySentence = allWords.stream()
+				.collect(Collectors.groupingBy(
+						info -> info.getSentence().getSentenceId(),
+						Collectors.collectingAndThen(
+								Collectors.toList(),
+								list -> {
+									list.sort(Comparator.comparingInt(WordMatchingInfo::getOriginalSequence));
+									return list;
+								}
+						)
+				));
+
+		// 각 문장의 단어들을 sequence 1부터 재할당하여 저장
+		for (Map.Entry<Long, List<WordMatchingInfo>> entry : wordsBySentence.entrySet()) {
+			List<WordMatchingInfo> words = entry.getValue();
+			int sequence = 1;
+
+			for (WordMatchingInfo info : words) {
+				// SentenceWord 저장
+				SentenceWord sentenceWord = SentenceWord.builder()
+						.sentence(info.getSentence())
+						.word(info.getWord())
+						.sequence(sequence++)
+						.build();
+				sentenceWordRepository.save(sentenceWord);
+
+				// 매칭 결과 수집
+				Word word = info.getWord();
+				matchingResults.add(WordMatchingResultDto.builder()
+						.sentenceSequence(info.getSentence().getSequence())
+						.sentenceTextKo(info.getSentence().getTextKo())
+						.wordKr(word.getWordKr())
+						.definitionKr(word.getDefinitionKr())
+						.wordVn(word.getWordVn())
+						.definitionVn(word.getDefinitionVn())
+						.matchType("VALIDATED")
+						.build());
+			}
 		}
 
 		// 문장 순서로 정렬
 		matchingResults.sort(Comparator.comparingInt(WordMatchingResultDto::getSentenceSequence));
+
+		log.info("[Pipeline] SentenceWord 저장 완료 - 총 {}개 단어", allWords.size());
 
 		return savedSentences;
 	}
@@ -199,18 +247,18 @@ public class ScriptSavingService {
 	}
 
 	/**
-	 * 형태소 분석 결과로 Word를 조회하고 SentenceWord로 연결
-	 * 동음이의어(2개 이상)는 homonymList에 보관
+	 * 형태소 분석 결과로 Word를 조회 (즉시 저장하지 않고 리스트에 보관)
+	 * SINGLE/HOMONYM 모두 LLM 검증 대상으로 수집
 	 *
 	 * @param sentence 저장된 문장
 	 * @param morphemeResult 형태소 분석 결과
-	 * @param matchingResults 매칭 결과를 수집할 리스트
-	 * @param homonymList 동음이의어를 수집할 리스트
+	 * @param allWordList 모든 단어를 수집할 리스트 (LLM 검증용)
 	 */
 	private void linkWordsToSentence(Sentence sentence, MorphemeAnalysisResponseDto morphemeResult,
-									 List<WordMatchingResultDto> matchingResults,
-									 List<HomonymWordDto> homonymList) {
+									 List<HomonymWordDto> allWordList) {
 		List<MorphemeAnalysisResponseDto.Morpheme> morphemes = morphemeResult.getMorphemes();
+
+		int wordSequence = 0;  // Word를 찾을 때마다 증가하는 카운터
 
 		for (int i = 0; i < morphemes.size(); i++) {
 			MorphemeAnalysisResponseDto.Morpheme morpheme = morphemes.get(i);
@@ -225,40 +273,22 @@ public class ScriptSavingService {
 				continue;
 			}
 
-			if (foundWords.size() == 1) {
-				// 1개만 있으면 SentenceWord 생성
-				Word word = foundWords.get(0);
-				SentenceWord sentenceWord = SentenceWord.builder()
-						.sentence(sentence)
-						.word(word)
-						.sequence(i + 1)
-						.build();
-				sentenceWordRepository.save(sentenceWord);
-				log.debug("[Pipeline] SentenceWord 연결 - sentenceId: {}, wordId: {}, wordKr: {}",
-						sentence.getSentenceId(), word.getWordId(), wordKr);
+			// Word를 찾았으므로 시퀀스 증가
+			wordSequence++;
 
-				// 매칭 결과 수집
-				matchingResults.add(WordMatchingResultDto.builder()
-						.sentenceSequence(sentence.getSequence())
-						.sentenceTextKo(sentence.getTextKo())
-						.wordKr(word.getWordKr())
-						.definitionKr(word.getDefinitionKr())
-						.wordVn(word.getWordVn())
-						.definitionVn(word.getDefinitionVn())
-						.matchType("SINGLE")
-						.build());
-			} else {
-				// 2개 이상(동음이의어)이면 리스트에 보관
-				HomonymWordDto homonymDto = HomonymWordDto.builder()
-						.sentence(sentence)
-						.sentenceSequence(sentence.getSequence())
-						.wordKr(wordKr)
-						.homonymWords(foundWords)
-						.build();
-				homonymList.add(homonymDto);
-				log.debug("[Pipeline] 동음이의어 발견 - wordKr: {}, 개수: {}, 문장 시퀀스: {}",
-						wordKr, foundWords.size(), sentence.getSequence());
-			}
+			// SINGLE/HOMONYM 구분 없이 모두 리스트에 추가 (LLM 검증용)
+			HomonymWordDto wordDto = HomonymWordDto.builder()
+					.sentence(sentence)
+					.sentenceSequence(sentence.getSequence())
+					.wordSequence(wordSequence)
+					.wordKr(wordKr)
+					.homonymWords(foundWords)
+					.build();
+			allWordList.add(wordDto);
+
+			String type = foundWords.size() == 1 ? "SINGLE" : "HOMONYM";
+			log.debug("[Pipeline] {} 단어 보관 - wordKr: {}, 후보: {}개, 단어 시퀀스: {}",
+					type, wordKr, foundWords.size(), wordSequence);
 		}
 	}
 
