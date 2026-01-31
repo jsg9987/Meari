@@ -64,7 +64,7 @@ export default function ChatPanel({ messages, onSendMessage, nickname, currentUs
                       : 'bg-gray-100 text-gray-900'
                   }`}
                 >
-                  <p className="text-sm break-words">{msg.message}</p>
+                  <p className="text-sm wrap-break-word">{msg.message}</p>
                 </div>
               </div>
             );
