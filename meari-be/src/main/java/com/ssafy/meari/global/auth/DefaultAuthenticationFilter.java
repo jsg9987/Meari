@@ -81,16 +81,13 @@ public class DefaultAuthenticationFilter extends AbstractAuthenticationProcessin
 
 		// Set-Cookie로 Refresh Token 설정
 		ResponseCookie cookie = ResponseCookie.from("refresh_token", refreshToken)
-			.httpOnly(true)
-			.secure(true)
-			.path("/")
-			.maxAge(Duration.ofSeconds(jwtUtil.getRefreshTokenExpireSeconds()))
-			.sameSite("Strict")
-			.build();
+				.httpOnly(true)
+				.secure(true)
+				.path("/")
+				.maxAge(Duration.ofSeconds(jwtUtil.getRefreshTokenExpireSeconds()))
+				.sameSite("Strict")
+				.build();
 		response.setHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-
-		response.setContentType("application/json;charset=UTF-8");
-		response.setStatus(HttpServletResponse.SC_OK);
 
 		// 응답 본문에 Access Token 추가
 		ApiResponse<Map<String, String>> successResponse = ApiResponse.success(Map.of("access_token", accessToken));

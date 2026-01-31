@@ -85,11 +85,7 @@ b2fb1f6 [BE] feat(room): 방 상태 관리 API 추가
 - [ ] 문장별 턴 할당 및 알림
 - [ ] Round 진행 상태 관리
 
-### Issue 7: 채팅 기능
-- [ ] WebSocket `/topic/room/{roomId}/chat` 구현
-- [ ] 채팅 메시지 브로드캐스트
-
-### Issue 8: 음성 녹음 및 분석 연동
+### Issue 7: 음성 녹음 및 분석 연동
 - [ ] S3 업로드 API
 - [ ] RabbitMQ 메시지 발행
 - [ ] 분석 결과 수신 및 Redis 저장

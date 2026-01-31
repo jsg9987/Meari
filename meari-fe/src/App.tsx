@@ -6,10 +6,12 @@ import './App.css';
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
+  const fetchUserInfo = useAuthStore((state) => state.fetchUserInfo);
 
   useEffect(() => {
     checkAuth();
-  }, [checkAuth]);
+    fetchUserInfo();
+  }, [checkAuth, fetchUserInfo]);
 
   return (
     <BrowserRouter>

@@ -91,12 +91,12 @@ const Signup = () => {
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 flex flex-col lg:flex-row items-center justify-center">
+                <div className="flex-1 flex flex-col lg:flex-row items-center justify-center pl-15">
 
                     {/* Signup Card */}
                     <div
                         className={
-                            'w-full max-w-[450px] rounded-xl border border-[#bebebe] bg-white p-6 sm:p-10 ' +
+                            'w-full max-w-[450px] rounded-xl border border-[#bebebe] bg-white p-8 sm:p-10 ' +
                             'shadow-[0_1px_2px_rgba(0,0,0,0.25)]' +
                             'transition-opacity duration-200'
                         }
