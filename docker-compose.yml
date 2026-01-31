@@ -157,6 +157,7 @@ services:
       AWS_SECRET_KEY: ${AWS_SECRET_KEY}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET}
       AWS_REGION: ${AWS_REGION}
+      CLOUD_AWS_S3_BUCKET: ${AWS_S3_BUCKET}
       CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
       CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ${AWS_ACCESS_KEY}
       CLOUD_AWS_CREDENTIALS_SECRET_KEY: ${AWS_SECRET_KEY}
@@ -213,6 +214,7 @@ services:
 # ============================================================
 networks:
   meari-network:
+    name: meari-network
     driver: bridge
 
 volumes:
