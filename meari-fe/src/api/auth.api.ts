@@ -63,6 +63,33 @@ export interface SignupResponse {
     } | null;
 }
 
+// --- Email/Nickname Check ---
+export interface EmailCheckResponse {
+    success: boolean;
+    data: { has_email: boolean } | null;
+    error: { code: string; message: string } | null;
+}
+
+export interface NicknameCheckResponse {
+    success: boolean;
+    data: { has_nickname: boolean } | null;
+    error: { code: string; message: string } | null;
+}
+
+const checkEmailReal = async (email: string) => {
+    const response = await axiosInstance.get<EmailCheckResponse>('/auth/email/check', {
+        params: { email },
+    });
+    return response;
+};
+
+const checkNicknameReal = async (nickname: string) => {
+    const response = await axiosInstance.get<NicknameCheckResponse>('/auth/nickname/check', {
+        params: { nickname },
+    });
+    return response;
+};
+
 const signupMock = async (credentials: SignupCredentials) => {
     console.log('[API] Mock Signup Requested:', credentials);
     return new Promise((resolve, reject) => {
@@ -100,6 +127,34 @@ const signupMock = async (credentials: SignupCredentials) => {
 const signupReal = async (credentials: SignupCredentials) => {
     const response = await axiosInstance.post<SignupResponse>('/auth/signup', credentials);
     return response;
+};
+
+const checkEmailMock = async (email: string) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                data: {
+                    success: true,
+                    data: { has_email: email === "user@gmail.com" },
+                    error: null,
+                },
+            });
+        }, 300);
+    });
+};
+
+const checkNicknameMock = async (nickname: string) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                data: {
+                    success: true,
+                    data: { has_nickname: nickname === "김싸피" },
+                    error: null,
+                },
+            });
+        }, 300);
+    });
 };
 
 // --- Get User Info ---
@@ -148,5 +203,7 @@ const useMock = apiConfig.shouldMock('AUTH');
 export const login = useMock ? loginMock : loginReal;
 export const signup = useMock ? signupMock : signupReal;
 export const getUserInfo = useMock ? getUserInfoMock : getUserInfoReal;
+export const checkEmail = useMock ? checkEmailMock : checkEmailReal;
+export const checkNickname = useMock ? checkNicknameMock : checkNicknameReal;
 
 console.log(`[AuthAPI] Initialized. Mode: ${useMock ? 'MOCK' : 'REAL'}`);

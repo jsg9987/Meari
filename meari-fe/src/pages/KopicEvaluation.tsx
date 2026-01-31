@@ -5,6 +5,7 @@ import logoWhite from '../assets/images/common/logo-white.svg'
 import {
     getKopicSentences,
     submitKopicAnswer,
+    createKopicTotalReport,
     type KopicSentence,
     type KopicReportItem,
 } from '../api/kopic.api'
@@ -15,6 +16,7 @@ export const kopicSessionData = {
     themeId: 0,
     themeName: '',
     themeImageUrl: '',
+    kopicTotalReportId: 0,
     analysisPromises: [] as Promise<KopicReportItem>[],
     sentences: [] as KopicSentence[],
 }
@@ -24,6 +26,7 @@ const clearKopicSession = () => {
     kopicSessionData.themeId = 0
     kopicSessionData.themeName = ''
     kopicSessionData.themeImageUrl = ''
+    kopicSessionData.kopicTotalReportId = 0
     kopicSessionData.analysisPromises = []
     kopicSessionData.sentences = []
 }
@@ -86,6 +89,7 @@ export default function KopicEvaluation() {
 
             try {
                 setIsLoading(true)
+                const totalReportRes = await createKopicTotalReport(Number(themeId))
                 const [sentencesRes, themesRes] = await Promise.all([
                     getKopicSentences(Number(themeId)),
                     getThemes(),
@@ -103,6 +107,9 @@ export default function KopicEvaluation() {
                         kopicSessionData.themeName = foundTheme.name
                         kopicSessionData.themeImageUrl = foundTheme.theme_url
                     }
+                }
+                if (totalReportRes.data.success && totalReportRes.data.data) {
+                    kopicSessionData.kopicTotalReportId = totalReportRes.data.data.kopic_total_report_id
                 }
             } catch (error) {
                 console.error('Failed to load data:', error)
@@ -165,6 +172,7 @@ export default function KopicEvaluation() {
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
 
                 const analysisPromise = submitKopicAnswer(
+                    kopicSessionData.kopicTotalReportId,
                     currentSentence.kopic_sentence_id,
                     audioBlob,
                     currentSentence.text_ko

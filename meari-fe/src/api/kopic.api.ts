@@ -39,6 +39,7 @@ export interface GetKopicSentencesResponse {
 }
 
 export interface KopicAnalyzeRequest {
+    kopic_total_report_id: number;
     kopic_sentence_id: number;
     audio_url: string;
 }
@@ -46,6 +47,38 @@ export interface KopicAnalyzeRequest {
 export interface KopicAnalyzeApiResponse {
     success: boolean;
     data: KopicAnalyzeResponse;
+    error: { code: string; message: string } | null;
+}
+
+export interface KopicTotalReportItem {
+    kopic_report_id: number;
+    kopic_sentence_id: number;
+    text_ko: string;
+    accuracy: number;
+    intonation: number;
+    total_score: number;
+    detailed_analysis: KopicDetailedAnalysis | null;
+}
+
+export interface KopicTotalReportResponse {
+    success: boolean;
+    data: {
+        kopic_total_report_id: number;
+        status: 'PROCESSING' | 'COMPLETED';
+        avg_accuracy?: number | null;
+        avg_intonation?: number | null;
+        total_score?: number | null;
+        sentence_count?: number | null;
+        completed_count?: number | null;
+        total_count?: number | null;
+        report_data?: KopicTotalReportItem[] | null;
+    };
+    error: { code: string; message: string } | null;
+}
+
+export interface KopicTotalReportCreateResponse {
+    success: boolean;
+    data: { kopic_total_report_id: number };
     error: { code: string; message: string } | null;
 }
 
@@ -145,13 +178,14 @@ export const getKopicSentences = async (themeId: number) => {
         return { data: await getKopicSentencesMock(themeId) };
     }
     // URL: GET /api/v1/contents?theme_id={id}
-    const response = await axiosInstance.get<GetKopicSentencesResponse>(`/api/v1/contents`, {
+    const response = await axiosInstance.get<GetKopicSentencesResponse>(`/contents`, {
         params: { theme_id: themeId }
     });
     return response;
 };
 
 export const submitKopicAnswer = async (
+    kopicTotalReportId: number,
     sentenceId: number,
     audioBlob: Blob,
     textKo: string
@@ -172,7 +206,8 @@ export const submitKopicAnswer = async (
 
     // 2. 분석 요청
     try {
-        const response = await axiosInstance.post<KopicAnalyzeApiResponse>(`/api/v1/kopic/report`, {
+        const response = await axiosInstance.post<KopicAnalyzeApiResponse>(`/kopic/evaluate`, {
+            kopic_total_report_id: kopicTotalReportId,
             kopic_sentence_id: sentenceId,
             audio_url: fakeAudioUrl
         });
@@ -203,4 +238,19 @@ export const submitKopicAnswer = async (
             detailed_analysis: null
         };
     }
+};
+
+// ===== total-report 생성 =====
+export const createKopicTotalReport = async (themeId: number) => {
+    // POST /api/v1/kopic/total-report
+    const response = await axiosInstance.post<KopicTotalReportCreateResponse>(`/kopic/total-report`, {
+        theme_id: themeId,
+    });
+    return response;
+};
+
+// ===== total-report 조회(진행률/최종 결과) =====
+export const getKopicTotalReport = async (totalReportId: number) => {
+    const response = await axiosInstance.get<KopicTotalReportResponse>(`/kopic/total-report/${totalReportId}`);
+    return response;
 };
