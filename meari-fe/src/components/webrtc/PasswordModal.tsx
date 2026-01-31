@@ -9,6 +9,8 @@ interface PasswordModalProps {
   errorMessage?: string;
 }
 
+// TODO: 비밀번호 모달 UI 수정
+
 export default function PasswordModal({ roomTitle, onSubmit, onCancel, errorMessage }: PasswordModalProps) {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

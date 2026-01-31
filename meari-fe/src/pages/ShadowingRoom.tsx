@@ -130,9 +130,7 @@ export default function ShadowingRoom() {
   // 오디오 레코더
   const { startRecording, stopRecording } = useAudioRecorder({
     onRecordingComplete: (audioBlob) => {
-      console.log('[ShadowingRoom] onRecordingComplete callback fired');
       const sentenceId = currentRecordingSentenceIdRef.current;
-      console.log('[ShadowingRoom] currentRecordingSentenceIdRef.current:', sentenceId);
       if (sentenceId !== null) {
         handleRecordingComplete(audioBlob, sentenceId);
         // 업로드 완료 후 sentenceId 초기화
@@ -184,13 +182,9 @@ export default function ShadowingRoom() {
       }
     },
     onRolePick: async (message) => {
-      console.log('Role pick received:', message);
-
       // store에서 최신 content_id 직접 가져오기 (클로저 문제 해결)
       const storeContentId = useRoomStore.getState().contentId;
       const currentContentId = storeContentId || message.content_id || selectedContent?.content_id;
-
-      console.log('DEBUG - currentContentId:', currentContentId, 'from store:', storeContentId);
 
       if (!currentContentId) {
         console.error('No content_id available to fetch roles');
@@ -210,7 +204,6 @@ export default function ShadowingRoom() {
             updated_at: new Date().toISOString(),
           }));
 
-          console.log('Roles fetched from API:', roles);
           setAvailableRoles(roles);
           setIsRoleSelectOpen(true);
         } else {
@@ -223,7 +216,6 @@ export default function ShadowingRoom() {
       }
     },
     onRoleAssigned: (message) => {
-      console.log('Role assigned:', message);
       // 역할 선점 성공 시 선택된 역할 ID 저장 (아직 확정은 아님)
       if (message.role_id && message.member_id) {
         setMySelectedRole(message.role_id);
@@ -261,8 +253,6 @@ export default function ShadowingRoom() {
         // 시작 시간순으로 정렬
         allSubtitles.sort((a, b) => a.start_time - b.start_time);
         timeIndexedSubtitlesRef.current = allSubtitles;
-
-        console.log('Time-indexed subtitles prepared:', allSubtitles);
       }
 
       // 게임 시작 시 즉시 영상 재생
@@ -394,7 +384,7 @@ export default function ShadowingRoom() {
         setRoomData(response.data.data);
 
         // 방장이면 enterRoom API 호출 없이 바로 입장
-        if (isOwner) {
+        if (userInfo?.memberId === response.data.data.owner_id) {
           setIsEntered(true);
         } else {
           // 비밀번호가 있는 방이면 비밀번호 모달 표시
@@ -427,7 +417,7 @@ export default function ShadowingRoom() {
     };
 
     fetchRoomDetail();
-  }, [roomId, navigate, setRoomData]);
+  }, [roomId, navigate, setRoomData, userInfo?.memberId]);
 
   // 방 퇴장 처리 (컴포넌트 언마운트 시)
   useEffect(() => {
