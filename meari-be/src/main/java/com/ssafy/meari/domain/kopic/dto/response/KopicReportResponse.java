@@ -32,9 +32,6 @@ public class KopicReportResponse {
     @Schema(description = "정확도 점수", example = "85")
     private Integer accuracy;
 
-    @Schema(description = "억양 점수", example = "80")
-    private Integer intonation;
-
     @Schema(description = "분석 상태", example = "COMPLETED")
     private String status;
 
@@ -59,7 +56,6 @@ public class KopicReportResponse {
                 .sentenceId(report.getKopicSentence().getKopicSentenceId())
                 .textKo(report.getKopicSentence().getTextKo())
                 .accuracy(report.getAccuracy())
-                .intonation(report.getIntonation())
                 .status(report.getStatus().name())
                 .detailedAnalysis(analysisMap)
                 .build();
