@@ -10,6 +10,8 @@ import java.util.List;
 
 public interface SentenceRepository extends JpaRepository<Sentence, Long> {
 
+    List<Sentence> findByContent(Content content);
+
     List<Sentence> findByContent_ContentId(Long contentId);
 
     @Query(value = "SELECT * FROM sentence ORDER BY RAND() LIMIT :count", nativeQuery = true)
