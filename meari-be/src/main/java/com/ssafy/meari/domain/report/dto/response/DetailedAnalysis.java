@@ -55,6 +55,9 @@ public class DetailedAnalysis {
 
         @Schema(description = "오류 목록")
         private List<ErrorDetail> errors;
+
+        @Schema(description = "억양 분석 결과")
+        private IntonationAnalysis intonation;
     }
 
     @Schema(description = "오류 상세")
@@ -84,6 +87,33 @@ public class DetailedAnalysis {
         private String description;
     }
 
+    @Schema(description = "억양 분석 결과")
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public static class IntonationAnalysis {
+
+        @Schema(description = "억양 점수", example = "85")
+        private Integer score;
+
+        @Schema(description = "정답 pitch 배열")
+        private List<Double> referencePitch;
+
+        @Schema(description = "사용자 pitch 배열")
+        private List<Double> userPitch;
+
+        @Schema(description = "시간 프레임 (초)")
+        private List<Double> timeFrames;
+
+        @Schema(description = "DTW 매핑 경로")
+        private List<List<Integer>> dtwPath;
+
+        @Schema(description = "피드백 메시지", example = "억양이 매우 자연스럽습니다!")
+        private String feedback;
+    }
+
     @Schema(description = "전체 요약")
     @Getter
     @NoArgsConstructor
@@ -103,5 +133,8 @@ public class DetailedAnalysis {
 
         @Schema(description = "평균 신뢰도", example = "0.9234")
         private Double averageConfidence;
+
+        @Schema(description = "평균 억양 점수", example = "85")
+        private Integer averageIntonation;
     }
 }

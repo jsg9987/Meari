@@ -88,6 +88,7 @@ public class AnalysisProducer {
                     .textKo(sentence.getTextKo())
                     .startTime(sentence.getStartTime().doubleValue())
                     .endTime(sentence.getEndTime().doubleValue())
+                    .referenceAudioKey(sentence.getReferenceAudioKey())
                     .build();
 
             sentences.add(info);
