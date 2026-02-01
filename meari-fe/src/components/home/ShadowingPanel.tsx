@@ -118,7 +118,6 @@ const ShadowingPanel = () => {
   // 무한 스크롤 Observer 설정
   useEffect(() => {
     if (!observerTarget.current || !hasNext || isFetchingNextPage || isInitialLoading) {
-      console.log('⏭️ Observer 설정 스킵:', { hasObserverTarget: !!observerTarget.current, hasNext, isFetchingNextPage, isInitialLoading })
       return
     }
 

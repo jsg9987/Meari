@@ -398,34 +398,6 @@ export default function ShadowingRoom() {
     fetchRoomDetail();
   }, [roomId, navigate, setRoomData, userInfo?.memberId]);
 
-  // 방 퇴장 처리 (컴포넌트 언마운트 시)
-  useEffect(() => {
-    return () => {
-      if (roomId && isEntered) {
-        leaveRoom(Number(roomId)).catch((error) => {
-          console.error('Failed to leave room:', error);
-        });
-        clearRoomData();
-      }
-    };
-  }, [roomId, isEntered, clearRoomData]);
-
-  // 브라우저 닫기/새로고침 시 퇴장 처리
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (roomId && isEntered) {
-        leaveRoom(Number(roomId)).catch((error) => {
-          console.error('Failed to leave room on unload:', error);
-        });
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [roomId, isEntered]);
-
   // 대본 데이터는 WebSocket ROLES_CONFIRMED 메시지로 받아서 roleSegments에 저장됨
 
   // 카운트다운 처리
@@ -807,11 +779,18 @@ export default function ShadowingRoom() {
     isOwner
   });
 
+  // leave 함수의 안정적 참조 (useEffect deps 재실행 방지)
+  const leaveRef = useRef(leave);
+  useEffect(() => {
+    leaveRef.current = leave;
+  }, [leave]);
+
   const [volume, setVolume] = useState(100);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
   const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
 
   const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
 
@@ -840,6 +819,48 @@ export default function ShadowingRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEntered, roomId, status]);
 
+  // 브라우저 뒤로가기 감지 및 처리
+  useEffect(() => {
+    const handlePopState = async () => {
+      if (roomId && isEntered && !isLeaving) {
+        // 뒤로가기 방지 (일단 현재 위치 유지)
+        window.history.pushState(null, '', window.location.href);
+
+        // leave 완료 후 이동
+        await handleLeaveInternal();
+      }
+    };
+
+    // 초기 진입 시 히스토리 스택에 현재 위치 추가 (뒤로가기 감지용)
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [roomId, isEntered, isLeaving]);
+
+  // 방 퇴장 처리 (컴포넌트 언마운트 시 - 강제 종료 대비)
+  useEffect(() => {
+    return () => {
+      // useVideoRoom의 cleanup에서 미디어 트랙 정리가 이미 처리됨
+      // 여기서는 추가 정리 작업 없음
+    };
+  }, []);
+
+  // 브라우저 닫기/새로고침 시 퇴장 처리
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // useVideoRoom의 cleanup에서 미디어 트랙 정리가 자동으로 처리됨
+      // 백엔드는 WebSocket 연결 해제로 자동 정리됨
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
   if (!roomId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-gray-50">
@@ -854,21 +875,39 @@ export default function ShadowingRoom() {
     );
   }
 
-  const handleLeave = async () => {
-    if (roomId) {
-      try {
-        setIsEntered(false); // useEffect 재실행 방지를 위해 먼저 입장 상태 해제
-        await leave(); // 카메라/마이크 즉시 종료 및 세션 정리
+  // 내부 leave 처리 함수 (뒤로가기/나가기 버튼 공통)
+  const handleLeaveInternal = async () => {
+    if (isLeaving) return; // 이미 처리 중이면 무시
+
+    setIsLeaving(true);
+    setIsEntered(false); // useEffect 재실행 방지
+
+    try {
+      if (roomId) {
+        // 1. OpenVidu 세션 정리 (카메라/마이크 즉시 종료)
+        await leaveRef.current();
+
+        // 2. 방 퇴장 API 호출 (완료 대기)
         await leaveRoom(Number(roomId));
+
+        // 3. 로컬 데이터 정리
         clearRoomData();
-        navigate("/"); // 모든 정리 완료 후 이동
-      } catch (error) {
-        console.error('Failed to leave room:', error);
-        navigate("/"); // 에러 발생해도 페이지 이동
       }
-    } else {
-      navigate("/");
+
+      // 4. 모든 정리 완료 후 홈으로 이동
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error('Failed to leave room:', error);
+      // 에러 발생해도 페이지 이동
+      navigate("/", { replace: true });
+    } finally {
+      setIsLeaving(false);
     }
+  };
+
+  // 나가기 버튼 클릭 핸들러
+  const handleLeave = () => {
+    handleLeaveInternal();
   };
 
   const handleCopyPassword = async () => {

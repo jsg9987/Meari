@@ -228,13 +228,11 @@ export function useVideoRoom({
 
   const publishStream = useCallback(() => {
     if (!session || !publisherRef.current) {
-      console.warn('Cannot publish: session or publisher not ready');
       return;
     }
 
     try {
       session.publish(publisherRef.current);
-      console.log('Stream published successfully');
     } catch (error) {
       console.error('Failed to publish stream:', error);
       setError('스트림 전송에 실패했습니다');
@@ -244,38 +242,59 @@ export function useVideoRoom({
   const leave = useCallback(async () => {
     // 먼저 미디어 트랙 즉시 정리 (카메라/마이크 바로 끄기)
     const currentPublisher = publisherRef.current || publisher;
+    const currentSession = session;
+
     if (currentPublisher) {
+      // 1. Publisher의 audio/video 끄기
+      try {
+        currentPublisher.publishAudio(false);
+        currentPublisher.publishVideo(false);
+      } catch {
+        // 이미 종료된 경우 무시
+      }
+
+      // 2. Session에서 unpublish
+      if (currentSession) {
+        try {
+          currentSession.unpublish(currentPublisher);
+        } catch {
+          // 이미 unpublish된 경우 무시
+        }
+      }
+
+      // 3. MediaStream의 모든 트랙 정리
       const stream = currentPublisher.stream?.getMediaStream();
       if (stream) {
-        console.log("스트림 정리 - 카메라/마이크 즉시 종료");
         stream.getTracks().forEach(track => {
           track.stop();
         });
       }
     }
 
+    // 화면에서 즉시 제거 (상태 초기화)
+    ovRef.current = null;
+    setPublisher(null);
+    publisherRef.current = null;
+    setSubscribers([]);
+    statusRef.current = "idle";
+    setStatus("idle");
+    setError(null);
+    setIsAudioEnabled(true);
+    setIsVideoEnabled(true);
+
     try {
-      // OpenVidu 세션 종료
+      // 백엔드 세션 삭제 (모든 연결이 자동으로 끊어짐)
       if (backendSessionId) {
         await deleteSession(backendSessionId);
       }
-      session?.disconnect();
+      // session.disconnect()는 호출 불필요 - 백엔드에서 세션 삭제 시 자동 처리됨
     } catch (error) {
-      console.error('Failed to leave WebRTC:', error);
+      console.error('[useVideoRoom] Failed to leave WebRTC:', error);
     } finally {
-      ovRef.current = null;
       setSession(null);
-      setPublisher(null);
-      publisherRef.current = null;
-      setSubscribers([]);
       setBackendSessionId(null);
-      statusRef.current = "idle";
-      setStatus("idle");
-      setError(null);
-      setIsAudioEnabled(true);
-      setIsVideoEnabled(true);
     }
-  }, [session, publisher, backendSessionId]);
+  }, [publisher, session, backendSessionId]);
 
   const toggleAudio = useCallback(() => {
     if (!publisher) return;
