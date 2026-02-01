@@ -1,6 +1,7 @@
 package com.ssafy.meari.domain.content.controller;
 
 import com.ssafy.meari.domain.content.dto.response.ContentListResponse;
+import com.ssafy.meari.domain.content.dto.response.QuizResponseDto;
 import com.ssafy.meari.domain.content.dto.response.RoleListResponse;
 import com.ssafy.meari.domain.content.dto.response.ThemeListResponse;
 import com.ssafy.meari.domain.content.service.ContentService;
@@ -16,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -85,6 +87,25 @@ public class ContentController {
         List<RoleListResponse> roles = contentService.getRolesByContent(contentId);
 
         return ResponseEntity.ok(ApiResponse.success(roles));
+    }
+
+    /**
+     * 문장 순서 맞추기 퀴즈 조회
+     */
+    @GetMapping("/quiz")
+    @Operation(
+            summary = "문장 순서 맞추기 퀴즈",
+            description = "랜덤 문장을 가져와 띄어쓰기 기준으로 단어를 쪼개고 셔플하여 반환합니다. 프론트에서 index 순서(0,1,2...)로 배치하면 정답입니다."
+    )
+    public ResponseEntity<ApiResponse<List<QuizResponseDto>>> getQuiz(
+            @Parameter(description = "퀴즈 문장 수 (1~5)", example = "5")
+            @RequestParam(defaultValue = "5") int count
+    ) {
+        log.info("문장 순서 맞추기 퀴즈 조회 요청: count={}", count);
+
+        List<QuizResponseDto> quiz = contentService.getQuiz(count);
+
+        return ResponseEntity.ok(ApiResponse.success(quiz));
     }
 
     /**

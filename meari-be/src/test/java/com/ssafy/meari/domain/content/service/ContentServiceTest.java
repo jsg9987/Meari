@@ -1,12 +1,16 @@
 package com.ssafy.meari.domain.content.service;
 
 import com.ssafy.meari.domain.content.dto.response.ContentListResponse;
+import com.ssafy.meari.domain.content.dto.response.QuizResponseDto;
+import com.ssafy.meari.domain.content.dto.response.QuizWordDto;
 import com.ssafy.meari.domain.content.dto.response.RoleListResponse;
 import com.ssafy.meari.domain.content.dto.response.ThemeListResponse;
 import com.ssafy.meari.domain.content.entity.Content;
 import com.ssafy.meari.domain.content.entity.Role;
+import com.ssafy.meari.domain.content.entity.Sentence;
 import com.ssafy.meari.domain.content.repository.ContentRepository;
 import com.ssafy.meari.domain.content.repository.RoleRepository;
+import com.ssafy.meari.domain.content.repository.SentenceRepository;
 import com.ssafy.meari.domain.theme.entity.Theme;
 import com.ssafy.meari.domain.theme.repository.ThemeRepository;
 import com.ssafy.meari.global.error.exception.BusinessException;
@@ -22,6 +26,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,6 +51,9 @@ class ContentServiceTest {
 
     @Mock
     private RoleRepository roleRepository;
+
+    @Mock
+    private SentenceRepository sentenceRepository;
 
     @Test
     @DisplayName("테마 목록 조회 - 성공")
@@ -216,5 +224,68 @@ class ContentServiceTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_CONTENT);
 
         verify(contentRepository).findById(contentId);
+    }
+
+    @Test
+    @DisplayName("퀴즈 조회 - 성공")
+    void getQuiz_Success() {
+        // Given
+        Sentence sentence1 = Sentence.builder()
+                .sentenceId(501L)
+                .textKo("어서오세요 주문 도와드릴까요")
+                .build();
+
+        Sentence sentence2 = Sentence.builder()
+                .sentenceId(502L)
+                .textKo("따뜻한 아메리카노 한잔 주세요")
+                .build();
+
+        given(sentenceRepository.findRandomSentences(2))
+                .willReturn(Arrays.asList(sentence1, sentence2));
+
+        // When
+        List<QuizResponseDto> result = contentService.getQuiz(2);
+
+        // Then
+        assertThat(result).hasSize(2);
+
+        // 첫 번째 퀴즈 검증
+        QuizResponseDto quiz1 = result.get(0);
+        assertThat(quiz1.getSentenceId()).isEqualTo(501L);
+        assertThat(quiz1.getWords()).hasSize(3);
+
+        // 셔플되어도 모든 단어와 인덱스가 포함되어 있는지 검증
+        List<String> texts1 = quiz1.getWords().stream()
+                .map(QuizWordDto::getText)
+                .collect(Collectors.toList());
+        assertThat(texts1).containsExactlyInAnyOrder("어서오세요", "주문", "도와드릴까요");
+
+        List<Integer> indices1 = quiz1.getWords().stream()
+                .map(QuizWordDto::getIndex)
+                .collect(Collectors.toList());
+        assertThat(indices1).containsExactlyInAnyOrder(0, 1, 2);
+
+        // 두 번째 퀴즈 검증
+        QuizResponseDto quiz2 = result.get(1);
+        assertThat(quiz2.getSentenceId()).isEqualTo(502L);
+        assertThat(quiz2.getWords()).hasSize(4);
+
+        verify(sentenceRepository).findRandomSentences(2);
+    }
+
+    @Test
+    @DisplayName("퀴즈 조회 - 빈 결과")
+    void getQuiz_Empty() {
+        // Given
+        given(sentenceRepository.findRandomSentences(5))
+                .willReturn(List.of());
+
+        // When
+        List<QuizResponseDto> result = contentService.getQuiz(5);
+
+        // Then
+        assertThat(result).isEmpty();
+
+        verify(sentenceRepository).findRandomSentences(5);
     }
 }

@@ -1,12 +1,15 @@
 package com.ssafy.meari.domain.content.service;
 
 import com.ssafy.meari.domain.content.dto.response.ContentListResponse;
+import com.ssafy.meari.domain.content.dto.response.QuizResponseDto;
 import com.ssafy.meari.domain.content.dto.response.RoleListResponse;
 import com.ssafy.meari.domain.content.dto.response.ThemeListResponse;
 import com.ssafy.meari.domain.content.entity.Content;
 import com.ssafy.meari.domain.content.entity.Role;
+import com.ssafy.meari.domain.content.entity.Sentence;
 import com.ssafy.meari.domain.content.repository.ContentRepository;
 import com.ssafy.meari.domain.content.repository.RoleRepository;
+import com.ssafy.meari.domain.content.repository.SentenceRepository;
 import com.ssafy.meari.domain.theme.entity.Theme;
 import com.ssafy.meari.domain.theme.repository.ThemeRepository;
 import com.ssafy.meari.global.error.exception.BusinessException;
@@ -31,6 +34,7 @@ public class ContentService {
     private final ThemeRepository themeRepository;
     private final ContentRepository contentRepository;
     private final RoleRepository roleRepository;
+    private final SentenceRepository sentenceRepository;
 
     /**
      * 테마 목록 조회
@@ -91,6 +95,19 @@ public class ContentService {
                         .contentId(content.getContentId())
                         .name(role.getName())
                         .build())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 문장 순서 맞추기 퀴즈 조회
+     */
+    public List<QuizResponseDto> getQuiz(int count) {
+        log.debug("퀴즈 조회: count={}", count);
+
+        List<Sentence> sentences = sentenceRepository.findRandomSentences(count);
+
+        return sentences.stream()
+                .map(QuizResponseDto::from)
                 .collect(Collectors.toList());
     }
 }
