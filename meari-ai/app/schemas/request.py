@@ -12,6 +12,7 @@ class SentenceAnalysisInfo(BaseModel):
     text_ko: str
     start_time: float
     end_time: float
+    reference_audio_key: str  # S3 key for reference audio
 
 
 class AnalysisRequestMessage(BaseModel):

@@ -29,6 +29,8 @@ from app.utils.korean_utils import (
     calculate_accuracy_from_syllables,
     strip_spaces
 )
+from app.utils.reference_audio_manager import reference_audio_manager
+from app.utils.intonation_analyzer import analyze_intonation
 
 logger = logging.getLogger(__name__)
 
@@ -56,33 +58,47 @@ class AnalysisService:
             f"memberId={message.member_id}, sentences={len(message.sentences)}"
         )
 
-        # 1. S3에서 모든 오디오 병렬 다운로드
-        logger.debug(f"S3 병렬 다운로드 시작: {len(message.sentences)}개 파일")
-        audio_data_list = asyncio.run(
+        # 1. S3에서 사용자 오디오 + 정답 오디오 병렬 다운로드
+        logger.debug(f"병렬 다운로드 시작: 사용자 {len(message.sentences)}개 + 정답 {len(message.sentences)}개")
+        user_audios, ref_audios = asyncio.run(
             self.download_all_audios_parallel(message.sentences)
         )
-        logger.debug("S3 병렬 다운로드 완료")
+        logger.debug("병렬 다운로드 완료")
 
         # 2. 각 문장 분석 (순차 처리)
         sentence_results = []
         total_accuracy = 0
         total_confidence = 0
+        total_intonation = 0
         valid_count = 0
 
         for idx, sentence_info in enumerate(message.sentences):
             try:
-                audio_waveform, sample_rate = audio_data_list[idx]
+                # 사용자 오디오
+                user_waveform, user_sr = user_audios[idx]
+                if user_waveform is None:
+                    raise Exception("사용자 오디오 다운로드 실패")
 
-                if audio_waveform is None:
-                    raise Exception("오디오 다운로드 실패")
+                # 정답 오디오
+                ref_waveform, ref_sr = ref_audios[idx]
+                if ref_waveform is None:
+                    raise Exception("정답 오디오 다운로드 실패")
 
                 # 음성 전처리 (16kHz 모노 변환)
-                audio_waveform = self.preprocess_audio(audio_waveform, sample_rate)
+                user_waveform = self.preprocess_audio(user_waveform, user_sr)
+                ref_waveform = self.preprocess_audio(ref_waveform, ref_sr)
 
                 # ASR 추론 + 발음 분석
                 analysis = self.detect_pronunciation_errors(
-                    audio_waveform,
+                    user_waveform,
                     sentence_info.text_ko
+                )
+
+                # 억양 분석
+                intonation_result = analyze_intonation(
+                    ref_waveform,
+                    user_waveform,
+                    user_sr
                 )
 
                 # 문장 결과 저장
@@ -94,7 +110,8 @@ class AnalysisService:
                     "mean_confidence": analysis.get("mean_confidence", 0.0),
                     "syllables": analysis.get("syllables", []),
                     "syllable_confidences": analysis.get("syllable_confidences", []),
-                    "errors": analysis.get("errors", [])
+                    "errors": analysis.get("errors", []),
+                    "intonation": intonation_result  # 억양 분석 결과 추가
                 }
 
                 # 에러 메시지 있으면 추가
@@ -106,6 +123,7 @@ class AnalysisService:
                 # 통계 누적
                 total_accuracy += analysis.get("accuracy", 0)
                 total_confidence += analysis.get("mean_confidence", 0.0)
+                total_intonation += intonation_result.get("score", 0)
                 valid_count += 1
 
                 logger.debug(
@@ -135,12 +153,14 @@ class AnalysisService:
         if valid_count > 0:
             accuracy = int(round(total_accuracy / valid_count))
             avg_confidence = total_confidence / valid_count
+            avg_intonation = int(round(total_intonation / valid_count))
         else:
             accuracy = 0
             avg_confidence = 0.0
+            avg_intonation = 0
 
-        # 억양 점수 (현재는 confidence 기반으로 계산)
-        intonation = self.calculate_intonation_score(sentence_results)
+        # 억양 점수 (각 문장의 억양 점수 평균)
+        intonation = avg_intonation
 
         # 4. detailed_analysis JSON 구성
         detailed = {
@@ -149,7 +169,8 @@ class AnalysisService:
                 "total_sentences": len(message.sentences),
                 "analyzed_sentences": valid_count,
                 "average_accuracy": accuracy,
-                "average_confidence": round(avg_confidence, 4)
+                "average_confidence": round(avg_confidence, 4),
+                "average_intonation": avg_intonation
             }
         }
 
@@ -174,36 +195,63 @@ class AnalysisService:
     async def download_all_audios_parallel(
         self,
         sentences: List[SentenceAnalysisInfo]
-    ) -> List[Tuple[Optional[torch.Tensor], int]]:
+    ) -> Tuple[List[Tuple[Optional[torch.Tensor], int]], List[Tuple[Optional[torch.Tensor], int]]]:
         """
-        모든 문장의 오디오를 S3에서 병렬로 다운로드
+        사용자 오디오 + 정답 오디오를 S3에서 병렬로 다운로드
 
         Args:
             sentences: 문장 정보 리스트
 
         Returns:
-            (waveform, sample_rate) 튜플 리스트
+            (user_audios, ref_audios) 튜플
+            - user_audios: 사용자 오디오 리스트
+            - ref_audios: 정답 오디오 리스트
             다운로드 실패 시 (None, 0) 반환
         """
-        tasks = [
-            self.download_audio_from_s3_async(sentence.audio_url, sentence.sentence_id)
-            for sentence in sentences
-        ]
+        tasks = []
 
+        # 사용자 오디오 다운로드 태스크
+        for sentence in sentences:
+            tasks.append(
+                self.download_audio_from_s3_async(sentence.audio_url, sentence.sentence_id)
+            )
+
+        # 정답 오디오 다운로드 태스크
+        for sentence in sentences:
+            tasks.append(
+                reference_audio_manager.get_reference_audio(sentence.reference_audio_key)
+            )
+
+        # 병렬 실행
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 결과 처리 (예외는 None으로 변환)
-        audio_data_list = []
-        for idx, result in enumerate(results):
+        # 결과 분리
+        n = len(sentences)
+        user_results = results[:n]
+        ref_results = results[n:]
+
+        # 예외 처리
+        user_audios = []
+        for idx, result in enumerate(user_results):
             if isinstance(result, Exception):
                 logger.error(
-                    f"문장 {sentences[idx].sentence_id} 오디오 다운로드 실패: {result}"
+                    f"문장 {sentences[idx].sentence_id} 사용자 오디오 다운로드 실패: {result}"
                 )
-                audio_data_list.append((None, 0))
+                user_audios.append((None, 0))
             else:
-                audio_data_list.append(result)
+                user_audios.append(result)
 
-        return audio_data_list
+        ref_audios = []
+        for idx, result in enumerate(ref_results):
+            if isinstance(result, Exception):
+                logger.error(
+                    f"문장 {sentences[idx].sentence_id} 정답 오디오 다운로드 실패: {result}"
+                )
+                ref_audios.append((None, 0))
+            else:
+                ref_audios.append(result)
+
+        return user_audios, ref_audios
 
     async def download_audio_from_s3_async(
         self,
