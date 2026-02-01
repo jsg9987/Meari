@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import RoomCard from './RoomCard'
-import PasswordModal from './PasswordModal'
+import PasswordModal from '../webrtc/PasswordModal'
 import CreateRoomButton from './CreateRoomButton'
 import { getRooms, joinRoom, type RoomItem } from '../../api/rooms.api'
 import { getThemes, type Theme } from '../../api/contents.api'
 
 // 테마 목록은 API를 통해 가져옵니다.
 
+// TODO: useEffect 4번 호출 버그 수정
 const ShadowingPanel = () => {
   const navigate = useNavigate()
   const [themes, setThemes] = useState<string[]>(['전체'])
   const [themeData, setThemeData] = useState<Theme[]>([])
   const [selectedTheme, setSelectedTheme] = useState<string>('전체')
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState('')
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isFetchingNextPage, setIsFetchingNextPage] = useState(false)
@@ -21,15 +23,19 @@ const ShadowingPanel = () => {
   const [hasNext, setHasNext] = useState(true)
 
   const observerTarget = useRef<HTMLDivElement>(null)
+  const minLoadingTimeRef = useRef<number | null>(null)
 
   // 비밀번호 모달 상태
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
   const [selectedRoomId, setSelectedRoomId] = useState<number | string | null>(null)
+  const [selectedRoomTitle, setSelectedRoomTitle] = useState<string>('')
 
   // 방 목록 불러오기 함수
   const fetchRooms = useCallback(async (isFirstPage: boolean = false) => {
     if (isFirstPage) {
       setIsInitialLoading(true)
+      // 스켈레톤 최소 노출 시간 시작
+      minLoadingTimeRef.current = Date.now()
     } else {
       if (!hasNext || isFetchingNextPage) return
       setIsFetchingNextPage(true)
@@ -46,21 +52,33 @@ const ShadowingPanel = () => {
         size: 16
       });
 
-      if (response.success && response.data) {
-        const newRooms = response.data.contents;
+      if (response.data.success && response.data.data) {
+        const newRooms = response.data.data.contents;
+
+        // 첫 페이지 로딩 시 최소 300ms 보장
+        if (isFirstPage && minLoadingTimeRef.current) {
+          const elapsedTime = Date.now() - minLoadingTimeRef.current
+          const remainingTime = Math.max(0, 300 - elapsedTime)
+
+          if (remainingTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, remainingTime))
+          }
+        }
+
         if (isFirstPage) {
           setRooms(newRooms);
         } else {
           setRooms(prev => [...prev, ...newRooms]);
         }
-        setNextCursor(response.data.next_cursor);
-        setHasNext(response.data.has_next);
+        setNextCursor(response.data.data.next_cursor);
+        setHasNext(response.data.data.has_next);
       }
     } catch (error) {
       console.error('Failed to fetch rooms:', error)
     } finally {
       setIsInitialLoading(false)
       setIsFetchingNextPage(false)
+      minLoadingTimeRef.current = null
     }
   }, [selectedTheme, themeData, nextCursor, hasNext, isFetchingNextPage])
 
@@ -81,16 +99,27 @@ const ShadowingPanel = () => {
     loadThemes()
   }, [])
 
-  // 테마/검색어 변경 시 초기화
+  // 검색어 디바운싱 (500ms)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchKeyword(searchKeyword)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchKeyword])
+
+  // 테마/디바운스된 검색어 변경 시 초기화
   useEffect(() => {
     setNextCursor(null)
     setHasNext(true)
     fetchRooms(true)
-  }, [selectedTheme, searchKeyword])
+  }, [selectedTheme, debouncedSearchKeyword])
 
   // 무한 스크롤 Observer 설정
   useEffect(() => {
-    if (!observerTarget.current || !hasNext || isFetchingNextPage || isInitialLoading) return
+    if (!observerTarget.current || !hasNext || isFetchingNextPage || isInitialLoading) {
+      return
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -102,13 +131,16 @@ const ShadowingPanel = () => {
     )
 
     observer.observe(observerTarget.current)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+    }
   }, [fetchRooms, hasNext, isFetchingNextPage, isInitialLoading])
 
   // 방 클릭 핸들러
   const handleRoomClick = (room: RoomItem) => {
     if (room.has_password) {
       setSelectedRoomId(room.room_id)
+      setSelectedRoomTitle(room.title)
       setIsPasswordModalOpen(true)
     } else {
       navigate(`/shadowing/${room.room_id}`)
@@ -119,18 +151,15 @@ const ShadowingPanel = () => {
   const handlePasswordSubmit = async (password: string) => {
     if (!selectedRoomId) return
 
-    try {
-      const response = await joinRoom({
-        room_id: selectedRoomId as number,
-        password,
-      })
-      if (response.success) {
-        setIsPasswordModalOpen(false)
-        navigate(`/shadowing/${selectedRoomId}`)
-      }
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { error?: { message?: string } } } }
-      alert(err.response?.data?.error?.message || '입장에 실패했습니다.')
+    const response = await joinRoom({
+      room_id: selectedRoomId as number,
+      password,
+    })
+    if (response.data.success) {
+      setIsPasswordModalOpen(false)
+      navigate(`/shadowing/${selectedRoomId}`)
+    } else {
+      throw new Error('비밀번호가 일치하지 않습니다.')
     }
   }
 
@@ -194,7 +223,23 @@ const ShadowingPanel = () => {
 
       {/* 방 목록 그리드 */}
       {isInitialLoading ? (
-        <div className='text-center py-20 text-gray-500'>로딩 중...</div>
+        <div className='grid grid-cols-4 gap-x-[18px] gap-y-[24px]'>
+          {[...Array(4)].map((_, index) => (
+            <div key={index} className='bg-white rounded-lg overflow-hidden shadow-md border border-gray-100'>
+              {/* 썸네일 스켈레톤 */}
+              <div className='aspect-video animate-shimmer' />
+              {/* 정보 스켈레톤 */}
+              <div className='p-4 space-y-3'>
+                <div className='h-5 animate-shimmer rounded' />
+                <div className='h-4 animate-shimmer rounded w-4/5' />
+                <div className='flex items-center justify-between pt-2'>
+                  <div className='h-4 animate-shimmer rounded w-16' />
+                  <div className='h-4 animate-shimmer rounded w-12' />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : rooms.length === 0 ? (
         <div className='text-center py-20 text-gray-500'>방이 없습니다.</div>
       ) : (
@@ -218,11 +263,13 @@ const ShadowingPanel = () => {
       )}
 
       {/* 비밀번호 모달 */}
-      <PasswordModal
-        isOpen={isPasswordModalOpen}
-        onClose={() => setIsPasswordModalOpen(false)}
-        onSubmit={handlePasswordSubmit}
-      />
+      {isPasswordModalOpen && (
+        <PasswordModal
+          roomTitle={selectedRoomTitle}
+          onCancel={() => setIsPasswordModalOpen(false)}
+          onSubmit={handlePasswordSubmit}
+        />
+      )}
     </section>
   )
 }

@@ -7,7 +7,6 @@ import static org.mockito.BDDMockito.doNothing;
 import static org.mockito.BDDMockito.never;
 import static org.mockito.BDDMockito.verify;
 import static org.mockito.BDDMockito.when;
-import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.anyString;
 
 import java.time.LocalDateTime;
@@ -23,7 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
-import com.ssafy.meari.domain.room.dto.websocket.ChatMessage;
+import com.ssafy.meari.domain.room.dto.websocket.ChatMessageRequest;
 import com.ssafy.meari.domain.room.entity.Chat;
 import com.ssafy.meari.domain.room.repository.ChatRepository;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
@@ -55,13 +54,13 @@ class RoomWebSocketControllerTest {
 
     @Nested
     @DisplayName("채팅 메시지")
-    class ChatMessageTest {
+    class ChatMessageRequestTest {
 
         @Test
         @DisplayName("성공 - 채팅 메시지 전송 및 저장")
         void chat_Success() {
             // Given
-            ChatMessage message = ChatMessage.builder()
+            ChatMessageRequest message = ChatMessageRequest.builder()
                     .senderId(testMemberId)
                     .nickname("테스터")
                     .message("안녕하세요!")
@@ -94,7 +93,7 @@ class RoomWebSocketControllerTest {
         @DisplayName("성공 - 채팅 메시지 저장 시 올바른 데이터 전달")
         void chat_Success_CorrectDataSaved() {
             // Given
-            ChatMessage message = ChatMessage.builder()
+            ChatMessageRequest message = ChatMessageRequest.builder()
                     .senderId(testMemberId)
                     .nickname("테스터")
                     .message("테스트 메시지")
@@ -129,7 +128,7 @@ class RoomWebSocketControllerTest {
         @DisplayName("실패 - 저장 실패 시 브로드캐스트 안됨")
         void chat_Fail_SaveException() {
             // Given
-            ChatMessage message = ChatMessage.builder()
+            ChatMessageRequest message = ChatMessageRequest.builder()
                     .senderId(testMemberId)
                     .nickname("테스터")
                     .message("안녕하세요!")

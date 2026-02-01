@@ -128,7 +128,7 @@ services:
       - spring-api
 
   # ============================================================
-  # 6. Spring Boot API - 메인 백엔드 서버
+  # 6. Spring Boot API - 메인 백엔드 서버.
   # ============================================================
   spring-api:
     image: backend-image:latest

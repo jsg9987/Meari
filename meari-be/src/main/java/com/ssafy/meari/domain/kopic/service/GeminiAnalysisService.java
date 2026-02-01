@@ -45,20 +45,28 @@ public class GeminiAnalysisService {
     }
 
     private static final String SYSTEM_PROMPT = """
-            당신은 한국어 발음 분석 전문가입니다.
-            사용자가 한국어 문장을 따라 읽은 음성을 분석하여 정확도와 억양을 평가합니다.
+            ## 역할
+            너는 외국인을 위한 전문 한국어 발음 교정 AI 가이드야. 사용자가 제공한 질문(텍스트)과 답변(음성)을 비교하여, 발음의 정확도와 자연스러움을 분석하고 피드백을 제공해야 해.
 
-            평가 기준:
-            - accuracy (정확도, 0~100): 원문과 발음의 일치도. 음절 누락, 대체, 삽입 등을 고려합니다.
-            - intonation (억양, 0~100): 자연스러운 한국어 억양과의 유사도. 높낮이, 강세, 리듬을 고려합니다.
+            ## 지시 사항
+            1. **음성 분석**: 사용자의 음성을 듣고, 실제 발음한 그대로를 텍스트로 변환해(잘못 발음한 부분도 그대로 반영).
+            2. **문장 유추**: 사용자가 의도했을 '정답 문장'이 무엇인지 문맥상 유추해서 확정해.
+            3. **상세 비교**: 문장 단위로 끊어서 분석하고, 특히 발음이 어색하거나 틀린 단어를 찾아내.
+            4. **평가 불가 판정**: 음성이 너무 짧거나, 소리가 너무 작거나, 잡음만 있어서 의미 있는 발화가 감지되지 않으면 accuracy를 0점으로 주고 detailed_analysis의 각 feedback 필드에 평가 불가 사유를 명시해.
+            5. **결과 출력**: 반드시 아래 지정된 JSON 형식으로만 응답해. 다른 텍스트는 절대 포함하지 마.
 
-            반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요:
+            ## JSON 결과 규격
             {
               "accuracy": 0~100 정수,
-              "intonation": 0~100 정수,
-              "missed_point": "틀리거나 부자연스러운 부분에 대한 구체적인 설명 (한국어)",
-              "correction": "올바른 표현 또는 발음 교정 (한국어)",
-              "tip": "발음 개선을 위한 실용적인 팁 (한국어)"
+              "detailed_analysis": {
+                "original_sentence": "사용자가 발음한 그대로의 텍스트 (오류 포함, 평가 불가 시 빈 문자열)",
+                "target_sentence": "교정된 정답 문장",
+                "feedback": {
+                  "missed_point": "발음에서 아쉬운 점 (평가 불가 시 사유 명시)",
+                  "correction": "어떻게 발음해야 하는지에 대한 피드백 (평가 불가 시 사유 명시)",
+                  "tip": "더 자연스럽게 들리기 위한 고급 발음 팁 (평가 불가 시 사유 명시)"
+                }
+              }
             }
             """;
 
@@ -95,19 +103,13 @@ public class GeminiAnalysisService {
             JsonNode jsonNode = objectMapper.readTree(jsonResponse);
 
             int accuracy = jsonNode.get("accuracy").asInt();
-            int intonation = jsonNode.get("intonation").asInt();
 
-            String detailedAnalysis = objectMapper.writeValueAsString(
-                    objectMapper.createObjectNode()
-                            .put("missed_point", jsonNode.get("missed_point").asText())
-                            .put("correction", jsonNode.get("correction").asText())
-                            .put("tip", jsonNode.get("tip").asText())
-            );
+            String detailedAnalysis = objectMapper.writeValueAsString(jsonNode.get("detailed_analysis"));
 
-            report.updateAnalysisResult(accuracy, intonation, detailedAnalysis);
+            report.updateAnalysisResult(accuracy, detailedAnalysis);
             kopicReportRepository.save(report);
 
-            log.debug("Gemini 분석 완료: reportId={}, accuracy={}, intonation={}", kopicReportId, accuracy, intonation);
+            log.debug("Gemini 분석 완료: reportId={}, accuracy={}", kopicReportId, accuracy);
 
             kopicAggregationService.tryAggregate(kopicTotalReportId);
 

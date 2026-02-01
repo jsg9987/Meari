@@ -47,9 +47,6 @@ public class KopicReport extends BaseEntity {
     @Column(name = "accuracy")
     private Integer accuracy;
 
-    @Column(name = "intonation")
-    private Integer intonation;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "detailed_analysis", columnDefinition = "jsonb", nullable = true)
     private String detailedAnalysis;
@@ -67,10 +64,9 @@ public class KopicReport extends BaseEntity {
         this.status = status;
     }
 
-    public void updateAnalysisResult(Integer accuracy, Integer intonation, String detailedAnalysis) {
+    public void updateAnalysisResult(Integer accuracy, String detailedAnalysis) {
         this.accuracy = accuracy;
-        this.intonation = intonation;
-        this.totalScore = (accuracy + intonation) / 2;
+        this.totalScore = accuracy;
         this.detailedAnalysis = detailedAnalysis;
         this.status = ReportStatus.COMPLETED;
     }

@@ -32,9 +32,6 @@ public class KopicTotalReport extends BaseEntity {
     @Column(name = "avg_accuracy")
     private Integer avgAccuracy;
 
-    @Column(name = "avg_intonation")
-    private Integer avgIntonation;
-
     @Column(name = "total_score")
     private Integer totalScore;
 
@@ -57,14 +54,12 @@ public class KopicTotalReport extends BaseEntity {
         this.reportData = "[]";
         this.sentenceCount = 0;
         this.avgAccuracy = 0;
-        this.avgIntonation = 0;
         this.totalScore = 0;
     }
 
-    public void updateAggregation(Integer avgAccuracy, Integer avgIntonation, Integer totalScore,
+    public void updateAggregation(Integer avgAccuracy, Integer totalScore,
                                   Integer sentenceCount, String reportData) {
         this.avgAccuracy = avgAccuracy;
-        this.avgIntonation = avgIntonation;
         this.totalScore = totalScore;
         this.sentenceCount = sentenceCount;
         this.reportData = reportData;
