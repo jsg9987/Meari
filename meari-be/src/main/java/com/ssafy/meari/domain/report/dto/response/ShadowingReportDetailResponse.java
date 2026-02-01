@@ -9,48 +9,49 @@ import lombok.Getter;
 
 import java.time.LocalDateTime;
 
-@Schema(description = "쉐도잉 리포트 목록 아이템 응답")
+@Schema(description = "쉐도잉 리포트 상세 조회 응답 (JSONB 분석 결과 포함)")
 @Getter
 @Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class ShadowingReportListResponse {
+public class ShadowingReportDetailResponse {
 
     @Schema(description = "쉐도잉 리포트 ID", example = "1001")
     private Long shadowingReportId;
 
-    @Schema(description = "콘텐츠 썸네일 URL", example = "https://cdn.example.com/content/thumbnail/default.png")
-    private String thumbnailUrl;
+    // CER을 이용한 정답문장과의 일치정도 점수
+    @Schema(description = "내용 정확도", example = "85")
+    private Integer accuracy;
 
-    @Schema(description = "방 제목", example = "초보만")
-    private String roomTitle;
+    // MFCC를 이용한 파형 유사도 분석 점수
+    @Schema(description = "억양 점수", example = "90")
+    private Integer intonation;
 
-    @Schema(description = "콘텐츠 제목", example = "Grocery inflation")
-    private String contentTitle;
+    // TODO 추후 평가항목 검토하여 수정 (현재 발음 필드 누락상태)
 
-    @Schema(description = "총 점수", example = "89")
+    @Schema(description = "총 점수", example = "87")
     private Integer totalScore;
 
-    @Schema(description = "읽음 여부", example = "false")
+    @Schema(description = "상세 분석 결과 (JSONB) - 문장별 accuracy_detail, intonation_detail 포함")
+    private Object detailedAnalysis;
+
+    @Schema(description = "읽음 여부", example = "true")
     private Boolean isRead;
 
     @Schema(description = "생성 시간")
     private LocalDateTime createdAt;
 
-    public static ShadowingReportListResponse from(ShadowingReport report) {
-
-        // TODO totalScore 계산로직 수정 (현재는 임의로 단순하게 절반씩 반영하였음)
-        // TODO 추후 평가항목 검토하여 수정 (현재 발음 필드 누락상태)
+    public static ShadowingReportDetailResponse from(ShadowingReport report) {
         Integer totalScore = null;
         if (report.getAccuracy() != null && report.getIntonation() != null) {
             totalScore = (report.getAccuracy() + report.getIntonation()) / 2;
         }
 
-        return ShadowingReportListResponse.builder()
+        return ShadowingReportDetailResponse.builder()
                 .shadowingReportId(report.getShadowingReportId())
-                .thumbnailUrl(report.getContent().getThumbnailUrl())
-                .roomTitle(report.getRoom().getTitle())
-                .contentTitle(report.getContent().getTitle())
+                .accuracy(report.getAccuracy())
+                .intonation(report.getIntonation())
                 .totalScore(totalScore)
+                .detailedAnalysis(report.getDetailedAnalysis())
                 .isRead(report.getIsRead())
                 .createdAt(report.getCreatedAt())
                 .build();

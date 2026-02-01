@@ -9,7 +9,7 @@ import lombok.Getter;
 
 import java.time.LocalDateTime;
 
-@Schema(description = "코픽 리포트 목록 아이템 응답")
+@Schema(description = "코픽 리포트 목록에 들어갈 응답요소")
 @Getter
 @Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
