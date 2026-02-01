@@ -3,22 +3,51 @@ import { MicOff, CheckCircle2 } from "lucide-react";
 import type { StreamManager } from "openvidu-browser";
 
 interface VideoTileProps {
-  streamManager: StreamManager;
+  streamManager?: StreamManager;
   muted?: boolean;
   label?: string;
   isSpeaker?: boolean;
   isReady?: boolean;
+  isSettingUp?: boolean;
   className?: string;
   videoClassName?: string;
 }
 
-export default function VideoTile({ streamManager, muted, label, isSpeaker, isReady, className, videoClassName }: VideoTileProps) {
+export default function VideoTile({ streamManager, muted, label, isSpeaker, isReady, isSettingUp, className, videoClassName }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
-    if (!videoRef.current) return;
+    if (!streamManager || !videoRef.current) return;
     streamManager.addVideoElement(videoRef.current);
   }, [streamManager]);
+
+  // 세팅 중인 경우
+  if (isSettingUp) {
+    return (
+      <div
+        className={`relative overflow-hidden rounded-xl bg-gray-800 border border-gray-200 ${className || ""}`}
+      >
+        <div className="w-full aspect-video flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center animate-pulse">
+              <div className="w-12 h-12 rounded-full border-4 border-gray-500 border-t-blue-500 animate-spin" />
+            </div>
+            {label && (
+              <div className="text-center">
+                <p className="text-sm text-gray-300 font-medium">{label}</p>
+                <p className="text-xs text-gray-400 mt-1">세팅 중...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // streamManager가 없으면 렌더링하지 않음
+  if (!streamManager) {
+    return null;
+  }
 
   return (
     <div

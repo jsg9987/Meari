@@ -41,10 +41,4 @@ public interface KopicTotalReportRepository extends JpaRepository<KopicTotalRepo
             @Param("status") ReportStatus status,
             Pageable pageable
     );
-
-    // PROCESSING 상태 리포트에서 완료된 개별 리포트 개수 조회
-    @Query("SELECT COUNT(kr) FROM KopicReport kr " +
-           "WHERE kr.kopicTotalReport.kopicTotalReportId = :totalReportId " +
-           "AND kr.status = 'COMPLETED'")
-    int countCompletedReports(@Param("totalReportId") Long totalReportId);
 }

@@ -6,10 +6,8 @@ import com.ssafy.meari.domain.content.repository.ContentRepository;
 import com.ssafy.meari.domain.content.repository.RoleRepository;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
-import com.ssafy.meari.domain.report.dto.response.KopicReportListResponse;
-import com.ssafy.meari.domain.report.dto.response.KopicTotalReportDetailResponse;
 import com.ssafy.meari.domain.report.dto.response.ShadowingReportDetailResponse;
-import com.ssafy.meari.domain.report.dto.response.ShadowingReportListResponse;
+import com.ssafy.meari.domain.report.dto.response.ShadowingReportListItemResponse;
 import com.ssafy.meari.domain.report.entity.KopicTotalReport;
 import com.ssafy.meari.domain.report.entity.ReportStatus;
 import com.ssafy.meari.domain.report.entity.ShadowingReport;
@@ -121,7 +119,7 @@ class ReportServiceTest {
         }
 
         // When: 첫 페이지 조회 (size=10)
-        CursorPageResponse<ShadowingReportListResponse> response = reportService.getShadowingReportList(
+        CursorPageResponse<ShadowingReportListItemResponse> response = reportService.getShadowingReportList(
                 member.getMemberId(), null, 10);
 
         // Then: 성공
@@ -133,7 +131,7 @@ class ReportServiceTest {
 
         // is_read 확인
         long readCount = response.getContents().stream()
-                .filter(ShadowingReportListResponse::getIsRead)
+                .filter(ShadowingReportListItemResponse::getIsRead)
                 .count();
         assertThat(readCount).isGreaterThan(0);
     }
@@ -167,13 +165,13 @@ class ReportServiceTest {
 
         // When: 첫 페이지 조회
         System.out.println("\n========== 첫 페이지 조회 (size=10, cursor=null) ==========");
-        CursorPageResponse<ShadowingReportListResponse> firstPage = reportService.getShadowingReportList(
+        CursorPageResponse<ShadowingReportListItemResponse> firstPage = reportService.getShadowingReportList(
                 member.getMemberId(), null, 10);
 
         System.out.println("조회 결과:");
-        java.util.List<ShadowingReportListResponse> firstPageContents = firstPage.getContents();
+        java.util.List<ShadowingReportListItemResponse> firstPageContents = firstPage.getContents();
         for (int i = 0; i < firstPageContents.size(); i++) {
-            ShadowingReportListResponse report = firstPageContents.get(i);
+            ShadowingReportListItemResponse report = firstPageContents.get(i);
             System.out.printf("  [%2d] ID: %4d | created_at: %s | is_read: %s%n",
                     i + 1, report.getShadowingReportId(),
                     report.getCreatedAt(), report.getIsRead());
@@ -192,13 +190,13 @@ class ReportServiceTest {
         System.out.printf("전달된 커서 (timestamp): %s%n", firstPage.getNextCursor());
         System.out.printf("변환된 커서 (LocalDateTime): %s%n", secondPageCursor);
 
-        CursorPageResponse<ShadowingReportListResponse> secondPage = reportService.getShadowingReportList(
+        CursorPageResponse<ShadowingReportListItemResponse> secondPage = reportService.getShadowingReportList(
                 member.getMemberId(), secondPageCursor, 10);
 
         System.out.println("조회 결과:");
-        java.util.List<ShadowingReportListResponse> secondPageContents = secondPage.getContents();
+        java.util.List<ShadowingReportListItemResponse> secondPageContents = secondPage.getContents();
         for (int i = 0; i < secondPageContents.size(); i++) {
-            ShadowingReportListResponse report = secondPageContents.get(i);
+            ShadowingReportListItemResponse report = secondPageContents.get(i);
             System.out.printf("  [%2d] ID: %4d | created_at: %s | is_read: %s%n",
                     i + 1, report.getShadowingReportId(),
                     report.getCreatedAt(), report.getIsRead());
@@ -209,10 +207,10 @@ class ReportServiceTest {
         // 정렬 순서 검증
         System.out.println("\n========== 정렬 순서 검증 ==========");
         java.util.List<LocalDateTime> firstPageTimes = firstPage.getContents().stream()
-                .map(ShadowingReportListResponse::getCreatedAt)
+                .map(ShadowingReportListItemResponse::getCreatedAt)
                 .toList();
         java.util.List<LocalDateTime> secondPageTimes = secondPage.getContents().stream()
-                .map(ShadowingReportListResponse::getCreatedAt)
+                .map(ShadowingReportListItemResponse::getCreatedAt)
                 .toList();
 
         // 첫 페이지 내림차순 정렬 검증 (각 항목이 이전 항목보다 이전 시간인지 확인)
@@ -248,7 +246,7 @@ class ReportServiceTest {
     @DisplayName("쉐도잉 리포트 목록 조회 - 데이터 없음")
     void getShadowingReportList_Empty() {
         // When: 리포트가 없는 사용자의 목록 조회
-        CursorPageResponse<ShadowingReportListResponse> response = reportService.getShadowingReportList(
+        CursorPageResponse<ShadowingReportListItemResponse> response = reportService.getShadowingReportList(
                 member.getMemberId(), null, 10);
 
         // Then

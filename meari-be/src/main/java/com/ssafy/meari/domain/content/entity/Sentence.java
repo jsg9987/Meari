@@ -44,4 +44,14 @@ public class Sentence extends BaseEntity {
 
     @Column(name = "text_vn", nullable = false, length = 1000)
     private String textVn;
+
+    @Column(name = "reference_audio_key", length = 500)
+    private String referenceAudioKey;
+
+    /**
+     * 정답 오디오 S3 key 업데이트 (Dirty Checking)
+     */
+    public void updateReferenceAudioKey(String referenceAudioKey) {
+        this.referenceAudioKey = referenceAudioKey;
+    }
 }
