@@ -28,13 +28,17 @@ public class SentenceAnalysisInfo {
     @Schema(description = "종료 시간 (초)", example = "2.3")
     private Double endTime;
 
+    @Schema(description = "정답 오디오 S3 key", example = "reference_audio/1/123.wav")
+    private String referenceAudioKey;
+
     @Builder
     public SentenceAnalysisInfo(Long sentenceId, String audioUrl, String textKo,
-                                Double startTime, Double endTime) {
+                                Double startTime, Double endTime, String referenceAudioKey) {
         this.sentenceId = sentenceId;
         this.audioUrl = audioUrl;
         this.textKo = textKo;
         this.startTime = startTime;
         this.endTime = endTime;
+        this.referenceAudioKey = referenceAudioKey;
     }
 }
