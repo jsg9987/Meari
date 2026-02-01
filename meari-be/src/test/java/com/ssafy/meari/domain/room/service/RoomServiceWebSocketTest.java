@@ -458,6 +458,9 @@ class RoomServiceWebSocketTest {
 
             given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_1);
             given(roomSessionService.isMember(roomId, 2L)).willReturn(true);
+            given(roomSessionService.getRoundTimeout(roomId, 1)).willReturn(null);
+            given(roomSessionService.isRoundCompleted(roomId, 1)).willReturn(false);
+            given(roomSessionService.isAllWatchingComplete(roomId, 1)).willReturn(true);
             given(roomSessionService.isAllRecordingsComplete(roomId, 1)).willReturn(true);
 
             // When
@@ -488,6 +491,7 @@ class RoomServiceWebSocketTest {
 
             given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_2);
             given(roomSessionService.isMember(roomId, 1L)).willReturn(true);
+            given(roomSessionService.getRoundTimeout(roomId, 2)).willReturn(null);
             given(roomSessionService.isAllRecordingsComplete(roomId, 2)).willReturn(false);
 
             // When
