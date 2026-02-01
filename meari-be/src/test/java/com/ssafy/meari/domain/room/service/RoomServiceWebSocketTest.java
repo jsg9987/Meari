@@ -305,6 +305,39 @@ class RoomServiceWebSocketTest {
     }
 
     @Nested
+    @DisplayName("영상 시청 완료(참여자 개인) WebSocket 브로드캐스트")
+    class WatchingCompleteBroadcast {
+
+        @Test
+        @DisplayName("성공 - 4명 모두 완료 시 PHASE_CHANGE(ROLE_PICK) 메시지 브로드캐스트")
+        void watchingComplete_Success_AllComplete_BroadcastPhaseChange() {
+            // Given
+            Long roomId = 1L;
+            Long memberId = 1L;
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            given(roomRepository.findById(roomId)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.WATCHING);
+            given(roomSessionService.isMember(roomId, memberId)).willReturn(true);
+            given(roomSessionService.isAllWatchingComplete(roomId)).willReturn(true);
+
+            // When
+            roomService.watchingComplete(roomId, memberId);
+
+            // Then
+            ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/" + roomId + "/state"),
+                    messageCaptor.capture()
+            );
+
+            RoomStateMessage sentMessage = messageCaptor.getValue();
+            assertThat(sentMessage.getType()).isEqualTo("PHASE_CHANGE");
+            assertThat(sentMessage.getPhase()).isEqualTo(GamePhase.ROLE_PICK);
+        }
+    }
+
+    @Nested
     @DisplayName("게임 종료 WebSocket 브로드캐스트")
     class FinishGameBroadcast {
 
