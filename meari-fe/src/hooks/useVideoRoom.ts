@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { OpenVidu, Publisher, Session, Subscriber } from "openvidu-browser";
+import { OpenVidu, Publisher, Session, Subscriber, Connection } from "openvidu-browser";
 import { enterWebRTC, leaveWebRTC } from "../api/rooms.api";
 import { createSession, createConnection } from "../api/webrtc.api";
 import { useAuthStore } from "../store/auth.store";
@@ -8,11 +8,12 @@ export type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
 
 export interface VideoTileData {
   id: string;
-  streamManager: Publisher | Subscriber;
+  streamManager?: Publisher | Subscriber;
   muted?: boolean;
   label?: string;
   isSpeaker?: boolean;
   isReady?: boolean;
+  isSettingUp?: boolean; // 세팅 중 (아직 publish 안 함)
 }
 
 interface UseVideoRoomOptions {
@@ -20,6 +21,7 @@ interface UseVideoRoomOptions {
   nickname: string;
   password?: string;
   autoJoin?: boolean;
+  autoPublish?: boolean; // 자동으로 publish 할지 여부
   isOwner?: boolean;
   memberId?: number;
   roleId?: number | null;
@@ -30,6 +32,7 @@ export function useVideoRoom({
   nickname,
   password,
   autoJoin = false,
+  autoPublish = true,
   isOwner = false,
   roleId = null
 }: UseVideoRoomOptions) {
@@ -38,6 +41,7 @@ export function useVideoRoom({
   const [session, setSession] = useState<Session | null>(null);
   const [publisher, setPublisher] = useState<Publisher | null>(null);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]); // 아직 publish 안 한 연결들
   const [status, setStatus] = useState<ConnectionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
@@ -45,25 +49,58 @@ export function useVideoRoom({
 
   const ovRef = useRef<OpenVidu | null>(null);
   const statusRef = useRef<ConnectionStatus>("idle");
+  const publisherRef = useRef<Publisher | null>(null);
 
   const tiles = useMemo<VideoTileData[]>(() => {
     const arr: VideoTileData[] = [];
     if (publisher) {
       arr.push({ id: "me", streamManager: publisher, muted: true, label: `${nickname} (나)` });
     }
+
+    // 실제 스트림이 있는 참가자들
     subscribers.forEach((s) => {
       const clientData = s.stream.connection.data;
       let name = "참여자";
       try {
-        const parsed = JSON.parse(clientData);
-        name = parsed.clientData || name;
-      } catch {
-        name = clientData || name;
+        // %/% 구분자로 나눠진 경우 처리 (백엔드에서 추가 데이터를 넣은 경우)
+        if (clientData.includes('%/%')) {
+          const parts = clientData.split('%/%');
+          // 두 번째 부분(백엔드 데이터)에서 nickname 추출
+          const backendData = JSON.parse(parts[1]);
+          name = backendData.nickname || name;
+        } else {
+          const parsed = JSON.parse(clientData);
+          name = parsed.clientData || parsed.nickname || name;
+        }
+      } catch (error) {
+        console.error('Failed to parse clientData:', clientData, error);
+        name = "참여자";
       }
       arr.push({ id: s.stream.streamId, streamManager: s, label: name });
     });
+
+    // 아직 publish 안 한 참가자들 (세팅 중)
+    connections.forEach((conn) => {
+      const clientData = conn.data;
+      let name = "참여자";
+      try {
+        if (clientData.includes('%/%')) {
+          const parts = clientData.split('%/%');
+          const backendData = JSON.parse(parts[1]);
+          name = backendData.nickname || name;
+        } else {
+          const parsed = JSON.parse(clientData);
+          name = parsed.clientData || parsed.nickname || name;
+        }
+      } catch (error) {
+        console.error('Failed to parse clientData:', clientData, error);
+        name = "참여자";
+      }
+      arr.push({ id: conn.connectionId, label: name, isSettingUp: true });
+    });
+
     return arr;
-  }, [publisher, subscribers, nickname]);
+  }, [publisher, subscribers, connections, nickname]);
 
   const join = useCallback(async () => {
     if (statusRef.current === "connecting" || statusRef.current === "connected") {
@@ -79,9 +116,27 @@ export function useVideoRoom({
     ovRef.current = OV;
     const mySession = OV.initSession();
 
+    mySession.on("connectionCreated", (event) => {
+      // 나 자신이 아니고, 아직 스트림이 없는 연결 (세팅 중)
+      if (event.connection.connectionId !== mySession.connection?.connectionId) {
+        setConnections((prev) => [...prev, event.connection]);
+      }
+    });
+
+    mySession.on("connectionDestroyed", (event) => {
+      setConnections((prev) =>
+        prev.filter((c) => c.connectionId !== event.connection.connectionId)
+      );
+    });
+
     mySession.on("streamCreated", (event) => {
       const subscriber = mySession.subscribe(event.stream, undefined);
       setSubscribers((prev) => [...prev, subscriber]);
+
+      // 스트림이 생성되면 connections에서 제거 (더 이상 세팅 중이 아님)
+      setConnections((prev) =>
+        prev.filter((c) => c.connectionId !== event.stream.connection.connectionId)
+      );
     });
 
     mySession.on("streamDestroyed", (event) => {
@@ -143,10 +198,15 @@ export function useVideoRoom({
         insertMode: "APPEND",
       });
 
-      mySession.publish(pub);
-
       setSession(mySession);
       setPublisher(pub);
+      publisherRef.current = pub;
+
+      // autoPublish가 true면 즉시 publish
+      if (autoPublish) {
+        mySession.publish(pub);
+      }
+
       statusRef.current = "connected";
       setStatus("connected");
     } catch (e) {
@@ -159,7 +219,22 @@ export function useVideoRoom({
         mySession.disconnect();
       } catch { }
     }
-  }, [roomId, nickname, password, isOwner, memberId, roleId]);
+  }, [roomId, nickname, password, isOwner, memberId, roleId, autoPublish]);
+
+  const publishStream = useCallback(() => {
+    if (!session || !publisherRef.current) {
+      console.warn('Cannot publish: session or publisher not ready');
+      return;
+    }
+
+    try {
+      session.publish(publisherRef.current);
+      console.log('Stream published successfully');
+    } catch (error) {
+      console.error('Failed to publish stream:', error);
+      setError('스트림 전송에 실패했습니다');
+    }
+  }, [session]);
 
   const leave = useCallback(async () => {
     try {
@@ -218,6 +293,7 @@ export function useVideoRoom({
     isVideoEnabled,
     join,
     leave,
+    publishStream,
     toggleAudio,
     toggleVideo,
   };

@@ -8,14 +8,13 @@ import VideoControls from "../components/webrtc/VideoControls";
 import ChatPanel from "../components/webrtc/ChatPanel";
 import MediaCheckScreen from "../components/webrtc/MediaCheckScreen";
 import ContentSelectModal from "../components/webrtc/ContentSelectModal";
-import PasswordModal from "../components/webrtc/PasswordModal";
 import Toast from "../components/common/Toast";
 import RoleSelectModal from "../components/webrtc/RoleSelectModal";
 import { useVideoRoom } from "../hooks/useVideoRoom";
 import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type ChatMessage } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
 import { selectRoomContent, getContentRoles, type ContentRole } from "../api/contents.api";
-import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
+import { getRoomDetail, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
 import { useRoomStore } from "../store/room.store";
 import { useRoleStore } from "../store/role.store";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
@@ -41,11 +40,8 @@ export default function ShadowingRoom() {
     clearRoles,
   } = useRoleStore();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("video");
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
   const [isRoomLoading, setIsRoomLoading] = useState(true);
   const [isEntered, setIsEntered] = useState(false);
-  const [roomPassword, setRoomPassword] = useState<string | undefined>(undefined);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("narrow");
   const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
@@ -387,25 +383,8 @@ export default function ShadowingRoom() {
         if (userInfo?.memberId === response.data.data.owner_id) {
           setIsEntered(true);
         } else {
-          // 비밀번호가 있는 방이면 비밀번호 모달 표시
-          if (response.data.data.has_password) {
-            setIsPasswordModalOpen(true);
-          } else {
-            // 비밀번호 없는 방은 enterRoom 호출
-            try {
-              const enterResponse = await enterRoom(Number(roomId), {});
-              if (enterResponse.data.success) {
-                setIsEntered(true);
-              } else {
-                alert('방 입장에 실패했습니다.');
-                navigate('/');
-              }
-            } catch (error) {
-              console.error('Failed to enter room:', error);
-              alert('방 입장에 실패했습니다.');
-              navigate('/');
-            }
-          }
+          // 메인페이지에서 이미 joinRoom으로 비밀번호 검증을 했으므로 바로 입장
+          setIsEntered(true);
         }
       } catch (error) {
         console.error('Failed to fetch room detail:', error);
@@ -623,32 +602,6 @@ export default function ShadowingRoom() {
     };
   }, []);
 
-  // 비밀번호 검증 처리
-  const handlePasswordSubmit = async (password: string) => {
-    if (!roomId) return;
-
-    // eslint-disable-next-line no-useless-catch
-    try {
-      const response = await enterRoom(Number(roomId), { password });
-
-      if (response.data.success) {
-        setRoomPassword(password);
-        setIsPasswordModalOpen(false);
-        setIsEntered(true);
-        setPasswordError('');
-      } else {
-        setPasswordError(response.data.error?.message || '비밀번호가 일치하지 않습니다.');
-        throw new Error('Invalid password');
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const handlePasswordCancel = () => {
-    navigate('/');
-  };
-
   // 방 정보 (store에서 가져오기)
   const roomInfo = roomData ? {
     isLocked: roomData.has_password,
@@ -837,17 +790,20 @@ export default function ShadowingRoom() {
     status,
     error,
     tiles,
+    publisher,
     isAudioEnabled,
     isVideoEnabled,
     join,
     leave,
+    publishStream,
     toggleAudio,
     toggleVideo,
   } = useVideoRoom({
     roomId: Number(roomId),
     nickname,
-    password: roomPassword,
+    password: undefined,
     autoJoin: false,
+    autoPublish: false, // 세팅 완료 후 수동으로 publish
     isOwner
   });
 
@@ -876,13 +832,13 @@ export default function ShadowingRoom() {
     console.log('Video device changed to:', deviceId);
   };
 
-  // 미디어 체크 완료 후 WebRTC 연결
+  // 방 입장 후 즉시 WebRTC 연결 (publisher 생성, 아직 publish 안 함)
   useEffect(() => {
-    if (isMediaChecked && isEntered && roomId && status === 'idle') {
+    if (isEntered && roomId && status === 'idle') {
       join();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMediaChecked, isEntered, roomId, status]);
+  }, [isEntered, roomId, status]);
 
   if (!roomId) {
     return (
@@ -933,8 +889,8 @@ export default function ShadowingRoom() {
   };
 
   const handleMediaCheckComplete = (
-    _audioEnabled: boolean,
-    _videoEnabled: boolean,
+    audioEnabled: boolean,
+    videoEnabled: boolean,
     audioDeviceId?: string,
     videoDeviceId?: string
   ) => {
@@ -943,6 +899,24 @@ export default function ShadowingRoom() {
     // 선택된 장치 정보 저장
     setSelectedAudioDevice(audioDeviceId);
     setSelectedVideoDevice(videoDeviceId);
+
+    // 오디오/비디오 설정 반영
+    if (publisher) {
+      publisher.publishAudio(audioEnabled);
+      publisher.publishVideo(videoEnabled);
+    }
+
+    // useVideoRoom 상태 동기화 (VideoControls 반영용)
+    // 초기값이 true이므로 false인 경우만 토글
+    if (!audioEnabled && isAudioEnabled) {
+      toggleAudio();
+    }
+    if (!videoEnabled && isVideoEnabled) {
+      toggleVideo();
+    }
+
+    // 세팅 완료 후 스트림 publish (다른 사람들에게 보이기 시작)
+    publishStream();
   };
 
   // 방 정보 로딩 중
@@ -952,18 +926,6 @@ export default function ShadowingRoom() {
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         <p className="text-gray-600">방 정보를 불러오는 중...</p>
       </div>
-    );
-  }
-
-  // 비밀번호 입력 모달
-  if (isPasswordModalOpen) {
-    return (
-      <PasswordModal
-        roomTitle={roomInfo.title}
-        onSubmit={handlePasswordSubmit}
-        onCancel={handlePasswordCancel}
-        errorMessage={passwordError}
-      />
     );
   }
 
@@ -977,13 +939,8 @@ export default function ShadowingRoom() {
     );
   }
 
-  // 미디어 체크가 완료되지 않았으면 미디어 체크 화면 표시
-  if (!isMediaChecked) {
-    return <MediaCheckScreen onJoin={handleMediaCheckComplete} roomTitle={roomInfo.title} />;
-  }
-
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 relative">
       {/* 왼쪽 메인 영역 */}
       <div className="flex flex-1 flex-col">
         {/* 헤더 */}
@@ -1372,7 +1329,7 @@ export default function ShadowingRoom() {
 
         {/* 탭 콘텐츠 */}
         <div className="flex-1 overflow-hidden bg-white">
-          {sidebarTab === "video" && (
+          {sidebarTab === "video" && isMediaChecked && (
             <div className={`h-full overflow-y-auto p-3 ${layoutMode === "grid" ? "grid grid-cols-2 gap-3 auto-rows-min" : "space-y-3"
               }`}>
               {status === "connected" && tiles.length > 0 ? (
@@ -1384,6 +1341,7 @@ export default function ShadowingRoom() {
                     label={t.label}
                     isSpeaker={t.isSpeaker}
                     isReady={t.id === "me" ? (isReady && !isGameStarting && !isPlaying) : false}
+                    isSettingUp={t.isSettingUp}
                     videoClassName={layoutMode === "wide" ? "aspect-[21/9]" : undefined}
                   />
                 ))
@@ -1436,6 +1394,13 @@ export default function ShadowingRoom() {
           type="error"
           onClose={() => setToastMessage(null)}
         />
+      )}
+
+      {/* 미디어 체크 모달 (블러 배경) */}
+      {!isMediaChecked && (
+        <div className="fixed inset-0 z-[9999] backdrop-blur-sm bg-black/30">
+          <MediaCheckScreen onJoin={handleMediaCheckComplete} roomTitle={roomInfo.title} />
+        </div>
       )}
     </div>
   );
