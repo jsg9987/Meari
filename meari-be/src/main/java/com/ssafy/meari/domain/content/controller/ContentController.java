@@ -4,6 +4,8 @@ import com.ssafy.meari.domain.content.dto.response.ContentListResponse;
 import com.ssafy.meari.domain.content.dto.response.RoleListResponse;
 import com.ssafy.meari.domain.content.dto.response.ThemeListResponse;
 import com.ssafy.meari.domain.content.service.ContentService;
+import com.ssafy.meari.domain.word.dto.response.WordResponseDto;
+import com.ssafy.meari.domain.word.service.WordService;
 import com.ssafy.meari.global.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,6 +31,7 @@ import java.util.List;
 public class ContentController {
 
     private final ContentService contentService;
+    private final WordService wordService;
 
     /**
      * 테마 목록 조회
@@ -83,4 +86,21 @@ public class ContentController {
 
         return ResponseEntity.ok(ApiResponse.success(roles));
     }
+
+    /**
+     * 랜덤 단어 10개 조회
+     */
+    @GetMapping("/words/random")
+    @Operation(
+            summary = "랜덤 단어 10개 조회",
+            description = "랜덤 단어 10개를 조회합니다."
+    )
+    public ResponseEntity<ApiResponse<List<WordResponseDto>>> getRandomWords() {
+        log.info("랜덤 단어 10개 조회 요청");
+
+        List<WordResponseDto> randomWords = wordService.getRandomWords();
+
+        return ResponseEntity.ok(ApiResponse.success(randomWords));
+    }
 }
+
