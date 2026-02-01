@@ -26,9 +26,6 @@ public class KopicTotalReportResponse {
     @Schema(description = "평균 정확도", example = "82")
     private Integer avgAccuracy;
 
-    @Schema(description = "평균 억양", example = "78")
-    private Integer avgIntonation;
-
     @Schema(description = "총점", example = "80")
     private Integer totalScore;
 
@@ -63,7 +60,6 @@ public class KopicTotalReportResponse {
                 .kopicTotalReportId(totalReport.getKopicTotalReportId())
                 .memberId(totalReport.getMember().getMemberId())
                 .avgAccuracy(totalReport.getAvgAccuracy())
-                .avgIntonation(totalReport.getAvgIntonation())
                 .totalScore(totalReport.getTotalScore())
                 .sentenceCount(totalReport.getSentenceCount())
                 .status(totalReport.getStatus().name())
