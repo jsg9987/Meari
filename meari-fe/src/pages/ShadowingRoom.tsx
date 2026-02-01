@@ -14,7 +14,7 @@ import { useVideoRoom } from "../hooks/useVideoRoom";
 import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type ChatMessage } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
 import { selectRoomContent, getContentRoles, type ContentRole } from "../api/contents.api";
-import { getRoomDetail, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
+import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
 import { useRoomStore } from "../store/room.store";
 import { useRoleStore } from "../store/role.store";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
@@ -56,7 +56,6 @@ export default function ShadowingRoom() {
   const [isContentSelectOpen, setIsContentSelectOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isHost] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
   const [isReady, setIsReady] = useState(false); // 내 준비 상태
   const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false); // 역할 선택 모달 상태
   const [isConfirmingRoles, setIsConfirmingRoles] = useState(false); // 역할 확정 로딩 상태
@@ -414,8 +413,15 @@ export default function ShadowingRoom() {
         if (userInfo?.memberId === response.data.data.owner_id) {
           setIsEntered(true);
         } else {
-          // 메인페이지에서 이미 joinRoom으로 비밀번호 검증을 했으므로 바로 입장
-          setIsEntered(true);
+          // 방장이 아니면 enterRoom API 호출
+          try {
+            await enterRoom(Number(roomId), {});
+            setIsEntered(true);
+          } catch (error) {
+            console.error('Failed to enter room:', error);
+            alert('방 입장에 실패했습니다.');
+            navigate('/');
+          }
         }
       } catch (error) {
         console.error('Failed to fetch room detail:', error);
@@ -807,7 +813,7 @@ export default function ShadowingRoom() {
     password: undefined,
     autoJoin: false,
     autoPublish: false, // 세팅 완료 후 수동으로 publish
-    isOwner
+    isOwner: isOwner
   });
 
   // leave 함수의 안정적 참조 (useEffect deps 재실행 방지)
@@ -1188,7 +1194,7 @@ export default function ShadowingRoom() {
                       {!selectedContent ? (
                         <div className="text-center">
                           <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
-                          {isHost && (
+                          {isOwner && (
                             <p className="text-gray-400 text-xs">컨텐츠를 선택해주세요</p>
                           )}
                         </div>
@@ -1220,7 +1226,7 @@ export default function ShadowingRoom() {
                               </button>
 
                               {/* 시작 버튼 (방장만) */}
-                              {isHost && (
+                              {isOwner && (
                                 <div className="flex flex-col items-center gap-2 mt-2">
                                   {totalParticipants > 0 && (
                                     <div className="text-sm text-gray-600 mb-1">
@@ -1247,7 +1253,7 @@ export default function ShadowingRoom() {
                           )}
 
                           {/* 역할 선택 완료 후: Round 버튼 (방장만) */}
-                          {isRoleAssigned && isHost && (
+                          {isRoleAssigned && isOwner && (
                             <>
                               {/* 라운드 시작 버튼 (Round 2까지만) */}
                               {!isRoundInProgress && !isRoundStarting && currentRound < 2 && (
@@ -1302,7 +1308,7 @@ export default function ShadowingRoom() {
             )}
 
             {/* 컨텐츠 변경 버튼 (방장만) - 게임 시작 전에만 표시 */}
-            {(DISABLE_WEBRTC || status === "connected") && isHost && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && (
+            {(DISABLE_WEBRTC || status === "connected") && isOwner && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && (
               <button
                 onClick={() => setIsContentSelectOpen(true)}
                 className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
@@ -1471,7 +1477,7 @@ export default function ShadowingRoom() {
           onClose={() => setIsRoleSelectOpen(false)}
           onConfirm={handleConfirmRoles}
           selectedRoleId={mySelectedRoleId}
-          isHost={isHost}
+          isHost={isOwner}
           isConfirming={isConfirmingRoles}
         />
       )}
