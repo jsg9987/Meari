@@ -60,6 +60,9 @@ public enum ErrorCode {
     NOT_FOUND_ROLE(HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."),
     NOT_FOUND_SENTENCE(HttpStatus.NOT_FOUND, "존재하지 않는 문장입니다."),
     NOT_FOUND_MEMBER_ROOM(HttpStatus.NOT_FOUND, "방에 참여하지 않은 사용자입니다."),
+    NOT_FOUND_KOPIC_SENTENCE(HttpStatus.NOT_FOUND, "해당 테마에 코픽 문장이 존재하지 않습니다."),
+    NOT_FOUND_KOPIC_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 코픽 리포트입니다."),
+    NOT_FOUND_KOPIC_TOTAL_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 코픽 통합 리포트입니다."),
     NOT_FOUND_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 리포트입니다."),
     NOT_FOUND_AUDIO_URL(HttpStatus.NOT_FOUND, "녹음 파일 URL을 찾을 수 없습니다."),
     OPENVIDU_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "OpenVidu 세션을 찾을 수 없습니다."),
@@ -101,6 +104,7 @@ public enum ErrorCode {
     OPENVIDU_SESSION_CLOSE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 종료에 실패했습니다."),
     OPENVIDU_DISCONNECT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 연결 강제 종료에 실패했습니다."),
     OPENVIDU_FETCH_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 정보 조회에 실패했습니다."),
+    GEMINI_ANALYSIS_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Gemini AI 분석에 실패했습니다."),
 	CHAT_SAVE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 저장에 실패했습니다."),
 	CHAT_BROADCAST_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 브로드캐스트에 실패했습니다."),
 
