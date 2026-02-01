@@ -1,6 +1,9 @@
-package com.ssafy.meari.global.pipeline.videosaving.nlp.service;
+package com.ssafy.meari.global.pipeline.videosaving.service;
 
 import com.ssafy.meari.global.pipeline.videosaving.nlp.dto.MorphemeAnalysisResponseDto;
+import com.ssafy.meari.global.pipeline.videosaving.nlp.service.NlpService;
+import com.ssafy.meari.global.pipeline.videosaving.nlp.service.NlpServiceImpl;
+
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 

@@ -1,6 +1,7 @@
 package com.ssafy.meari.domain.admin.controller;
 
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,17 +28,12 @@ public class AdminDataController {
 
 	@Operation(summary = "스크립트 CSV 업로드", description = "CSV 파일을 업로드하여 스크립트를 저장하고 형태소 분석 및 동음이의어 처리를 수행합니다. 매칭 결과는 CSV 파일로 저장됩니다.")
 	@PostMapping(value = "/scripts/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ApiResponse<ScriptUploadResponseDto> uploadScript(@RequestParam("file") MultipartFile file) {
+	public ResponseEntity<ApiResponse<Void>> uploadScript(@RequestParam("file") MultipartFile file) {
 
 
-		String resultCsvPath = scriptSavingService.processCsvFile(file);
+		scriptSavingService.processCsvFile(file);
+		// log.debug("[Admin] 스크립트 저장 완료 - 결과 CSV: {}", resultCsvPath);
 
-		log.debug("[Admin] 스크립트 저장 완료 - 결과 CSV: {}", resultCsvPath);
-
-		ScriptUploadResponseDto response = ScriptUploadResponseDto.builder()
-				.resultCsvPath(resultCsvPath)
-				.build();
-
-		return ApiResponse.success(response);
+		return ResponseEntity.ok(ApiResponse.successWithoutData());
 	}
 }

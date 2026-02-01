@@ -1,4 +1,4 @@
-package com.ssafy.meari.global.pipeline.videosaving.nlp.service;
+package com.ssafy.meari.global.pipeline.videosaving.service;
 
 import static org.assertj.core.api.Assertions.*;
 

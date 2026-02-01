@@ -64,7 +64,7 @@ public class ScriptSavingService {
 	 * @return 결과 CSV 파일 경로
 	 */
 	@Transactional
-	public String processCsvFile(MultipartFile file) {
+	public void processCsvFile(MultipartFile file) {
 		log.debug("[Pipeline] CSV 파일 처리 시작 - 파일명: {}", file.getOriginalFilename());
 
 		// 1. CSV 파싱
@@ -78,10 +78,8 @@ public class ScriptSavingService {
 				savedSentences.size(), matchingResults.size());
 
 		// 3. 매칭 결과 CSV 저장
-		String csvPath = saveMatchingResultsCsv(matchingResults, file.getOriginalFilename());
-		log.info("[Pipeline] 매칭 결과 CSV 저장 완료 - {}", csvPath);
-
-		return csvPath;
+		// String csvPath = saveMatchingResultsCsv(matchingResults, file.getOriginalFilename());
+	// log.info("[Pipeline] 매칭 결과 CSV 저장 완료 - {}", csvPath);
 	}
 
 	/**
