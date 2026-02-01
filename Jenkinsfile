@@ -160,8 +160,8 @@ pipeline {
                             echo "AWS_REGION=ap-northeast-2" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION=3600" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
-                            # 이제 meari-fastapi 이미지가 생성되었으므로 정상적으로 실행됩니다.
-                            docker compose up -d --force-recreate frontend spring-api fastapi openvidu
+                            # 이제 meari-fastapi 붙이면 포함시켜서 docker compose up에 포함
+                            docker compose up -d --force-recreate frontend spring-api openvidu
                         '''
                         sh 'docker image prune -f'
                     }

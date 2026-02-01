@@ -166,13 +166,13 @@ services:
       - "8080:8080"
     networks:
       - meari-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#      rabbitmq:
+#        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
@@ -193,13 +193,13 @@ services:
       - "8000:8000"
     networks:
       - meari-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#      rabbitmq:
+#        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
