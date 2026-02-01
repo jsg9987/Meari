@@ -910,6 +910,27 @@ public class RoomService {
             log.warn("녹음 완료 타임아웃: roomId={}, round={}, 경과시간={}ms",
                     roomId, round, currentTime - (timeoutMillis - 40000));
 
+            // 부분 완료 멤버도 분석 요청
+            Set<String> members = roomSessionService.getMembers(roomId);
+            if (members != null) {
+                for (String memberIdStr : members) {
+                    Long memberId = Long.parseLong(memberIdStr);
+
+                    // 이미 모든 문장 완료한 경우는 건너뛰기 (이미 분석 요청됨)
+                    if (roomSessionService.isMemberRecordingsComplete(roomId, round, memberId)) {
+                        continue;
+                    }
+
+                    // 1개 이상 녹음했으면 분석 요청
+                    Long recordedCount = roomSessionService.getRecordedCount(roomId, round, memberId);
+                    if (recordedCount != null && recordedCount > 0) {
+                        log.info("타임아웃: 부분 완료 멤버 분석 요청 - memberId={}, recordedCount={}",
+                                memberId, recordedCount);
+                        analysisProducer.requestMemberAnalysis(roomId, round, memberId);
+                    }
+                }
+            }
+
             // 완료 플래그 설정 (중복 처리 방지)
             roomSessionService.markRoundCompleted(roomId, round);
 
