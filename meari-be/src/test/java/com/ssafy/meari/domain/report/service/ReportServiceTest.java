@@ -7,6 +7,8 @@ import com.ssafy.meari.domain.content.repository.RoleRepository;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
 import com.ssafy.meari.domain.report.dto.response.KopicReportListResponse;
+import com.ssafy.meari.domain.report.dto.response.KopicTotalReportDetailResponse;
+import com.ssafy.meari.domain.report.dto.response.ShadowingReportDetailResponse;
 import com.ssafy.meari.domain.report.dto.response.ShadowingReportListResponse;
 import com.ssafy.meari.domain.report.entity.KopicTotalReport;
 import com.ssafy.meari.domain.report.entity.ReportStatus;
@@ -139,7 +141,9 @@ class ReportServiceTest {
     @Test
     @DisplayName("쉐도잉 리포트 목록 조회 - 커서 기반 페이징")
     void getShadowingReportList_Success_WithCursor() {
-        // Given: 15개의 리포트 생성
+        // Given: 15개의 리포트 생성 (의도적으로 시간차 두고 생성)
+        System.out.println("\n========== 데이터 생성 ==========");
+        java.util.List<ShadowingReport> createdReports = new java.util.ArrayList<>();
         for (int i = 0; i < 15; i++) {
             Role role = roleRepository.findById(i % 2 == 0 ? 1L : 2L).orElseThrow();
             ShadowingReport report = ShadowingReport.builder()
@@ -151,20 +155,87 @@ class ReportServiceTest {
                     .build();
             ShadowingReport saved = shadowingReportRepository.save(report);
             saved.updateAnalysisResult(85, 85, "{\"feedback\": \"테스트\"}");
+            createdReports.add(saved);
+
+            // 각 리포트의 생성 시간 출력
+            System.out.printf("생성 리포트 #%2d | ID: %3d | created_at: %s%n",
+                    i + 1, saved.getShadowingReportId(), saved.getCreatedAt());
+
+            // 약간의 시간차를 위해 sleep (선택사항)
+            try { Thread.sleep(10); } catch (InterruptedException e) {}
         }
 
         // When: 첫 페이지 조회
+        System.out.println("\n========== 첫 페이지 조회 (size=10, cursor=null) ==========");
         CursorPageResponse<ShadowingReportListResponse> firstPage = reportService.getShadowingReportList(
                 member.getMemberId(), null, 10);
 
+        System.out.println("조회 결과:");
+        java.util.List<ShadowingReportListResponse> firstPageContents = firstPage.getContents();
+        for (int i = 0; i < firstPageContents.size(); i++) {
+            ShadowingReportListResponse report = firstPageContents.get(i);
+            System.out.printf("  [%2d] ID: %4d | created_at: %s | is_read: %s%n",
+                    i + 1, report.getShadowingReportId(),
+                    report.getCreatedAt(), report.getIsRead());
+        }
+        System.out.printf("반환된 커서 (timestamp ms): %s%n", firstPage.getNextCursor());
+        System.out.printf("다음 페이지 존재: %s%n", firstPage.isHasNext());
+
         // 다음 페이지 조회 (nextCursor 변환: Long timestamp → LocalDateTime)
+        System.out.println("\n========== 두 번째 페이지 조회 ==========");
         LocalDateTime secondPageCursor = firstPage.getNextCursor() != null
                 ? LocalDateTime.ofInstant(
                         java.time.Instant.ofEpochMilli(firstPage.getNextCursor()),
                         ZoneId.systemDefault())
                 : null;
+
+        System.out.printf("전달된 커서 (timestamp): %s%n", firstPage.getNextCursor());
+        System.out.printf("변환된 커서 (LocalDateTime): %s%n", secondPageCursor);
+
         CursorPageResponse<ShadowingReportListResponse> secondPage = reportService.getShadowingReportList(
                 member.getMemberId(), secondPageCursor, 10);
+
+        System.out.println("조회 결과:");
+        java.util.List<ShadowingReportListResponse> secondPageContents = secondPage.getContents();
+        for (int i = 0; i < secondPageContents.size(); i++) {
+            ShadowingReportListResponse report = secondPageContents.get(i);
+            System.out.printf("  [%2d] ID: %4d | created_at: %s | is_read: %s%n",
+                    i + 1, report.getShadowingReportId(),
+                    report.getCreatedAt(), report.getIsRead());
+        }
+        System.out.printf("반환된 커서: %s%n", secondPage.getNextCursor());
+        System.out.printf("다음 페이지 존재: %s%n", secondPage.isHasNext());
+
+        // 정렬 순서 검증
+        System.out.println("\n========== 정렬 순서 검증 ==========");
+        java.util.List<LocalDateTime> firstPageTimes = firstPage.getContents().stream()
+                .map(ShadowingReportListResponse::getCreatedAt)
+                .toList();
+        java.util.List<LocalDateTime> secondPageTimes = secondPage.getContents().stream()
+                .map(ShadowingReportListResponse::getCreatedAt)
+                .toList();
+
+        // 첫 페이지 내림차순 정렬 검증 (각 항목이 이전 항목보다 이전 시간인지 확인)
+        boolean firstPageSorted = true;
+        for (int i = 1; i < firstPageTimes.size(); i++) {
+            if (!firstPageTimes.get(i).isBefore(firstPageTimes.get(i - 1)) &&
+                !firstPageTimes.get(i).isEqual(firstPageTimes.get(i - 1))) {
+                firstPageSorted = false;
+                break;
+            }
+        }
+        System.out.printf("첫 페이지 내림차순 정렬: %s%n", firstPageSorted);
+
+        // 두 번째 페이지 내림차순 정렬 검증
+        boolean secondPageSorted = true;
+        for (int i = 1; i < secondPageTimes.size(); i++) {
+            if (!secondPageTimes.get(i).isBefore(secondPageTimes.get(i - 1)) &&
+                !secondPageTimes.get(i).isEqual(secondPageTimes.get(i - 1))) {
+                secondPageSorted = false;
+                break;
+            }
+        }
+        System.out.printf("두 번째 페이지 내림차순 정렬: %s%n", secondPageSorted);
 
         // Then
         assertThat(firstPage.getContents()).hasSize(10);
@@ -235,9 +306,9 @@ class ReportServiceTest {
     }
 
     @Test
-    @DisplayName("쉐도잉 리포트 읽음 처리 - 성공")
-    void markShadowingReportAsRead_Success() {
-        // Given: 쉐도잉 리포트 생성
+    @DisplayName("쉐도잉 리포트 상세 조회 - 성공 및 자동 읽음 처리")
+    void getShadowingReportDetail_Success() {
+        // Given: 쉐도잉 리포트 생성 (is_read = false)
         Role role = roleRepository.findById(1L).orElseThrow();
         ShadowingReport report = ShadowingReport.builder()
                 .member(member)
@@ -247,30 +318,37 @@ class ReportServiceTest {
                 .round(1)
                 .build();
         ShadowingReport savedReport = shadowingReportRepository.save(report);
-        savedReport.updateAnalysisResult(85, 85, "{\"feedback\": \"테스트\"}");
+        savedReport.updateAnalysisResult(85, 80, "{\"feedback\": \"좋은 발음입니다\"}");
         assertThat(savedReport.getIsRead()).isFalse();
 
-        // When: 읽음 처리
-        reportService.markShadowingReportAsRead(savedReport.getShadowingReportId(), member.getMemberId());
+        // When: 상세 조회
+        ShadowingReportDetailResponse response = reportService.getShadowingReportDetail(
+                savedReport.getShadowingReportId(), member.getMemberId());
 
-        // Then: is_read가 true로 변경됨
+        // Then: 응답 검증
+        assertThat(response).isNotNull();
+        assertThat(response.getShadowingReportId()).isEqualTo(savedReport.getShadowingReportId());
+        assertThat(response.getAccuracy()).isEqualTo(85);
+        assertThat(response.getIntonation()).isEqualTo(80);
+
+        // Then: 자동으로 is_read가 true로 변경됨
         ShadowingReport updated = shadowingReportRepository.findById(savedReport.getShadowingReportId())
                 .orElseThrow();
         assertThat(updated.getIsRead()).isTrue();
     }
 
     @Test
-    @DisplayName("쉐도잉 리포트 읽음 처리 - 리포트 없음 (실패)")
-    void markShadowingReportAsRead_NotFound() {
+    @DisplayName("쉐도잉 리포트 상세 조회 - 리포트 없음 (실패)")
+    void getShadowingReportDetail_NotFound() {
         // When & Then: 존재하지 않는 리포트 조회 시 예외 발생
-        assertThatThrownBy(() -> reportService.markShadowingReportAsRead(9999L, member.getMemberId()))
+        assertThatThrownBy(() -> reportService.getShadowingReportDetail(9999L, member.getMemberId()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.NOT_FOUND_SHADOWING_REPORT.getMessage());
     }
 
     @Test
-    @DisplayName("쉐도잉 리포트 읽음 처리 - 권한 없음 (실패)")
-    void markShadowingReportAsRead_Forbidden() {
+    @DisplayName("쉐도잉 리포트 상세 조회 - 권한 없음 (실패)")
+    void getShadowingReportDetail_Forbidden() {
         // Given: 다른 사용자의 리포트
         Member otherMember = Member.builder()
                 .email("other@example.com")
@@ -288,67 +366,106 @@ class ReportServiceTest {
                 .round(1)
                 .build();
         ShadowingReport savedReport = shadowingReportRepository.save(report);
-        savedReport.updateAnalysisResult(85, 85, "{\"feedback\": \"테스트\"}");
-
+        savedReport.updateAnalysisResult(85, 80, "{\"feedback\": \"테스트\"}");
 
         // When & Then: 다른 사용자가 접근 시 예외 발생
-        assertThatThrownBy(() -> reportService.markShadowingReportAsRead(
+        assertThatThrownBy(() -> reportService.getShadowingReportDetail(
                 savedReport.getShadowingReportId(), member.getMemberId()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.ACCESS_DENIED.getMessage());
     }
 
     @Test
-    @DisplayName("코픽 리포트 읽음 처리 - 성공")
-    void markKopicReportAsRead_Success() {
-        // Given: 코픽 리포트 생성
-        KopicTotalReport report = KopicTotalReport.builder()
+    @DisplayName("코픽 통합 리포트 상세 조회 - COMPLETED 상태 및 자동 읽음 처리")
+    void getKopicTotalReportDetail_Completed_Success() {
+        // Given: COMPLETED 상태의 코픽 통합 리포트 생성
+        KopicTotalReport totalReport = KopicTotalReport.builder()
                 .member(member)
                 .theme(theme)
-                .status(ReportStatus.COMPLETED)
+                .status(ReportStatus.PROCESSING)
                 .build();
-        KopicTotalReport savedReport = kopicTotalReportRepository.save(report);
-        assertThat(savedReport.getIsRead()).isFalse();
+        KopicTotalReport savedTotalReport = kopicTotalReportRepository.save(totalReport);
 
-        // When: 읽음 처리
-        reportService.markKopicReportAsRead(savedReport.getKopicTotalReportId(), member.getMemberId());
+        // 통합 리포트 업데이트 (COMPLETED로 변경)
+        savedTotalReport.updateAggregation(85, 80, 82, 5, "[]");
+        assertThat(savedTotalReport.getIsRead()).isFalse();
+        assertThat(savedTotalReport.getStatus()).isEqualTo(ReportStatus.COMPLETED);
 
-        // Then: is_read가 true로 변경됨
-        KopicTotalReport updated = kopicTotalReportRepository.findById(savedReport.getKopicTotalReportId())
+        // When: 상세 조회
+        KopicTotalReportDetailResponse response = reportService.getKopicTotalReportDetail(
+                savedTotalReport.getKopicTotalReportId(), member.getMemberId());
+
+        // Then: 응답 검증
+        assertThat(response).isNotNull();
+        assertThat(response.getKopicTotalReportId()).isEqualTo(savedTotalReport.getKopicTotalReportId());
+        assertThat(response.getStatus()).isEqualTo("COMPLETED");
+        assertThat(response.getAvgAccuracy()).isEqualTo(85);
+        assertThat(response.getTotalScore()).isEqualTo(82);
+
+        // Then: 자동으로 is_read가 true로 변경됨
+        KopicTotalReport updated = kopicTotalReportRepository.findById(savedTotalReport.getKopicTotalReportId())
                 .orElseThrow();
         assertThat(updated.getIsRead()).isTrue();
     }
 
     @Test
-    @DisplayName("코픽 리포트 읽음 처리 - 리포트 없음 (실패)")
-    void markKopicReportAsRead_NotFound() {
+    @DisplayName("코픽 통합 리포트 상세 조회 - PROCESSING 상태")
+    void getKopicTotalReportDetail_Processing() {
+        // Given: PROCESSING 상태의 코픽 통합 리포트 생성
+        KopicTotalReport totalReport = KopicTotalReport.builder()
+                .member(member)
+                .theme(theme)
+                .status(ReportStatus.PROCESSING)
+                .build();
+        KopicTotalReport savedTotalReport = kopicTotalReportRepository.save(totalReport);
+
+        // When: 상세 조회
+        KopicTotalReportDetailResponse response = reportService.getKopicTotalReportDetail(
+                savedTotalReport.getKopicTotalReportId(), member.getMemberId());
+
+        // Then: PROCESSING 응답 검증
+        assertThat(response).isNotNull();
+        assertThat(response.getKopicTotalReportId()).isEqualTo(savedTotalReport.getKopicTotalReportId());
+        assertThat(response.getStatus()).isEqualTo("PROCESSING");
+        assertThat(response.getCompletedCount()).isNotNull();
+        assertThat(response.getTotalCount()).isNotNull();
+
+        // PROCESSING 상태에서는 읽음 처리되지 않음
+        KopicTotalReport updated = kopicTotalReportRepository.findById(savedTotalReport.getKopicTotalReportId())
+                .orElseThrow();
+        assertThat(updated.getIsRead()).isFalse();
+    }
+
+    @Test
+    @DisplayName("코픽 통합 리포트 상세 조회 - 리포트 없음 (실패)")
+    void getKopicTotalReportDetail_NotFound() {
         // When & Then: 존재하지 않는 리포트 조회 시 예외 발생
-        assertThatThrownBy(() -> reportService.markKopicReportAsRead(9999L, member.getMemberId()))
+        assertThatThrownBy(() -> reportService.getKopicTotalReportDetail(9999L, member.getMemberId()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.NOT_FOUND_KOPIC_TOTAL_REPORT.getMessage());
     }
 
     @Test
-    @DisplayName("코픽 리포트 읽음 처리 - 권한 없음 (실패)")
-    void markKopicReportAsRead_Forbidden() {
+    @DisplayName("코픽 통합 리포트 상세 조회 - 권한 없음 (실패)")
+    void getKopicTotalReportDetail_Forbidden() {
         // Given: 다른 사용자의 리포트
         Member otherMember = Member.builder()
-                .email("other@example.com")
-                .nickname("다른유저")
+                .email("other2@example.com")
+                .nickname("다른유저2")
                 .password("password123")
                 .build();
         memberRepository.save(otherMember);
 
-        KopicTotalReport report = KopicTotalReport.builder()
+        KopicTotalReport totalReport = KopicTotalReport.builder()
                 .member(otherMember)
                 .theme(theme)
                 .status(ReportStatus.COMPLETED)
                 .build();
-        KopicTotalReport savedReport = kopicTotalReportRepository.save(report);
+        KopicTotalReport savedTotalReport = kopicTotalReportRepository.save(totalReport);
 
         // When & Then: 다른 사용자가 접근 시 예외 발생
-        assertThatThrownBy(() -> reportService.markKopicReportAsRead(
-                savedReport.getKopicTotalReportId(), member.getMemberId()))
+        assertThatThrownBy(() -> reportService.getKopicTotalReportDetail(
+                savedTotalReport.getKopicTotalReportId(), member.getMemberId()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.ACCESS_DENIED.getMessage());
     }
