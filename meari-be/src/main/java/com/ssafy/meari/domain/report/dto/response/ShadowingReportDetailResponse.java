@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Getter
 @Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class ShadowingReportHyperDetailResponse {
+public class ShadowingReportDetailResponse {
 
     @Schema(description = "쉐도잉 리포트 ID", example = "1001")
     private Long shadowingReportId;
@@ -69,15 +69,17 @@ public class ShadowingReportHyperDetailResponse {
     @Schema(description = "수정일시", example = "2025-01-30T10:30:00")
     private final LocalDateTime updatedAt;
 
+
+
     @Builder
-    public ShadowingReportHyperDetailResponse(Long shadowingReportId, Long memberId, String memberNickname,
-                                              Long roomId, String roomTitle,
-                                              Long contentId, String contentTitle,
-                                              Long roleId, String roleName,
-                                              Integer accuracy, Integer intonation,
-                                              Integer totalScore,
-                                              DetailedAnalysis detailedAnalysis, ReportStatus status,
-                                              LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public ShadowingReportDetailResponse(Long shadowingReportId, Long memberId, String memberNickname,
+                                         Long roomId, String roomTitle,
+                                         Long contentId, String contentTitle,
+                                         Long roleId, String roleName,
+                                         Integer accuracy, Integer intonation,
+                                         Integer totalScore,
+                                         DetailedAnalysis detailedAnalysis, ReportStatus status,
+                                         LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.shadowingReportId = shadowingReportId;
         this.memberId = memberId;
         this.memberNickname = memberNickname;

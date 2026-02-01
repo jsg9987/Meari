@@ -35,16 +35,13 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest
 @Transactional
 @DisplayName("ReportService 통합 테스트")
-class ReportServiceTest {
+class ShadowingReportServiceTest {
 
     @Autowired
-    private ReportService reportService;
+    private ShadowingReportService shadowingReportService;
 
     @Autowired
     private ShadowingReportRepository shadowingReportRepository;
-
-    @Autowired
-    private KopicTotalReportRepository kopicTotalReportRepository;
 
     @Autowired
     private MemberRepository memberRepository;
@@ -119,7 +116,7 @@ class ReportServiceTest {
         }
 
         // When: 첫 페이지 조회 (size=10)
-        CursorPageResponse<ShadowingReportListItemResponse> response = reportService.getShadowingReportList(
+        CursorPageResponse<ShadowingReportListItemResponse> response = shadowingReportService.getShadowingReportList(
                 member.getMemberId(), null, 10);
 
         // Then: 성공
@@ -165,7 +162,7 @@ class ReportServiceTest {
 
         // When: 첫 페이지 조회
         System.out.println("\n========== 첫 페이지 조회 (size=10, cursor=null) ==========");
-        CursorPageResponse<ShadowingReportListItemResponse> firstPage = reportService.getShadowingReportList(
+        CursorPageResponse<ShadowingReportListItemResponse> firstPage = shadowingReportService.getShadowingReportList(
                 member.getMemberId(), null, 10);
 
         System.out.println("조회 결과:");
@@ -190,7 +187,7 @@ class ReportServiceTest {
         System.out.printf("전달된 커서 (timestamp): %s%n", firstPage.getNextCursor());
         System.out.printf("변환된 커서 (LocalDateTime): %s%n", secondPageCursor);
 
-        CursorPageResponse<ShadowingReportListItemResponse> secondPage = reportService.getShadowingReportList(
+        CursorPageResponse<ShadowingReportListItemResponse> secondPage = shadowingReportService.getShadowingReportList(
                 member.getMemberId(), secondPageCursor, 10);
 
         System.out.println("조회 결과:");
@@ -246,55 +243,7 @@ class ReportServiceTest {
     @DisplayName("쉐도잉 리포트 목록 조회 - 데이터 없음")
     void getShadowingReportList_Empty() {
         // When: 리포트가 없는 사용자의 목록 조회
-        CursorPageResponse<ShadowingReportListItemResponse> response = reportService.getShadowingReportList(
-                member.getMemberId(), null, 10);
-
-        // Then
-        assertThat(response.getContents()).isEmpty();
-        assertThat(response.isHasNext()).isFalse();
-        assertThat(response.getNextCursor()).isNull();
-    }
-
-    @Test
-    @DisplayName("코픽 리포트 목록 조회 - 성공 케이스")
-    void getKopicReportList_Success() {
-        // Given: 15개의 코픽 리포트 생성
-        for (int i = 0; i < 15; i++) {
-            KopicTotalReport report = KopicTotalReport.builder()
-                    .member(member)
-                    .theme(theme)
-                    .status(ReportStatus.COMPLETED)
-                    .build();
-            KopicTotalReport saved = kopicTotalReportRepository.save(report);
-
-            // is_read: 짝수 인덱스만 true
-            if (i % 2 == 0) {
-                saved.markAsRead();
-            }
-        }
-
-        // When: 첫 페이지 조회 (size=10)
-        CursorPageResponse<KopicReportListResponse> response = reportService.getKopicReportList(
-                member.getMemberId(), null, 10);
-
-        // Then
-        assertThat(response.getContents()).hasSize(10);
-        assertThat(response.getSize()).isEqualTo(10);
-        assertThat(response.isHasNext()).isTrue();
-        assertThat(response.getNextCursor()).isNotNull();
-
-        // is_read 확인
-        long readCount = response.getContents().stream()
-                .filter(KopicReportListResponse::getIsRead)
-                .count();
-        assertThat(readCount).isGreaterThan(0);
-    }
-
-    @Test
-    @DisplayName("코픽 리포트 목록 조회 - 데이터 없음")
-    void getKopicReportList_Empty() {
-        // When: 리포트가 없는 사용자의 목록 조회
-        CursorPageResponse<KopicReportListResponse> response = reportService.getKopicReportList(
+        CursorPageResponse<ShadowingReportListItemResponse> response = shadowingReportService.getShadowingReportList(
                 member.getMemberId(), null, 10);
 
         // Then
@@ -320,7 +269,7 @@ class ReportServiceTest {
         assertThat(savedReport.getIsRead()).isFalse();
 
         // When: 상세 조회
-        ShadowingReportDetailResponse response = reportService.getShadowingReportDetail(
+        ShadowingReportDetailResponse response = shadowingReportService.getShadowingReportDetail(
                 savedReport.getShadowingReportId(), member.getMemberId());
 
         // Then: 응답 검증
@@ -339,7 +288,7 @@ class ReportServiceTest {
     @DisplayName("쉐도잉 리포트 상세 조회 - 리포트 없음 (실패)")
     void getShadowingReportDetail_NotFound() {
         // When & Then: 존재하지 않는 리포트 조회 시 예외 발생
-        assertThatThrownBy(() -> reportService.getShadowingReportDetail(9999L, member.getMemberId()))
+        assertThatThrownBy(() -> shadowingReportService.getShadowingReportDetail(9999L, member.getMemberId()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.NOT_FOUND_SHADOWING_REPORT.getMessage());
     }
@@ -367,104 +316,10 @@ class ReportServiceTest {
         savedReport.updateAnalysisResult(85, 80, "{\"feedback\": \"테스트\"}");
 
         // When & Then: 다른 사용자가 접근 시 예외 발생
-        assertThatThrownBy(() -> reportService.getShadowingReportDetail(
+        assertThatThrownBy(() -> shadowingReportService.getShadowingReportDetail(
                 savedReport.getShadowingReportId(), member.getMemberId()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.ACCESS_DENIED.getMessage());
     }
 
-    @Test
-    @DisplayName("코픽 통합 리포트 상세 조회 - COMPLETED 상태 및 자동 읽음 처리")
-    void getKopicTotalReportDetail_Completed_Success() {
-        // Given: COMPLETED 상태의 코픽 통합 리포트 생성
-        KopicTotalReport totalReport = KopicTotalReport.builder()
-                .member(member)
-                .theme(theme)
-                .status(ReportStatus.PROCESSING)
-                .build();
-        KopicTotalReport savedTotalReport = kopicTotalReportRepository.save(totalReport);
-
-        // 통합 리포트 업데이트 (COMPLETED로 변경)
-        savedTotalReport.updateAggregation(85, 80, 82, 5, "[]");
-        assertThat(savedTotalReport.getIsRead()).isFalse();
-        assertThat(savedTotalReport.getStatus()).isEqualTo(ReportStatus.COMPLETED);
-
-        // When: 상세 조회
-        KopicTotalReportDetailResponse response = reportService.getKopicTotalReportDetail(
-                savedTotalReport.getKopicTotalReportId(), member.getMemberId());
-
-        // Then: 응답 검증
-        assertThat(response).isNotNull();
-        assertThat(response.getKopicTotalReportId()).isEqualTo(savedTotalReport.getKopicTotalReportId());
-        assertThat(response.getStatus()).isEqualTo("COMPLETED");
-        assertThat(response.getAvgAccuracy()).isEqualTo(85);
-        assertThat(response.getTotalScore()).isEqualTo(82);
-
-        // Then: 자동으로 is_read가 true로 변경됨
-        KopicTotalReport updated = kopicTotalReportRepository.findById(savedTotalReport.getKopicTotalReportId())
-                .orElseThrow();
-        assertThat(updated.getIsRead()).isTrue();
-    }
-
-    @Test
-    @DisplayName("코픽 통합 리포트 상세 조회 - PROCESSING 상태")
-    void getKopicTotalReportDetail_Processing() {
-        // Given: PROCESSING 상태의 코픽 통합 리포트 생성
-        KopicTotalReport totalReport = KopicTotalReport.builder()
-                .member(member)
-                .theme(theme)
-                .status(ReportStatus.PROCESSING)
-                .build();
-        KopicTotalReport savedTotalReport = kopicTotalReportRepository.save(totalReport);
-
-        // When: 상세 조회
-        KopicTotalReportDetailResponse response = reportService.getKopicTotalReportDetail(
-                savedTotalReport.getKopicTotalReportId(), member.getMemberId());
-
-        // Then: PROCESSING 응답 검증
-        assertThat(response).isNotNull();
-        assertThat(response.getKopicTotalReportId()).isEqualTo(savedTotalReport.getKopicTotalReportId());
-        assertThat(response.getStatus()).isEqualTo("PROCESSING");
-        assertThat(response.getCompletedCount()).isNotNull();
-        assertThat(response.getTotalCount()).isNotNull();
-
-        // PROCESSING 상태에서는 읽음 처리되지 않음
-        KopicTotalReport updated = kopicTotalReportRepository.findById(savedTotalReport.getKopicTotalReportId())
-                .orElseThrow();
-        assertThat(updated.getIsRead()).isFalse();
-    }
-
-    @Test
-    @DisplayName("코픽 통합 리포트 상세 조회 - 리포트 없음 (실패)")
-    void getKopicTotalReportDetail_NotFound() {
-        // When & Then: 존재하지 않는 리포트 조회 시 예외 발생
-        assertThatThrownBy(() -> reportService.getKopicTotalReportDetail(9999L, member.getMemberId()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(ErrorCode.NOT_FOUND_KOPIC_TOTAL_REPORT.getMessage());
-    }
-
-    @Test
-    @DisplayName("코픽 통합 리포트 상세 조회 - 권한 없음 (실패)")
-    void getKopicTotalReportDetail_Forbidden() {
-        // Given: 다른 사용자의 리포트
-        Member otherMember = Member.builder()
-                .email("other2@example.com")
-                .nickname("다른유저2")
-                .password("password123")
-                .build();
-        memberRepository.save(otherMember);
-
-        KopicTotalReport totalReport = KopicTotalReport.builder()
-                .member(otherMember)
-                .theme(theme)
-                .status(ReportStatus.COMPLETED)
-                .build();
-        KopicTotalReport savedTotalReport = kopicTotalReportRepository.save(totalReport);
-
-        // When & Then: 다른 사용자가 접근 시 예외 발생
-        assertThatThrownBy(() -> reportService.getKopicTotalReportDetail(
-                savedTotalReport.getKopicTotalReportId(), member.getMemberId()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(ErrorCode.ACCESS_DENIED.getMessage());
-    }
 }

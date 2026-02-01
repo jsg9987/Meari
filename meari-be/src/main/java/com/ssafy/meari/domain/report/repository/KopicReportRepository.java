@@ -19,10 +19,4 @@ public interface KopicReportRepository extends JpaRepository<KopicReport, Long> 
 
     long countByKopicTotalReport(KopicTotalReport kopicTotalReport);
 
-    // 코픽 통합 리포트 ID로 개별 리포트 조회 (문장 ID 오름차순 정렬)
-    @Query("SELECT kr FROM KopicReport kr " +
-           "JOIN FETCH kr.kopicSentence ks " +
-           "WHERE kr.kopicTotalReport.kopicTotalReportId = :totalReportId " +
-           "ORDER BY ks.kopicSentenceId ASC")
-    List<KopicReport> findByKopicTotalReportIdOrderBySentenceId(@Param("totalReportId") Long totalReportId);
-}
+    }

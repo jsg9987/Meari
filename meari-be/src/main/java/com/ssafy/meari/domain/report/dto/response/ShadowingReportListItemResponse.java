@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Getter
 @Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class ShadowingReportListResponse {
+public class ShadowingReportListItemResponse {
 
     @Schema(description = "쉐도잉 리포트 ID", example = "1001")
     private Long shadowingReportId;
@@ -36,7 +36,7 @@ public class ShadowingReportListResponse {
     @Schema(description = "생성 시간")
     private LocalDateTime createdAt;
 
-    public static ShadowingReportListResponse from(ShadowingReport report) {
+    public static ShadowingReportListItemResponse from(ShadowingReport report) {
 
         // TODO totalScore 계산로직 수정 (현재는 임의로 단순하게 절반씩 반영하였음)
         // TODO 추후 평가항목 검토하여 수정 (현재 발음 필드 누락상태)
@@ -45,7 +45,7 @@ public class ShadowingReportListResponse {
             totalScore = (report.getAccuracy() + report.getIntonation()) / 2;
         }
 
-        return ShadowingReportListResponse.builder()
+        return ShadowingReportListItemResponse.builder()
                 .shadowingReportId(report.getShadowingReportId())
                 .thumbnailUrl(report.getContent().getThumbnailUrl())
                 .roomTitle(report.getRoom().getTitle())

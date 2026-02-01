@@ -1,5 +1,6 @@
 package com.ssafy.meari.domain.report.repository;
 
+import com.ssafy.meari.domain.report.entity.ReportStatus;
 import com.ssafy.meari.domain.report.entity.ShadowingReport;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
