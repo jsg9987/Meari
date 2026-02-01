@@ -158,7 +158,6 @@ class KopicEvaluateServiceTest {
             given(report.getMember()).willReturn(member);
             given(report.getKopicSentence()).willReturn(sentence);
             given(report.getAccuracy()).willReturn(85);
-            given(report.getIntonation()).willReturn(80);
             given(report.getStatus()).willReturn(ReportStatus.COMPLETED);
             given(report.getDetailedAnalysis()).willReturn("{\"missed_point\":\"test\",\"correction\":\"test\",\"tip\":\"test\"}");
             given(kopicReportRepository.findById(1001L)).willReturn(Optional.of(report));
@@ -170,7 +169,6 @@ class KopicEvaluateServiceTest {
             assertThat(response.getKopicReportId()).isEqualTo(1001L);
             assertThat(response.getStatus()).isEqualTo("COMPLETED");
             assertThat(response.getAccuracy()).isEqualTo(85);
-            assertThat(response.getIntonation()).isEqualTo(80);
             assertThat(response.getDetailedAnalysis()).isNotNull();
         }
 
