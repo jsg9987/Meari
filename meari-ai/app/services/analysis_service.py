@@ -3,7 +3,7 @@
 Wav2Vec2 ASR을 사용한 한국어 발음 분석 및 점수 계산
 
 주요 기능:
-- S3에서 오디오 다운로드
+- S3에서 오디오 병렬 다운로드 (aioboto3)
 - Wav2Vec2 ASR 추론 (자모 단위 인식)
 - 자모 → 음절 변환 및 confidence 계산
 - 정답 대비 정확도 계산 (edit distance 기반)
@@ -11,11 +11,12 @@ Wav2Vec2 ASR을 사용한 한국어 발음 분석 및 점수 계산
 import json
 import logging
 import io
+import asyncio
 import torch
 import torch.nn.functional as F
 import torchaudio
 import numpy as np
-import boto3
+import aioboto3
 from typing import List, Dict, Any, Tuple, Optional
 from app.config import settings
 from app.schemas.request import AnalysisRequestMessage, SentenceAnalysisInfo
@@ -36,12 +37,6 @@ class AnalysisService:
     """발음 분석 서비스"""
 
     def __init__(self):
-        self.s3_client = boto3.client(
-            's3',
-            aws_access_key_id=settings.AWS_ACCESS_KEY,
-            aws_secret_access_key=settings.AWS_SECRET_KEY,
-            region_name=settings.AWS_REGION
-        )
         logger.info("AnalysisService 초기화 완료")
 
     def analyze_member(self, message: AnalysisRequestMessage) -> AnalysisResultMessage:
@@ -61,22 +56,30 @@ class AnalysisService:
             f"memberId={message.member_id}, sentences={len(message.sentences)}"
         )
 
+        # 1. S3에서 모든 오디오 병렬 다운로드
+        logger.debug(f"S3 병렬 다운로드 시작: {len(message.sentences)}개 파일")
+        audio_data_list = asyncio.run(
+            self.download_all_audios_parallel(message.sentences)
+        )
+        logger.debug("S3 병렬 다운로드 완료")
+
+        # 2. 각 문장 분석 (순차 처리)
         sentence_results = []
         total_accuracy = 0
         total_confidence = 0
         valid_count = 0
 
-        for sentence_info in message.sentences:
+        for idx, sentence_info in enumerate(message.sentences):
             try:
-                # 1. S3에서 오디오 다운로드
-                audio_waveform, sample_rate = self.download_audio_from_s3(
-                    sentence_info.audio_url
-                )
+                audio_waveform, sample_rate = audio_data_list[idx]
 
-                # 2. 음성 전처리 (16kHz 모노 변환)
+                if audio_waveform is None:
+                    raise Exception("오디오 다운로드 실패")
+
+                # 음성 전처리 (16kHz 모노 변환)
                 audio_waveform = self.preprocess_audio(audio_waveform, sample_rate)
 
-                # 3. ASR 추론 + 발음 분석
+                # ASR 추론 + 발음 분석
                 analysis = self.detect_pronunciation_errors(
                     audio_waveform,
                     sentence_info.text_ko
@@ -128,7 +131,7 @@ class AnalysisService:
                     "error_message": str(e)
                 })
 
-        # 4. 전체 점수 계산
+        # 3. 전체 점수 계산
         if valid_count > 0:
             accuracy = int(round(total_accuracy / valid_count))
             avg_confidence = total_confidence / valid_count
@@ -139,7 +142,7 @@ class AnalysisService:
         # 억양 점수 (현재는 confidence 기반으로 계산)
         intonation = self.calculate_intonation_score(sentence_results)
 
-        # 5. detailed_analysis JSON 구성
+        # 4. detailed_analysis JSON 구성
         detailed = {
             "sentences": sentence_results,
             "summary": {
@@ -150,7 +153,7 @@ class AnalysisService:
             }
         }
 
-        # 6. 결과 생성
+        # 5. 결과 생성
         result = AnalysisResultMessage(
             room_id=message.room_id,
             round=message.round,
@@ -168,12 +171,51 @@ class AnalysisService:
 
         return result
 
-    def download_audio_from_s3(self, audio_url: str) -> Tuple[torch.Tensor, int]:
+    async def download_all_audios_parallel(
+        self,
+        sentences: List[SentenceAnalysisInfo]
+    ) -> List[Tuple[Optional[torch.Tensor], int]]:
         """
-        S3에서 오디오 파일 다운로드
+        모든 문장의 오디오를 S3에서 병렬로 다운로드
+
+        Args:
+            sentences: 문장 정보 리스트
+
+        Returns:
+            (waveform, sample_rate) 튜플 리스트
+            다운로드 실패 시 (None, 0) 반환
+        """
+        tasks = [
+            self.download_audio_from_s3_async(sentence.audio_url, sentence.sentence_id)
+            for sentence in sentences
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 결과 처리 (예외는 None으로 변환)
+        audio_data_list = []
+        for idx, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(
+                    f"문장 {sentences[idx].sentence_id} 오디오 다운로드 실패: {result}"
+                )
+                audio_data_list.append((None, 0))
+            else:
+                audio_data_list.append(result)
+
+        return audio_data_list
+
+    async def download_audio_from_s3_async(
+        self,
+        audio_url: str,
+        sentence_id: int
+    ) -> Tuple[torch.Tensor, int]:
+        """
+        S3에서 오디오 파일 비동기 다운로드
 
         Args:
             audio_url: S3 URL (s3://bucket/key 형식) 또는 HTTP URL
+            sentence_id: 문장 ID (로깅용)
 
         Returns:
             (오디오 waveform, sample_rate) 튜플
@@ -185,7 +227,6 @@ class AnalysisService:
                 bucket = parts[0]
                 key = parts[1]
             elif audio_url.startswith("https://") and ".s3." in audio_url:
-                # HTTPS S3 URL 처리: https://bucket.s3.region.amazonaws.com/key
                 from urllib.parse import urlparse
                 parsed = urlparse(audio_url)
                 bucket = parsed.netloc.split('.')[0]
@@ -193,32 +234,34 @@ class AnalysisService:
             else:
                 raise ValueError(f"Invalid S3 URL format: {audio_url}")
 
-            logger.debug(f"S3 다운로드: bucket={bucket}, key={key}")
-            
             # 파일 확장자 추출
             file_extension = key.split('.')[-1].lower()
             if file_extension not in ['wav', 'mp3', 'flac', 'ogg']:
-                logger.warning(f"오디오 파일 확장자를 알 수 없거나 지원하지 않는 형식입니다: {file_extension}")
                 format_hint = None
             else:
                 format_hint = file_extension
 
-            # S3 객체 다운로드
-            response = self.s3_client.get_object(Bucket=bucket, Key=key)
-            audio_bytes = response['Body'].read()
+            # aioboto3로 비동기 다운로드
+            session = aioboto3.Session()
+            async with session.client(
+                's3',
+                aws_access_key_id=settings.AWS_ACCESS_KEY,
+                aws_secret_access_key=settings.AWS_SECRET_KEY,
+                region_name=settings.AWS_REGION
+            ) as s3_client:
+                response = await s3_client.get_object(Bucket=bucket, Key=key)
+                audio_bytes = await response['Body'].read()
 
-            # 오디오 로드
-            waveform, sample_rate = torchaudio.load(io.BytesIO(audio_bytes), format=format_hint)
-
-            logger.debug(
-                f"오디오 로드 완료: sample_rate={sample_rate}, "
-                f"shape={waveform.shape}, duration={waveform.shape[1]/sample_rate:.2f}s"
+            # 오디오 로드 (동기 작업)
+            waveform, sample_rate = torchaudio.load(
+                io.BytesIO(audio_bytes),
+                format=format_hint
             )
 
             return waveform, sample_rate
 
         except Exception as e:
-            logger.error(f"S3 다운로드 실패: {e}")
+            logger.error(f"문장 {sentence_id} S3 비동기 다운로드 실패: {e}")
             raise
 
     def preprocess_audio(
