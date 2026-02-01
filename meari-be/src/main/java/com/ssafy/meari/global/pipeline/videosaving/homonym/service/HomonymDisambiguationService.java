@@ -102,17 +102,14 @@ public class HomonymDisambiguationService {
 		List<WordMatchingInfo> wordMatchingInfos = new ArrayList<>();
 
 		if (homonymList.isEmpty()) {
-			log.info("[Homonym] 처리할 동음이의어 없음");
 			return wordMatchingInfos;
 		}
 
 		// 사용자 프롬프트 생성
 		String userPrompt = buildUserPrompt(homonymList, fullScript);
-		log.debug("[Homonym] LLM 요청 - 동음이의어 {}개", homonymList.size());
 
 		// Claude API 호출 (한 번만)
 		String response = anthropicService.chat(SYSTEM_PROMPT, userPrompt);
-		log.info("[Homonym] LLM 응답: {}", response);
 
 		if (response == null || response.isBlank()) {
 			log.warn("[Homonym] LLM 응답이 비어있음");
@@ -121,7 +118,6 @@ public class HomonymDisambiguationService {
 
 		// 응답에서 선택 배열 파싱
 		List<Integer> selections = parseResponse(response.trim());
-		log.info("[Homonym] 파싱된 선택 배열: {} ({}개)", selections, selections.size());
 
 		if (selections.size() != homonymList.size()) {
 			log.warn("[Homonym] LLM 응답 개수 불일치 - 요청: {}, 응답: {} (일부만 처리합니다)",
@@ -132,8 +128,6 @@ public class HomonymDisambiguationService {
 		int processableCount = Math.min(selections.size(), homonymList.size());
 
 		int processedCount = 0;
-
-		log.info("[Homonym] AI 선택 결과 ({}개 처리):", processableCount);
 		int skippedCount = 0;
 		for (int i = 0; i < processableCount; i++) {
 			HomonymWordDto homonymDto = homonymList.get(i);

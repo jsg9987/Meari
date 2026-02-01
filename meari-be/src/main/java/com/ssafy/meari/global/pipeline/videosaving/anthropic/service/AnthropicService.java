@@ -56,8 +56,6 @@ public class AnthropicService {
 	 * @return 응답 텍스트
 	 */
 	public String chat(String systemPrompt, String userPrompt) {
-		log.debug("[Anthropic] Claude API 호출 시작 (model: {})", model);
-
 		AnthropicRequestDto requestDto = AnthropicRequestDto.builder()
 				.model(model)
 				.system(systemPrompt)
@@ -73,7 +71,6 @@ public class AnthropicService {
 		try {
 			// 1. DTO를 JSON 문자열로 변환
 			String requestBody = objectMapper.writeValueAsString(requestDto);
-			log.debug("[Anthropic] 요청 본문: {}", requestBody.substring(0, Math.min(200, requestBody.length())));
 
 			// 2. HttpRequest 생성
 			HttpRequest request = HttpRequest.newBuilder()
@@ -92,7 +89,6 @@ public class AnthropicService {
 			if (response.statusCode() == 200) {
 				AnthropicResponseDto responseDto = objectMapper.readValue(response.body(), AnthropicResponseDto.class);
 				String content = responseDto.getContent();
-				log.debug("[Anthropic] API 호출 성공 - 응답 길이: {}", content != null ? content.length() : 0);
 				return content;
 			} else {
 				log.error("[Anthropic] API 호출 실패 - 상태 코드: {}, 응답: {}", response.statusCode(), response.body());

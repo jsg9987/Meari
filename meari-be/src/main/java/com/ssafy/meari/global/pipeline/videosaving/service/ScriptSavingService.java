@@ -127,9 +127,6 @@ public class ScriptSavingService {
 		String fullScript = buildFullScript(rows);
 
 		for (ScriptCsvRowDto row : rows) {
-			log.info("[Pipeline] CSV 행 처리 - contentId: {}, roleId: {}, sequence: {}",
-					row.getContentId(), row.getRoleId(), row.getSequence());
-
 			// Content 조회
 			Content content = contentRepository.findById(row.getContentId())
 					.orElseThrow(() -> {
@@ -161,9 +158,6 @@ public class ScriptSavingService {
 
 			// 형태소 분석
 			MorphemeAnalysisResponseDto morphemeResult = nlpService.analyzeMorphemes(row.getTextKo());
-			log.debug("[Pipeline] 문장 ID: {}, 형태소 분석 결과: {}개",
-					savedSentence.getSentenceId(),
-					morphemeResult.getMorphemes().size());
 
 			// 형태소 분석 결과로 Word 조회 (SINGLE도 LLM 검증 위해 리스트에 보관)
 			linkWordsToSentence(savedSentence, morphemeResult, allWordList);
@@ -269,7 +263,6 @@ public class ScriptSavingService {
 
 			if (foundWords.isEmpty()) {
 				// Word가 없으면 스킵
-				log.debug("[Pipeline] Word 없음 - wordKr: {}", wordKr);
 				continue;
 			}
 
@@ -285,10 +278,6 @@ public class ScriptSavingService {
 					.homonymWords(foundWords)
 					.build();
 			allWordList.add(wordDto);
-
-			String type = foundWords.size() == 1 ? "SINGLE" : "HOMONYM";
-			log.debug("[Pipeline] {} 단어 보관 - wordKr: {}, 후보: {}개, 단어 시퀀스: {}",
-					type, wordKr, foundWords.size(), wordSequence);
 		}
 	}
 
