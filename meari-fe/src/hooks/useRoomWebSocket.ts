@@ -256,9 +256,6 @@ export function useRoomWebSocket({
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
-      debug: (str) => {
-        // console.log('[WebSocket Debug]', str);
-      },
 
       beforeConnect: async () => {
         const token = localStorage.getItem('access_token');
