@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { OpenVidu, Publisher, Session, Subscriber, Connection } from "openvidu-browser";
-import { enterWebRTC, leaveWebRTC } from "../api/rooms.api";
-import { createSession, createConnection } from "../api/webrtc.api";
+import { enterWebRTC } from "../api/rooms.api";
+import { createSession, createConnection, deleteSession } from "../api/webrtc.api";
 import { useAuthStore } from "../store/auth.store";
 
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
@@ -46,6 +46,7 @@ export function useVideoRoom({
   const [error, setError] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [backendSessionId, setBackendSessionId] = useState<string | null>(null); // 백엔드에서 받은 session_id
 
   const ovRef = useRef<OpenVidu | null>(null);
   const statusRef = useRef<ConnectionStatus>("idle");
@@ -174,6 +175,8 @@ export function useVideoRoom({
           throw new Error(connectionResponse.data.error?.message || "연결 토큰 생성에 실패했습니다");
         }
 
+        // 백엔드에서 받은 session_id 저장
+        setBackendSessionId(session_id);
         token = connectionResponse.data.data.token;
       } else {
         // 일반 사용자: enterWebRTC 사용
@@ -183,6 +186,8 @@ export function useVideoRoom({
           throw new Error(webrtcResponse.data.error?.message || "WebRTC 입장에 실패했습니다");
         }
 
+        // 백엔드에서 받은 session_id 저장
+        setBackendSessionId(webrtcResponse.data.data.sessionId);
         token = webrtcResponse.data.data.token;
       }
 
@@ -237,23 +242,40 @@ export function useVideoRoom({
   }, [session]);
 
   const leave = useCallback(async () => {
+    // 먼저 미디어 트랙 즉시 정리 (카메라/마이크 바로 끄기)
+    const currentPublisher = publisherRef.current || publisher;
+    if (currentPublisher) {
+      const stream = currentPublisher.stream?.getMediaStream();
+      if (stream) {
+        console.log("스트림 정리 - 카메라/마이크 즉시 종료");
+        stream.getTracks().forEach(track => {
+          track.stop();
+        });
+      }
+    }
+
     try {
+      // OpenVidu 세션 종료
+      if (backendSessionId) {
+        await deleteSession(backendSessionId);
+      }
       session?.disconnect();
-      await leaveWebRTC(roomId);
     } catch (error) {
       console.error('Failed to leave WebRTC:', error);
     } finally {
       ovRef.current = null;
       setSession(null);
       setPublisher(null);
+      publisherRef.current = null;
       setSubscribers([]);
+      setBackendSessionId(null);
       statusRef.current = "idle";
       setStatus("idle");
       setError(null);
       setIsAudioEnabled(true);
       setIsVideoEnabled(true);
     }
-  }, [session, roomId]);
+  }, [session, publisher, backendSessionId]);
 
   const toggleAudio = useCallback(() => {
     if (!publisher) return;
@@ -274,6 +296,16 @@ export function useVideoRoom({
       join();
     }
     return () => {
+      // Cleanup: 미디어 트랙 정리
+      if (publisherRef.current) {
+        const stream = publisherRef.current.stream?.getMediaStream();
+        if (stream) {
+          stream.getTracks().forEach(track => {
+            track.stop();
+          });
+        }
+      }
+
       if (session) {
         try {
           session.disconnect();

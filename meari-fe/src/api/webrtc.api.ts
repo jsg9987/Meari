@@ -47,6 +47,7 @@ export const createConnection = async (
 export const deleteSession = async (sessionId: string): Promise<void> => {
   await axiosInstance.delete(`/openvidu/sessions/${sessionId}`);
 };
+
 export async function getTokenMock(sessionName: string): Promise<string> {
   console.log('[API] Mock GetToken Requested:', sessionName);
   return new Promise((resolve) => {

@@ -857,14 +857,18 @@ export default function ShadowingRoom() {
   const handleLeave = async () => {
     if (roomId) {
       try {
-        await leave();
+        setIsEntered(false); // useEffect 재실행 방지를 위해 먼저 입장 상태 해제
+        await leave(); // 카메라/마이크 즉시 종료 및 세션 정리
         await leaveRoom(Number(roomId));
         clearRoomData();
+        navigate("/"); // 모든 정리 완료 후 이동
       } catch (error) {
         console.error('Failed to leave room:', error);
+        navigate("/"); // 에러 발생해도 페이지 이동
       }
+    } else {
+      navigate("/");
     }
-    navigate("/");
   };
 
   const handleCopyPassword = async () => {
