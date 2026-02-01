@@ -250,17 +250,12 @@ export function useRoomWebSocket({
       wsUrl = `${wsUrl}?token=${encodeURIComponent(accessToken)}`;
     }
 
-    console.log('[WebSocket] Connecting to:', wsUrl.replace(/token=[^&]+/, 'token=***'));
-
     // SockJS를 사용한 WebSocket 연결
     const client = new Client({
       webSocketFactory: () => new SockJS(wsUrl) as WebSocket,
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
-      debug: (str) => {
-        console.log('[WebSocket Debug]', str);
-      },
 
       beforeConnect: async () => {
         const token = localStorage.getItem('access_token');
