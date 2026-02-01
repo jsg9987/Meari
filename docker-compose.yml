@@ -83,7 +83,7 @@ services:
       retries: 5
 
   # ============================================================
-  # 4. OpenVidu - WebRTC 미디어 서버
+  # 4. OpenVidu - WebRTC 미디어 서버 포트범위 수정
   # ============================================================
   openvidu:
     image: openvidu/openvidu-dev:2.29.0
@@ -108,7 +108,7 @@ services:
           memory: 2G
 
   # ============================================================
-  # 5. Frontend (Nginx + React).
+  # 5. Frontend (Nginx + React)
   # ============================================================
   frontend:
     container_name: meari-frontend
