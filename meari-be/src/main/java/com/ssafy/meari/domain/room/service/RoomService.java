@@ -21,6 +21,7 @@ import com.ssafy.meari.domain.room.dto.response.RoomResponse;
 import com.ssafy.meari.domain.room.dto.websocket.MemberSegmentInfo;
 import com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
+import com.ssafy.meari.domain.room.dto.websocket.WatchingCompleteMessage;
 import com.ssafy.meari.domain.room.dto.websocket.SentenceSegmentInfo;
 import com.ssafy.meari.global.common.CursorPageResponse;
 import com.ssafy.meari.domain.room.entity.GamePhase;
@@ -694,16 +695,51 @@ public class RoomService {
             return; // 타임아웃 처리됨
         }
 
-        // 모든 멤버의 모든 문장이 완료되었는지 확인
-        if (roomSessionService.isAllRecordingsComplete(roomId, round)) {
-            log.info("모든 멤버 녹음 완료: roomId={}, round={}", roomId, round);
+        // 전원 영상 시청 완료 + 전원 녹음 전송 완료 시 영상 시청 끝남 브로드캐스트
+        tryBroadcastRecordingsComplete(roomId, round, currentPhase);
+    }
 
-            // 완료 플래그 설정 (중복 처리 방지)
-            roomSessionService.markRoundCompleted(roomId, round);
+    /**
+     * 영상 시청 완료 처리 (WATCHING_COMPLETE 수신 시)
+     * 전원 WATCHING_COMPLETE + 전원 녹음 전송 완료 시 RECORDINGS_COMPLETE 브로드캐스트
+     */
+    @Transactional
+    public void watchingComplete(Long roomId, WatchingCompleteMessage message) {
+        log.info("영상 시청 완료 요청: roomId={}, memberId={}", roomId, message.getMemberId());
 
-            RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
-            messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+        GamePhase currentPhase = roomSessionService.getPhase(roomId);
+        if (currentPhase != GamePhase.ROUND_1 && currentPhase != GamePhase.ROUND_2) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
         }
+        if (!roomSessionService.isMember(roomId, message.getMemberId())) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_MEMBER);
+        }
+
+        int round = currentPhase == GamePhase.ROUND_1 ? 1 : 2;
+        roomSessionService.addMemberWatchingComplete(roomId, round, message.getMemberId());
+
+        if (checkAndHandleRecordingTimeout(roomId, round, currentPhase)) {
+            return;
+        }
+
+        tryBroadcastRecordingsComplete(roomId, round, currentPhase);
+    }
+
+    /**
+     * 전원 영상 시청 완료 + 전원 녹음 전송 완료 시 RECORDINGS_COMPLETE 브로드캐스트 (중복 방지)
+     */
+    private void tryBroadcastRecordingsComplete(Long roomId, int round, GamePhase currentPhase) {
+        if (roomSessionService.isRoundCompleted(roomId, round)) {
+            return;
+        }
+        if (!roomSessionService.isAllWatchingComplete(roomId, round)
+                || !roomSessionService.isAllRecordingsComplete(roomId, round)) {
+            return;
+        }
+        log.info("모든 멤버 영상 시청 및 녹음 전송 완료: roomId={}, round={}", roomId, round);
+        roomSessionService.markRoundCompleted(roomId, round);
+        RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
     }
 
     /**
