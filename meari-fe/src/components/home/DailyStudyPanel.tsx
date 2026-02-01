@@ -12,7 +12,7 @@ const CARDS = [
     badge: '10 quizes',
     themeColor: 'white',
     image: illustratorCard,
-    path: '/study/word',
+    path: '/daily/word-study',
     isLocked: false
   },
   {

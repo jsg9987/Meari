@@ -7,28 +7,51 @@ import {
     submitKopicAnswer,
     createKopicTotalReport,
     type KopicSentence,
-    type KopicReportItem,
 } from '../api/kopic.api'
 import { getThemes } from '../api/contents.api'
 
-// 세션 데이터를 전역으로 관리 (리포트 페이지로 전달용)
+const KOPIC_SESSION_STORAGE_KEY = 'kopic_session'
+
+type KopicSessionSnapshot = {
+    themeId: number
+    themeName: string
+    themeImageUrl: string
+    kopicTotalReportId: number
+}
+
+const saveKopicSession = (snapshot: KopicSessionSnapshot) => {
+    sessionStorage.setItem(KOPIC_SESSION_STORAGE_KEY, JSON.stringify(snapshot))
+}
+
+const loadKopicSession = (): KopicSessionSnapshot | null => {
+    try {
+        const raw = sessionStorage.getItem(KOPIC_SESSION_STORAGE_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw) as KopicSessionSnapshot
+        if (!parsed?.kopicTotalReportId) return null
+        return parsed
+    } catch {
+        return null
+    }
+}
+
+// 세션 데이터 전역 저장 (리포트 페이지 전달)
 export const kopicSessionData = {
     themeId: 0,
     themeName: '',
     themeImageUrl: '',
     kopicTotalReportId: 0,
-    analysisPromises: [] as Promise<KopicReportItem>[],
     sentences: [] as KopicSentence[],
 }
 
-// 세션 데이터 초기화 함수
+// 세션 데이터 초기화
 const clearKopicSession = () => {
     kopicSessionData.themeId = 0
     kopicSessionData.themeName = ''
     kopicSessionData.themeImageUrl = ''
     kopicSessionData.kopicTotalReportId = 0
-    kopicSessionData.analysisPromises = []
     kopicSessionData.sentences = []
+    sessionStorage.removeItem(KOPIC_SESSION_STORAGE_KEY)
 }
 
 export default function KopicEvaluation() {
@@ -45,7 +68,7 @@ export default function KopicEvaluation() {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const audioChunksRef = useRef<Blob[]>([])
 
-    // 타이머 관련 상태
+    // 타이머 상태
     const [timeRemaining, setTimeRemaining] = useState(60)
     const [isTimerRunning, setIsTimerRunning] = useState(false)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -54,13 +77,12 @@ export default function KopicEvaluation() {
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [transitionMessage, setTransitionMessage] = useState('')
 
-    // 분석 Promise 저장 (비동기 순차 처리용)
-    const analysisPromisesRef = useRef<Promise<KopicReportItem>[]>([])
-
     const currentSentence = sentences[currentIndex]
     const totalSentences = sentences.length
+    const safeSentenceImageUrl =
+        currentSentence?.kopic_sentence_url?.startsWith('http') ? currentSentence.kopic_sentence_url : ''
 
-    // 뒤로가기 / 페이지 이탈 감지
+    // 뒤로가기/새로고침 시 세션 초기화
     useEffect(() => {
         const handleBeforeUnload = () => {
             clearKopicSession()
@@ -82,16 +104,37 @@ export default function KopicEvaluation() {
         }
     }, [navigate])
 
-    // 질문 및 테마 데이터 로드
+    // 질문/테마 데이터 로드
     useEffect(() => {
         const loadData = async () => {
             if (!themeId) return
 
             try {
+                const numericThemeId = Number(themeId)
+                const stored = loadKopicSession()
+                const hasStoredSession =
+                    stored &&
+                    stored.themeId === numericThemeId &&
+                    Number.isFinite(stored.kopicTotalReportId) &&
+                    stored.kopicTotalReportId > 0
+
+                if (hasStoredSession && stored) {
+                    kopicSessionData.themeId = stored.themeId
+                    kopicSessionData.themeName = stored.themeName
+                    kopicSessionData.themeImageUrl = stored.themeImageUrl
+                    kopicSessionData.kopicTotalReportId = stored.kopicTotalReportId
+                } else {
+                    clearKopicSession()
+                }
+
+                setSentences([])
+                setCurrentIndex(0)
                 setIsLoading(true)
-                const totalReportRes = await createKopicTotalReport(Number(themeId))
+                const totalReportRes = hasStoredSession
+                    ? null
+                    : await createKopicTotalReport(numericThemeId)
                 const [sentencesRes, themesRes] = await Promise.all([
-                    getKopicSentences(Number(themeId)),
+                    getKopicSentences(numericThemeId),
                     getThemes(),
                 ])
 
@@ -108,8 +151,18 @@ export default function KopicEvaluation() {
                         kopicSessionData.themeImageUrl = foundTheme.theme_url
                     }
                 }
-                if (totalReportRes.data.success && totalReportRes.data.data) {
+
+                if (totalReportRes?.data.success && totalReportRes.data.data) {
                     kopicSessionData.kopicTotalReportId = totalReportRes.data.data.kopic_total_report_id
+                }
+
+                if (kopicSessionData.kopicTotalReportId) {
+                    saveKopicSession({
+                        themeId: kopicSessionData.themeId,
+                        themeName: kopicSessionData.themeName,
+                        themeImageUrl: kopicSessionData.themeImageUrl,
+                        kopicTotalReportId: kopicSessionData.kopicTotalReportId,
+                    })
                 }
             } catch (error) {
                 console.error('Failed to load data:', error)
@@ -120,23 +173,6 @@ export default function KopicEvaluation() {
 
         loadData()
     }, [themeId])
-
-    // 타이머 로직
-    useEffect(() => {
-        if (isTimerRunning && timeRemaining > 0) {
-            timerRef.current = setTimeout(() => {
-                setTimeRemaining(prev => prev - 1)
-            }, 1000)
-        } else if (timeRemaining === 0 && isTimerRunning) {
-            handleStopRecording(true)
-        }
-
-        return () => {
-            if (timerRef.current) {
-                clearTimeout(timerRef.current)
-            }
-        }
-    }, [isTimerRunning, timeRemaining])
 
     // 녹음 시작
     const handleStartRecording = async () => {
@@ -157,11 +193,11 @@ export default function KopicEvaluation() {
             setIsTimerRunning(true)
         } catch (error) {
             console.error('Failed to start recording:', error)
-            alert('마이크 접근 권한을 허용해주세요.')
+            alert('마이크 권한을 허용해주세요.')
         }
     }
 
-    // 녹음 종료 및 답변 제출
+    // 녹음 종료 및 분석 요청
     const handleStopRecording = useCallback(async (isAutoStop = false) => {
         if (!mediaRecorderRef.current || !currentSentence) return
 
@@ -171,13 +207,12 @@ export default function KopicEvaluation() {
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
 
-                const analysisPromise = submitKopicAnswer(
+                submitKopicAnswer(
                     kopicSessionData.kopicTotalReportId,
                     currentSentence.kopic_sentence_id,
                     audioBlob,
                     currentSentence.text_ko
                 )
-                analysisPromisesRef.current.push(analysisPromise)
 
                 mediaRecorder.stream.getTracks().forEach(track => track.stop())
 
@@ -187,14 +222,13 @@ export default function KopicEvaluation() {
 
                 const isLastQuestion = currentIndex >= totalSentences - 1
                 if (isLastQuestion) {
-                    showTransition('평가가 완료되었습니다. 리포트를 생성 중입니다...', () => {
-                        kopicSessionData.analysisPromises = analysisPromisesRef.current
+                    showTransition('학습이 완료되었습니다. 리포트를 생성 중입니다...', () => {
                         navigate('/kopic/report')
                     })
                 } else {
                     const message = isAutoStop
                         ? '시간이 초과되었습니다. 다음 문제로 넘어갑니다.'
-                        : '답변이 저장되었습니다. 다음 문제로 넘어갑니다.'
+                        : '녹음이 완료되었습니다. 다음 문제로 넘어갑니다.'
                     showTransition(message, () => {
                         setCurrentIndex(prev => prev + 1)
                     })
@@ -207,7 +241,24 @@ export default function KopicEvaluation() {
         })
     }, [currentSentence, currentIndex, totalSentences, navigate])
 
-    // 전환 안내 표시 함수
+    // 타이머 로직
+    useEffect(() => {
+        if (isTimerRunning && timeRemaining > 0) {
+            timerRef.current = setTimeout(() => {
+                setTimeRemaining(prev => prev - 1)
+            }, 1000)
+        } else if (timeRemaining === 0 && isTimerRunning) {
+            handleStopRecording(true)
+        }
+
+        return () => {
+            if (timerRef.current) {
+                clearTimeout(timerRef.current)
+            }
+        }
+    }, [isTimerRunning, timeRemaining, handleStopRecording])
+
+    // 전환 안내 표시
     const showTransition = (message: string, callback: () => void) => {
         setTransitionMessage(message)
         setIsTransitioning(true)
@@ -219,7 +270,7 @@ export default function KopicEvaluation() {
         }, 1500)
     }
 
-    // 타이머 프로그레스 계산
+    // 타이머 진행률 계산
     const timerProgress = (timeRemaining / 60) * 100
 
     if (isLoading) {
@@ -227,7 +278,7 @@ export default function KopicEvaluation() {
             <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
                     <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-gray-600">질문을 불러오는 중...</p>
+                    <p className="text-gray-600">문장을 불러오는 중...</p>
                 </div>
             </div>
         )
@@ -237,7 +288,7 @@ export default function KopicEvaluation() {
         return (
             <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
-                    <p className="text-gray-600 mb-4">질문을 찾을 수 없습니다.</p>
+                    <p className="text-gray-600 mb-4">문장을 찾을 수 없습니다.</p>
                     <button
                         onClick={() => {
                             clearKopicSession()
@@ -245,7 +296,7 @@ export default function KopicEvaluation() {
                         }}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
-                        홈으로 돌아가기
+                        처음으로 돌아가기
                     </button>
                 </div>
             </div>
@@ -254,7 +305,7 @@ export default function KopicEvaluation() {
 
     return (
         <div className="min-h-screen w-full">
-            {/* 헤더 - 로고만 표시 */}
+            {/* 헤더 */}
             <header className="w-full h-[50px] bg-[var(--color-bg-root)]">
                 <div className="mx-auto h-full w-full max-w-[75rem] flex items-center px-6">
                     <img src={logoWhite} alt="Meari" className="h-[16px]" />
@@ -271,14 +322,10 @@ export default function KopicEvaluation() {
                 </div>
             )}
 
-            {/* 사이드 인디케이터 - 콘텐츠 영역 우측 배너 공간 중앙에 배치 */}
-            {/* calc: 콘텐츠 max-w = 68.2rem, 뷰포트 중앙 기준 우측 여백의 중앙 */}
+            {/* 사이드 인디케이터 */}
             <div
                 className="fixed top-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-10 z-10"
-                style={{
-                    // 콘텐츠 영역(68.2rem = 1091.2px) 우측 끝에서 배너 공간 중앙으로 배치
-                    left: 'calc(50% + 34.1rem + 4rem)'
-                }}
+                style={{ left: 'calc(50% + 34.1rem + 4rem)' }}
             >
                 {Array.from({ length: totalSentences }, (_, index) => {
                     const isCompleted = index < currentIndex
@@ -287,12 +334,13 @@ export default function KopicEvaluation() {
                     return (
                         <div
                             key={index}
-                            className={`w-14 h-14 rounded-full flex items-center justify-center text-base font-semibold transition-all shadow-md ${isCompleted
-                                ? 'bg-gray-400 text-white'
-                                : isCurrent
-                                    ? 'bg-[#2D9CDB] text-white ring-4 ring-blue-100 scale-110'
-                                    : 'bg-gray-200 text-white border border-gray-200'
-                                }`}
+                            className={`w-14 h-14 rounded-full flex items-center justify-center text-base font-semibold transition-all shadow-md ${
+                                isCompleted
+                                    ? 'bg-gray-400 text-white'
+                                    : isCurrent
+                                        ? 'bg-[#2D9CDB] text-white ring-4 ring-blue-100 scale-110'
+                                        : 'bg-gray-200 text-white border border-gray-200'
+                            }`}
                         >
                             {isCompleted ? <Check size={20} /> : index + 1}
                         </div>
@@ -300,42 +348,44 @@ export default function KopicEvaluation() {
                 })}
             </div>
 
-            {/* 메인 콘텐츠 */}
+            {/* 메인 컨텐츠 */}
             <main
                 className="mx-auto w-full max-w-[68.2rem] py-11"
-                style={{
-                    transform: 'scale(1.1)',
-                    transformOrigin: 'top center'
-                }}
+                style={{ transform: 'scale(1.1)', transformOrigin: 'top center' }}
             >
-                {/* 타이머 영역 - 항상 공간 확보 (녹음 시에만 내용 표시) */}
+                {/* 타이머 영역 */}
                 <div className="relative mb-1 max-w-4xl mx-auto w-full h-8">
-                    {/* 타이머 바 배경 - 항상 표시 */}
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        {/* 프로그레스 바 - 녹음 중에만 움직임 */}
                         <div
-                            className={`h-full transition-all duration-1000 ease-linear ${isRecording
-                                ? timeRemaining <= 10 ? 'bg-red-500' : 'bg-blue-500'
-                                : 'bg-gray-300'
-                                }`}
+                            className={`h-full transition-all duration-1000 ease-linear ${
+                                isRecording
+                                    ? timeRemaining <= 10
+                                        ? 'bg-red-500'
+                                        : 'bg-blue-500'
+                                    : 'bg-gray-300'
+                            }`}
                             style={{ width: isRecording ? `${timerProgress}%` : '100%' }}
                         />
                     </div>
-                    {/* 타이머 숫자 - 녹음 중에만 표시 */}
-                    <div className={`absolute right-0 top-4 text-sm font-medium transition-opacity ${isRecording
-                        ? timeRemaining <= 10 ? 'text-red-500 opacity-100' : 'text-gray-500 opacity-100'
-                        : 'opacity-0'
-                        }`}>
+                    <div
+                        className={`absolute right-0 top-4 text-sm font-medium transition-opacity ${
+                            isRecording
+                                ? timeRemaining <= 10
+                                    ? 'text-red-500 opacity-100'
+                                    : 'text-gray-500 opacity-100'
+                                : 'opacity-0'
+                        }`}
+                    >
                         {timeRemaining}초
                     </div>
                 </div>
 
-                {/* 중앙: 질문 콘텐츠 영역 */}
+                {/* 질문 컨텐츠 영역 */}
                 <div className="flex flex-col items-center justify-center max-w-5xl mx-auto w-full px-16">
                     {/* 질문 이미지 */}
                     <div className="w-full aspect-video bg-gray-200 rounded-xl overflow-hidden mb-6 shadow-lg p-1">
                         <img
-                            src={currentSentence.kopic_sentence_url}
+                            src={safeSentenceImageUrl || undefined}
                             alt={`문제 ${currentIndex + 1}`}
                             className="w-full h-full object-cover rounded-lg"
                         />
@@ -346,47 +396,43 @@ export default function KopicEvaluation() {
                         {currentSentence.text_ko}
                     </p>
 
-                    {/* 답변 버튼 / 녹음 중 UI */}
+                    {/* 녹음 버튼 / 녹음 UI */}
                     <div className="flex flex-col items-center">
                         {!isRecording ? (
                             <div className="flex flex-col items-center">
                                 <button
                                     onClick={handleStartRecording}
                                     className="w-16 h-16 rounded-full flex items-center justify-center bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all"
-                                    title="클릭하여 답변 시작"
+                                    title="클릭하여 녹음 시작"
                                 >
                                     <Mic size={30} />
                                 </button>
-                                <p className="mt-3 mb-3 text-sm text-gray-500">
-                                    클릭하여 답변 시작
-                                </p>
+                                <p className="mt-3 mb-3 text-sm text-gray-500">클릭하여 녹음 시작</p>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center">
                                 <button
                                     onClick={() => handleStopRecording(false)}
                                     className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500 text-white shadow-lg hover:bg-red-600 transition-all animate-pulse"
-                                    title="클릭하여 답변 종료"
+                                    title="클릭하여 녹음 종료"
                                 >
                                     <MicOff size={30} />
                                 </button>
-                                <p className="mt-3 mb-3 text-sm text-gray-500">
-                                    클릭하여 답변 종료
-                                </p>
+                                <p className="mt-3 mb-3 text-sm text-gray-500">클릭하여 녹음 종료</p>
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* 하단: 안내 메시지 */}
+                {/* 하단 안내 메시지 */}
                 <div className="text-center pt-2">
                     {!isRecording ? (
                         <p className="text-sm text-gray-400">
-                            "답변 시작하기"를 누르면 60초 타이머가 시작됩니다
+                            "녹음 시작하기"를 누르면 60초 타이머가 시작됩니다.
                         </p>
                     ) : (
                         <p className="text-sm text-gray-400">
-                            녹음 중입니다. 버튼을 클릭하거나 시간이 초과되면 자동으로 저장됩니다.
+                            녹음 중입니다. 버튼을 누르거나 시간이 초과되면 자동으로 종료됩니다.
                         </p>
                     )}
                 </div>
