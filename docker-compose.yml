@@ -111,7 +111,7 @@ services:
           memory: 4G
 
   # ============================================================
-  # 5. Frontend (Nginx + React)
+  # 5. Frontend (Nginx + React).
   # ============================================================
   frontend:
     container_name: meari-frontend
