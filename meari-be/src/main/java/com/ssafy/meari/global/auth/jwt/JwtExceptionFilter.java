@@ -17,7 +17,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RequiredArgsConstructor
 public class JwtExceptionFilter extends OncePerRequestFilter {
 
@@ -38,6 +40,7 @@ public class JwtExceptionFilter extends OncePerRequestFilter {
 		} catch (IllegalArgumentException e) {
 			setErrorResponse(response, ErrorCode.TOKEN_TYPE_ERROR);
 		} catch (Exception e) {
+			log.error("JWT 필터 처리 중 알 수 없는 예외 발생: {}", e.getMessage(), e);
 			setErrorResponse(response, ErrorCode.TOKEN_UNKNOWN_ERROR);
 		}
 	}

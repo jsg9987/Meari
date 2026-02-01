@@ -45,20 +45,33 @@ public class GeminiAnalysisService {
     }
 
     private static final String SYSTEM_PROMPT = """
-            당신은 한국어 발음 분석 전문가입니다.
-            사용자가 한국어 문장을 따라 읽은 음성을 분석하여 정확도와 억양을 평가합니다.
+            ## 역할
+            너는 외국인의 한국어 회화 능력을 평가하는 AI 채점관이야. 사용자가 제공한 질문(텍스트)에 대해 답변(음성)이 문맥상 적절한 응답인지 판단하고 피드백을 제공해야 해.
 
-            평가 기준:
-            - accuracy (정확도, 0~100): 원문과 발음의 일치도. 음절 누락, 대체, 삽입 등을 고려합니다.
-            - intonation (억양, 0~100): 자연스러운 한국어 억양과의 유사도. 높낮이, 강세, 리듬을 고려합니다.
+            ## 지시 사항
+            1. **음성 분석**: 사용자의 음성을 듣고, 실제 말한 내용을 텍스트로 변환해(잘못된 부분도 그대로 반영).
+            2. **문맥 판단**: 주어진 질문에 대해 사용자의 답변이 문맥상 적절한 응답인지 평가해. 정확한 정답 문장이 정해져 있지 않으므로, 질문의 의도에 맞는 자연스러운 답변이면 높은 점수를 줘.
+            3. **상세 비교**: 답변의 내용 적절성, 문법 정확성, 표현의 자연스러움을 종합적으로 분석해.
+            4. **평가 불가 판정**: 음성이 너무 짧거나, 소리가 너무 작거나, 잡음만 있어서 의미 있는 발화가 감지되지 않으면 accuracy를 0점으로 주고 detailed_analysis의 각 feedback 필드에 평가 불가 사유를 명시해.
+            5. **결과 출력**: 반드시 아래 지정된 JSON 형식으로만 응답해. 다른 텍스트는 절대 포함하지 마.
 
-            반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요:
+            ## 채점 기준
+            - **내용 적절성 (50%)**: 질문의 의도를 정확히 파악하고 문맥에 맞는 답변을 했는가
+            - **문법 정확성 (30%)**: 한국어 문법에 맞게 답변했는가
+            - **표현 자연스러움 (20%)**: 한국어 원어민이 자연스럽게 느낄 수 있는 표현인가
+
+            ## JSON 결과 규격
             {
               "accuracy": 0~100 정수,
-              "intonation": 0~100 정수,
-              "missed_point": "틀리거나 부자연스러운 부분에 대한 구체적인 설명 (한국어)",
-              "correction": "올바른 표현 또는 발음 교정 (한국어)",
-              "tip": "발음 개선을 위한 실용적인 팁 (한국어)"
+              "detailed_analysis": {
+                "original_sentence": "사용자가 실제로 말한 텍스트 (오류 포함, 평가 불가 시 빈 문자열)",
+                "target_sentence": "질문에 대한 모범 답변 예시",
+                "feedback": {
+                  "missed_point": "답변에서 부족하거나 문맥에 맞지 않는 부분 (평가 불가 시 사유 명시)",
+                  "correction": "더 적절한 답변 방향에 대한 피드백 (평가 불가 시 사유 명시)",
+                  "tip": "더 자연스러운 한국어 표현을 위한 팁 (평가 불가 시 사유 명시)"
+                }
+              }
             }
             """;
 
@@ -95,19 +108,13 @@ public class GeminiAnalysisService {
             JsonNode jsonNode = objectMapper.readTree(jsonResponse);
 
             int accuracy = jsonNode.get("accuracy").asInt();
-            int intonation = jsonNode.get("intonation").asInt();
 
-            String detailedAnalysis = objectMapper.writeValueAsString(
-                    objectMapper.createObjectNode()
-                            .put("missed_point", jsonNode.get("missed_point").asText())
-                            .put("correction", jsonNode.get("correction").asText())
-                            .put("tip", jsonNode.get("tip").asText())
-            );
+            String detailedAnalysis = objectMapper.writeValueAsString(jsonNode.get("detailed_analysis"));
 
-            report.updateAnalysisResult(accuracy, intonation, detailedAnalysis);
+            report.updateAnalysisResult(accuracy, detailedAnalysis);
             kopicReportRepository.save(report);
 
-            log.debug("Gemini 분석 완료: reportId={}, accuracy={}, intonation={}", kopicReportId, accuracy, intonation);
+            log.debug("Gemini 분석 완료: reportId={}, accuracy={}", kopicReportId, accuracy);
 
             kopicAggregationService.tryAggregate(kopicTotalReportId);
 

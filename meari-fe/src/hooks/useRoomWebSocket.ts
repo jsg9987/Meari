@@ -5,6 +5,7 @@ import SockJS from 'sockjs-client';
 // 웹소켓 메시지 타입 정의
 export type WebSocketMessageType =
   | 'MEMBER_JOIN'
+  | 'MEMBER_LEAVE'
   | 'READY'
   | 'ROLE_PICK'
   | 'ROLE_ASSIGNED'
@@ -90,6 +91,7 @@ interface UseRoomWebSocketOptions {
   memberId: number;
   onMessage?: (message: WebSocketMessage) => void;
   onMemberJoin?: (message: WebSocketMessage) => void;
+  onMemberLeave?: (message: WebSocketMessage) => void;
   onReady?: (message: WebSocketMessage) => void;
   onRolePick?: (message: WebSocketMessage) => void;
   onRoleAssigned?: (message: WebSocketMessage) => void;
@@ -110,6 +112,7 @@ export function useRoomWebSocket({
   memberId,
   onMessage,
   onMemberJoin,
+  onMemberLeave,
   onReady,
   onRolePick,
   onRoleAssigned,
@@ -140,7 +143,13 @@ export function useRoomWebSocket({
   // 채팅 메시지 핸들러
   const handleChatMessage = useCallback((message: IMessage) => {
     try {
-      const chatMessage: ChatMessage = JSON.parse(message.body);
+      const parsedMessage = JSON.parse(message.body);
+      const chatMessage: ChatMessage = {
+        sender_id: Number(parsedMessage.sender_id),
+        nickname: parsedMessage.nickname,
+        message: parsedMessage.message,
+        timestamp: parsedMessage.timestamp,
+      };
       console.log('[WebSocket] Received chat message:', chatMessage);
       onChatMessage?.(chatMessage);
     } catch (error) {
@@ -164,6 +173,10 @@ export function useRoomWebSocket({
         case 'MEMBER_JOIN':
           console.log('[WebSocket] Handling MEMBER_JOIN');
           onMemberJoin?.(payload);
+          break;
+        case 'MEMBER_LEAVE':
+          console.log('[WebSocket] Handling MEMBER_LEAVE');
+          onMemberLeave?.(payload);
           break;
         case 'READY':
           console.log('[WebSocket] Handling READY');
@@ -226,7 +239,7 @@ export function useRoomWebSocket({
       console.error('[WebSocket] Failed to parse message:', error);
       console.error('[WebSocket] Raw message:', message.body);
     }
-  }, [onMessage, onMemberJoin, onReady, onRolePick, onRoleAssigned, onRoleReleased, onGameStart, onPhaseWaiting, onRolesConfirmed, onRoundStart, onGameFinished]);
+  }, [onMessage, onMemberJoin, onMemberLeave, onReady, onRolePick, onRoleAssigned, onRoleReleased, onGameStart, onPhaseWaiting, onRolesConfirmed, onRoundStart, onGameFinished]);
 
   // 웹소켓 연결
   const connect = useCallback(() => {
@@ -244,17 +257,12 @@ export function useRoomWebSocket({
       wsUrl = `${wsUrl}?token=${encodeURIComponent(accessToken)}`;
     }
 
-    console.log('[WebSocket] Connecting to:', wsUrl.replace(/token=[^&]+/, 'token=***'));
-
     // SockJS를 사용한 WebSocket 연결
     const client = new Client({
       webSocketFactory: () => new SockJS(wsUrl) as WebSocket,
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
-      debug: (str) => {
-        console.log('[WebSocket Debug]', str);
-      },
 
       beforeConnect: async () => {
         const token = localStorage.getItem('access_token');

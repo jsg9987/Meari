@@ -141,6 +141,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/rooms/**").permitAll()
                 .requestMatchers("/api/v1/contents/**").permitAll()
 
+                    // 로그인 회원가입
+                    .requestMatchers("/api/v1/members/login", "/api/v1/members/signup").permitAll()
+
 
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
