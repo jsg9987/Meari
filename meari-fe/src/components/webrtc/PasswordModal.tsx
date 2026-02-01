@@ -34,7 +34,6 @@ export default function PasswordModal({ roomTitle, onSubmit, onCancel, errorMess
     }
   };
 
-  // 모달이 열릴 때 스크롤 방지
   useEffect(() => {
     const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
     document.body.style.overflow = 'hidden';
