@@ -64,7 +64,7 @@ export default function ShadowingRoom() {
   const [videoReady, setVideoReady] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
   const readyTimeoutRef = useRef<number | null>(null);
-  const memberId = 1; // TODO: 실제 사용자 ID로 변경 필요
+  const memberId = userInfo?.memberId ?? 0;
 
   // 영상 재생 관련 상태
   const videoRef = useRef<HTMLVideoElement>(null);
