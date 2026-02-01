@@ -101,10 +101,10 @@ public class ContentService {
     /**
      * 문장 순서 맞추기 퀴즈 조회
      */
-    public List<QuizResponseDto> getQuiz(int count) {
-        log.debug("퀴즈 조회: count={}", count);
+    public List<QuizResponseDto> getQuiz() {
+        log.debug("퀴즈 조회");
 
-        List<Sentence> sentences = sentenceRepository.findRandomSentences(count);
+        List<Sentence> sentences = sentenceRepository.findRandomSentences(5);
 
         return sentences.stream()
                 .map(QuizResponseDto::from)

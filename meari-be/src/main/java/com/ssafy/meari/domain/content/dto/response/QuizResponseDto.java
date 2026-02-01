@@ -20,6 +20,9 @@ public class QuizResponseDto {
     @Schema(description = "문장 ID", example = "501")
     private Long sentenceId;
 
+    @Schema(description = "베트남어 문장", example = "Xin chào, tôi có thể giúp gì cho bạn?")
+    private String textVn;
+
     @Schema(description = "셔플된 단어 목록 (각 단어에 원래 인덱스 포함)")
     private List<QuizWordDto> words;
 
@@ -38,6 +41,7 @@ public class QuizResponseDto {
 
         return QuizResponseDto.builder()
                 .sentenceId(sentence.getSentenceId())
+                .textVn(sentence.getTextVn())
                 .words(wordList)
                 .build();
     }

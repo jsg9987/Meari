@@ -233,18 +233,20 @@ class ContentServiceTest {
         Sentence sentence1 = Sentence.builder()
                 .sentenceId(501L)
                 .textKo("어서오세요 주문 도와드릴까요")
+                .textVn("Xin chào, tôi có thể giúp gì cho bạn?")
                 .build();
 
         Sentence sentence2 = Sentence.builder()
                 .sentenceId(502L)
                 .textKo("따뜻한 아메리카노 한잔 주세요")
+                .textVn("Cho tôi một ly americano nóng")
                 .build();
 
-        given(sentenceRepository.findRandomSentences(2))
+        given(sentenceRepository.findRandomSentences(5))
                 .willReturn(Arrays.asList(sentence1, sentence2));
 
         // When
-        List<QuizResponseDto> result = contentService.getQuiz(2);
+        List<QuizResponseDto> result = contentService.getQuiz();
 
         // Then
         assertThat(result).hasSize(2);
@@ -252,6 +254,7 @@ class ContentServiceTest {
         // 첫 번째 퀴즈 검증
         QuizResponseDto quiz1 = result.get(0);
         assertThat(quiz1.getSentenceId()).isEqualTo(501L);
+        assertThat(quiz1.getTextVn()).isEqualTo("Xin chào, tôi có thể giúp gì cho bạn?");
         assertThat(quiz1.getWords()).hasSize(3);
 
         // 셔플되어도 모든 단어와 인덱스가 포함되어 있는지 검증
@@ -268,9 +271,10 @@ class ContentServiceTest {
         // 두 번째 퀴즈 검증
         QuizResponseDto quiz2 = result.get(1);
         assertThat(quiz2.getSentenceId()).isEqualTo(502L);
+        assertThat(quiz2.getTextVn()).isEqualTo("Cho tôi một ly americano nóng");
         assertThat(quiz2.getWords()).hasSize(4);
 
-        verify(sentenceRepository).findRandomSentences(2);
+        verify(sentenceRepository).findRandomSentences(5);
     }
 
     @Test
@@ -281,7 +285,7 @@ class ContentServiceTest {
                 .willReturn(List.of());
 
         // When
-        List<QuizResponseDto> result = contentService.getQuiz(5);
+        List<QuizResponseDto> result = contentService.getQuiz();
 
         // Then
         assertThat(result).isEmpty();
