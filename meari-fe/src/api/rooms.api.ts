@@ -29,7 +29,6 @@ export type CreateRoomResponse = AxiosResponse<ApiResponse<CreateRoomData>>;
 export const createRoomMock = async (
   payload: CreateRoomRequest
 ): Promise<CreateRoomResponse> => {
-  console.log('[API] Mock Create Room Requested:', payload);
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
@@ -187,7 +186,6 @@ const mockRooms: RoomItem[] = [
 export const getRoomsMock = async (
   params: GetRoomsRequest
 ): Promise<GetRoomsResponse> => {
-  console.log('[API] Mock Get Rooms Requested:', params);
   return new Promise((resolve) => {
     setTimeout(() => {
       let filteredRooms = [...mockRooms];
@@ -237,7 +235,6 @@ export type JoinRoomResponse = AxiosResponse<ApiResponse<JoinRoomData>>;
 export const joinRoomMock = async (
   payload: JoinRoomRequest
 ): Promise<JoinRoomResponse> => {
-  console.log('[API] Mock Join Room Requested:', payload);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       const room = mockRooms.find(r => r.room_id === payload.room_id);
@@ -428,5 +425,3 @@ export const uploadRecordingToS3 = async (
     body: audioBlob,
   });
 };
-
-console.log(`[RoomsAPI] Initialized. Mode: ${useMock ? 'MOCK' : 'REAL'}`);

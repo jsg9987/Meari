@@ -8,20 +8,25 @@ import VideoControls from "../components/webrtc/VideoControls";
 import ChatPanel from "../components/webrtc/ChatPanel";
 import MediaCheckScreen from "../components/webrtc/MediaCheckScreen";
 import ContentSelectModal from "../components/webrtc/ContentSelectModal";
-import PasswordModal from "../components/webrtc/PasswordModal";
 import Toast from "../components/common/Toast";
 import RoleSelectModal from "../components/webrtc/RoleSelectModal";
 import { useVideoRoom } from "../hooks/useVideoRoom";
 import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type ChatMessage } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
 import { selectRoomContent, getContentRoles, type ContentRole } from "../api/contents.api";
-import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
+import { getRoomDetail, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
 import { useRoomStore } from "../store/room.store";
 import { useRoleStore } from "../store/role.store";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
 type SidebarTab = "video" | "chat";
 type LayoutMode = "narrow" | "grid" | "wide";
+
+// ========================================
+// WebRTC 비활성화 플래그
+// true로 설정하면 WebRTC 없이 쉐도잉 기능만 테스트
+// ========================================
+const DISABLE_WEBRTC = true;
 
 // TODO: 헤더 변경, 비디오 타일 변경
 export default function ShadowingRoom() {
@@ -41,15 +46,13 @@ export default function ShadowingRoom() {
     clearRoles,
   } = useRoleStore();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("video");
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
   const [isRoomLoading, setIsRoomLoading] = useState(true);
   const [isEntered, setIsEntered] = useState(false);
-  const [roomPassword, setRoomPassword] = useState<string | undefined>(undefined);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("narrow");
   const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
-  const [isMediaChecked, setIsMediaChecked] = useState(false);
+  // WebRTC 비활성화 시 미디어 체크 건너뛰기
+  const [isMediaChecked, setIsMediaChecked] = useState(DISABLE_WEBRTC ? true : false);
   const [isContentSelectOpen, setIsContentSelectOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -68,7 +71,7 @@ export default function ShadowingRoom() {
   const [videoReady, setVideoReady] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
   const readyTimeoutRef = useRef<number | null>(null);
-  const memberId = 1; // TODO: 실제 사용자 ID로 변경 필요
+  const memberId = userInfo?.memberId ?? 0;
 
   // 영상 재생 관련 상태
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -130,9 +133,7 @@ export default function ShadowingRoom() {
   // 오디오 레코더
   const { startRecording, stopRecording } = useAudioRecorder({
     onRecordingComplete: (audioBlob) => {
-      console.log('[ShadowingRoom] onRecordingComplete callback fired');
       const sentenceId = currentRecordingSentenceIdRef.current;
-      console.log('[ShadowingRoom] currentRecordingSentenceIdRef.current:', sentenceId);
       if (sentenceId !== null) {
         handleRecordingComplete(audioBlob, sentenceId);
         // 업로드 완료 후 sentenceId 초기화
@@ -184,13 +185,9 @@ export default function ShadowingRoom() {
       }
     },
     onRolePick: async (message) => {
-      console.log('Role pick received:', message);
-
       // store에서 최신 content_id 직접 가져오기 (클로저 문제 해결)
       const storeContentId = useRoomStore.getState().contentId;
       const currentContentId = storeContentId || message.content_id || selectedContent?.content_id;
-
-      console.log('DEBUG - currentContentId:', currentContentId, 'from store:', storeContentId);
 
       if (!currentContentId) {
         console.error('No content_id available to fetch roles');
@@ -210,7 +207,6 @@ export default function ShadowingRoom() {
             updated_at: new Date().toISOString(),
           }));
 
-          console.log('Roles fetched from API:', roles);
           setAvailableRoles(roles);
           setIsRoleSelectOpen(true);
         } else {
@@ -223,7 +219,6 @@ export default function ShadowingRoom() {
       }
     },
     onRoleAssigned: (message) => {
-      console.log('Role assigned:', message);
       // 역할 선점 성공 시 선택된 역할 ID 저장 (아직 확정은 아님)
       if (message.role_id && message.member_id) {
         setMySelectedRole(message.role_id);
@@ -261,8 +256,6 @@ export default function ShadowingRoom() {
         // 시작 시간순으로 정렬
         allSubtitles.sort((a, b) => a.start_time - b.start_time);
         timeIndexedSubtitlesRef.current = allSubtitles;
-
-        console.log('Time-indexed subtitles prepared:', allSubtitles);
       }
 
       // 게임 시작 시 즉시 영상 재생
@@ -357,9 +350,33 @@ export default function ShadowingRoom() {
       resetToWaitingState();
       setToastMessage('게임이 종료되었습니다');
     },
-    onMemberJoin: (message) => {
+    onMemberJoin: async (message) => {
       console.log('Member joined:', message);
-      // TODO: 멤버 입장 시 처리 로직
+      // 멤버 입장 시 방 정보 다시 가져오기 (members 업데이트)
+      if (roomId) {
+        try {
+          const response = await getRoomDetail(Number(roomId));
+          if (response.data.success && response.data.data) {
+            setRoomData(response.data.data);
+          }
+        } catch (error) {
+          console.error('Failed to refresh room detail:', error);
+        }
+      }
+    },
+    onMemberLeave: async (message) => {
+      console.log('Member left:', message);
+      // 멤버 퇴장 시 방 정보 다시 가져오기 (members 업데이트)
+      if (roomId) {
+        try {
+          const response = await getRoomDetail(Number(roomId));
+          if (response.data.success && response.data.data) {
+            setRoomData(response.data.data);
+          }
+        } catch (error) {
+          console.error('Failed to refresh room detail:', error);
+        }
+      }
     },
     onConnect: () => {
       console.log('WebSocket connected');
@@ -394,28 +411,11 @@ export default function ShadowingRoom() {
         setRoomData(response.data.data);
 
         // 방장이면 enterRoom API 호출 없이 바로 입장
-        if (isOwner) {
+        if (userInfo?.memberId === response.data.data.owner_id) {
           setIsEntered(true);
         } else {
-          // 비밀번호가 있는 방이면 비밀번호 모달 표시
-          if (response.data.data.has_password) {
-            setIsPasswordModalOpen(true);
-          } else {
-            // 비밀번호 없는 방은 enterRoom 호출
-            try {
-              const enterResponse = await enterRoom(Number(roomId), {});
-              if (enterResponse.data.success) {
-                setIsEntered(true);
-              } else {
-                alert('방 입장에 실패했습니다.');
-                navigate('/');
-              }
-            } catch (error) {
-              console.error('Failed to enter room:', error);
-              alert('방 입장에 실패했습니다.');
-              navigate('/');
-            }
-          }
+          // 메인페이지에서 이미 joinRoom으로 비밀번호 검증을 했으므로 바로 입장
+          setIsEntered(true);
         }
       } catch (error) {
         console.error('Failed to fetch room detail:', error);
@@ -427,35 +427,7 @@ export default function ShadowingRoom() {
     };
 
     fetchRoomDetail();
-  }, [roomId, navigate, setRoomData]);
-
-  // 방 퇴장 처리 (컴포넌트 언마운트 시)
-  useEffect(() => {
-    return () => {
-      if (roomId && isEntered) {
-        leaveRoom(Number(roomId)).catch((error) => {
-          console.error('Failed to leave room:', error);
-        });
-        clearRoomData();
-      }
-    };
-  }, [roomId, isEntered, clearRoomData]);
-
-  // 브라우저 닫기/새로고침 시 퇴장 처리
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (roomId && isEntered) {
-        leaveRoom(Number(roomId)).catch((error) => {
-          console.error('Failed to leave room on unload:', error);
-        });
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [roomId, isEntered]);
+  }, [roomId, navigate, setRoomData, userInfo?.memberId]);
 
   // 대본 데이터는 WebSocket ROLES_CONFIRMED 메시지로 받아서 roleSegments에 저장됨
 
@@ -632,32 +604,6 @@ export default function ShadowingRoom() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  // 비밀번호 검증 처리
-  const handlePasswordSubmit = async (password: string) => {
-    if (!roomId) return;
-
-    // eslint-disable-next-line no-useless-catch
-    try {
-      const response = await enterRoom(Number(roomId), { password });
-
-      if (response.data.success) {
-        setRoomPassword(password);
-        setIsPasswordModalOpen(false);
-        setIsEntered(true);
-        setPasswordError('');
-      } else {
-        setPasswordError(response.data.error?.message || '비밀번호가 일치하지 않습니다.');
-        throw new Error('Invalid password');
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const handlePasswordCancel = () => {
-    navigate('/');
-  };
 
   // 방 정보 (store에서 가져오기)
   const roomInfo = roomData ? {
@@ -847,30 +793,41 @@ export default function ShadowingRoom() {
     status,
     error,
     tiles,
+    publisher,
     isAudioEnabled,
     isVideoEnabled,
     join,
     leave,
+    publishStream,
     toggleAudio,
     toggleVideo,
   } = useVideoRoom({
     roomId: Number(roomId),
     nickname,
-    password: roomPassword,
+    password: undefined,
     autoJoin: false,
+    autoPublish: false, // 세팅 완료 후 수동으로 publish
     isOwner
   });
+
+  // leave 함수의 안정적 참조 (useEffect deps 재실행 방지)
+  const leaveRef = useRef(leave);
+  useEffect(() => {
+    leaveRef.current = leave;
+  }, [leave]);
 
   const [volume, setVolume] = useState(100);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
   const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
 
   const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
 
   // 모든 참가자가 준비 완료되었는지 확인
-  const totalParticipants = tiles.length;
+  // getRoomDetail의 members 배열 기반으로 인원 수 계산 (WebRTC와 분리)
+  const totalParticipants = roomData?.members.length || 0;
   const readyCount = Object.values(participantsReady).filter(ready => ready).length;
   const allParticipantsReady = totalParticipants > 0 && readyCount === totalParticipants;
 
@@ -886,13 +843,58 @@ export default function ShadowingRoom() {
     console.log('Video device changed to:', deviceId);
   };
 
-  // 미디어 체크 완료 후 WebRTC 연결
+  // 방 입장 후 즉시 WebRTC 연결 (publisher 생성, 아직 publish 안 함)
   useEffect(() => {
-    if (isMediaChecked && isEntered && roomId && status === 'idle') {
+    // WebRTC 비활성화 시 연결하지 않음
+    if (DISABLE_WEBRTC) return;
+
+    if (isEntered && roomId && status === 'idle') {
       join();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMediaChecked, isEntered, roomId, status]);
+  }, [isEntered, roomId, status]);
+
+  // 브라우저 뒤로가기 감지 및 처리
+  useEffect(() => {
+    const handlePopState = async () => {
+      if (roomId && isEntered && !isLeaving) {
+        // 뒤로가기 방지 (일단 현재 위치 유지)
+        window.history.pushState(null, '', window.location.href);
+
+        // leave 완료 후 이동
+        await handleLeaveInternal();
+      }
+    };
+
+    // 초기 진입 시 히스토리 스택에 현재 위치 추가 (뒤로가기 감지용)
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [roomId, isEntered, isLeaving]);
+
+  // 방 퇴장 처리 (컴포넌트 언마운트 시 - 강제 종료 대비)
+  useEffect(() => {
+    return () => {
+      // useVideoRoom의 cleanup에서 미디어 트랙 정리가 이미 처리됨
+      // 여기서는 추가 정리 작업 없음
+    };
+  }, []);
+
+  // 브라우저 닫기/새로고침 시 퇴장 처리
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // useVideoRoom의 cleanup에서 미디어 트랙 정리가 자동으로 처리됨
+      // 백엔드는 WebSocket 연결 해제로 자동 정리됨
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   if (!roomId) {
     return (
@@ -908,17 +910,39 @@ export default function ShadowingRoom() {
     );
   }
 
-  const handleLeave = async () => {
-    if (roomId) {
-      try {
-        await leave();
+  // 내부 leave 처리 함수 (뒤로가기/나가기 버튼 공통)
+  const handleLeaveInternal = async () => {
+    if (isLeaving) return; // 이미 처리 중이면 무시
+
+    setIsLeaving(true);
+    setIsEntered(false); // useEffect 재실행 방지
+
+    try {
+      if (roomId) {
+        // 1. OpenVidu 세션 정리 (카메라/마이크 즉시 종료)
+        await leaveRef.current();
+
+        // 2. 방 퇴장 API 호출 (완료 대기)
         await leaveRoom(Number(roomId));
+
+        // 3. 로컬 데이터 정리
         clearRoomData();
-      } catch (error) {
-        console.error('Failed to leave room:', error);
       }
+
+      // 4. 모든 정리 완료 후 홈으로 이동
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error('Failed to leave room:', error);
+      // 에러 발생해도 페이지 이동
+      navigate("/", { replace: true });
+    } finally {
+      setIsLeaving(false);
     }
-    navigate("/");
+  };
+
+  // 나가기 버튼 클릭 핸들러
+  const handleLeave = () => {
+    handleLeaveInternal();
   };
 
   const handleCopyPassword = async () => {
@@ -943,8 +967,8 @@ export default function ShadowingRoom() {
   };
 
   const handleMediaCheckComplete = (
-    _audioEnabled: boolean,
-    _videoEnabled: boolean,
+    audioEnabled: boolean,
+    videoEnabled: boolean,
     audioDeviceId?: string,
     videoDeviceId?: string
   ) => {
@@ -953,6 +977,24 @@ export default function ShadowingRoom() {
     // 선택된 장치 정보 저장
     setSelectedAudioDevice(audioDeviceId);
     setSelectedVideoDevice(videoDeviceId);
+
+    // 오디오/비디오 설정 반영
+    if (publisher) {
+      publisher.publishAudio(audioEnabled);
+      publisher.publishVideo(videoEnabled);
+    }
+
+    // useVideoRoom 상태 동기화 (VideoControls 반영용)
+    // 초기값이 true이므로 false인 경우만 토글
+    if (!audioEnabled && isAudioEnabled) {
+      toggleAudio();
+    }
+    if (!videoEnabled && isVideoEnabled) {
+      toggleVideo();
+    }
+
+    // 세팅 완료 후 스트림 publish (다른 사람들에게 보이기 시작)
+    publishStream();
   };
 
   // 방 정보 로딩 중
@@ -962,18 +1004,6 @@ export default function ShadowingRoom() {
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         <p className="text-gray-600">방 정보를 불러오는 중...</p>
       </div>
-    );
-  }
-
-  // 비밀번호 입력 모달
-  if (isPasswordModalOpen) {
-    return (
-      <PasswordModal
-        roomTitle={roomInfo.title}
-        onSubmit={handlePasswordSubmit}
-        onCancel={handlePasswordCancel}
-        errorMessage={passwordError}
-      />
     );
   }
 
@@ -987,13 +1017,8 @@ export default function ShadowingRoom() {
     );
   }
 
-  // 미디어 체크가 완료되지 않았으면 미디어 체크 화면 표시
-  if (!isMediaChecked) {
-    return <MediaCheckScreen onJoin={handleMediaCheckComplete} roomTitle={roomInfo.title} />;
-  }
-
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 relative">
       {/* 왼쪽 메인 영역 */}
       <div className="flex flex-1 flex-col">
         {/* 헤더 */}
@@ -1038,13 +1063,14 @@ export default function ShadowingRoom() {
         {/* 메인 비디오 영역 */}
         <div className="flex-1 p-4 bg-white">
           <div className="relative h-full w-full rounded-lg bg-gray-900 flex items-center justify-center">
-            {status === "connecting" && (
+            {/* WebRTC 비활성화 시 연결 상태 무시 */}
+            {!DISABLE_WEBRTC && status === "connecting" && (
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
                 <p className="text-gray-400">연결 중...</p>
               </div>
             )}
-            {status === "error" && (
+            {!DISABLE_WEBRTC && status === "error" && (
               <div className="flex flex-col items-center gap-3">
                 <p className="text-red-500">{error}</p>
                 <button
@@ -1055,7 +1081,7 @@ export default function ShadowingRoom() {
                 </button>
               </div>
             )}
-            {status === "connected" && (
+            {(DISABLE_WEBRTC || status === "connected") && (
               <>
                 {/* 카운트다운 오버레이 */}
                 {countdown !== null && (
@@ -1265,7 +1291,8 @@ export default function ShadowingRoom() {
                 )}
               </>
             )}
-            {status === "idle" && (
+            {/* WebRTC 비활성화 시 참여하기 버튼 숨김 */}
+            {!DISABLE_WEBRTC && status === "idle" && (
               <button
                 onClick={join}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -1275,7 +1302,7 @@ export default function ShadowingRoom() {
             )}
 
             {/* 컨텐츠 변경 버튼 (방장만) - 게임 시작 전에만 표시 */}
-            {status === "connected" && isHost && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && (
+            {(DISABLE_WEBRTC || status === "connected") && isHost && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && (
               <button
                 onClick={() => setIsContentSelectOpen(true)}
                 className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
@@ -1285,7 +1312,7 @@ export default function ShadowingRoom() {
             )}
 
             {/* 캐릭터 선택 버튼 - 역할 선택 완료 전까지만 표시 */}
-            {status === "connected" && !isPlaying && !isGameStarting && countdown === null && !isRoleAssigned && availableRoles.length > 0 && (
+            {(DISABLE_WEBRTC || status === "connected") && !isPlaying && !isGameStarting && countdown === null && !isRoleAssigned && availableRoles.length > 0 && (
               <button
                 onClick={() => setIsRoleSelectOpen(true)}
                 className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
@@ -1382,10 +1409,19 @@ export default function ShadowingRoom() {
 
         {/* 탭 콘텐츠 */}
         <div className="flex-1 overflow-hidden bg-white">
-          {sidebarTab === "video" && (
+          {sidebarTab === "video" && isMediaChecked && (
             <div className={`h-full overflow-y-auto p-3 ${layoutMode === "grid" ? "grid grid-cols-2 gap-3 auto-rows-min" : "space-y-3"
               }`}>
-              {status === "connected" && tiles.length > 0 ? (
+              {/* WebRTC 비활성화 시 안내 메시지 표시 */}
+              {DISABLE_WEBRTC ? (
+                <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                  <p className="text-gray-600 text-lg font-semibold mb-2">WebRTC 비활성화됨</p>
+                  <p className="text-gray-500 text-sm">쉐도잉 기능만 테스트 중입니다</p>
+                  <p className="text-gray-400 text-xs mt-4">
+                    WebRTC를 활성화하려면 DISABLE_WEBRTC를 false로 설정하세요
+                  </p>
+                </div>
+              ) : status === "connected" && tiles.length > 0 ? (
                 tiles.map((t) => (
                   <VideoTile
                     key={t.id}
@@ -1394,6 +1430,7 @@ export default function ShadowingRoom() {
                     label={t.label}
                     isSpeaker={t.isSpeaker}
                     isReady={t.id === "me" ? (isReady && !isGameStarting && !isPlaying) : false}
+                    isSettingUp={t.isSettingUp}
                     videoClassName={layoutMode === "wide" ? "aspect-[21/9]" : undefined}
                   />
                 ))
@@ -1410,7 +1447,7 @@ export default function ShadowingRoom() {
                 messages={chatMessages}
                 onSendMessage={sendChatMessage}
                 nickname={nickname}
-                currentUserId={userInfo?.memberId || 0}
+                currentUserId={memberId}
               />
             </div>
           )}
@@ -1446,6 +1483,14 @@ export default function ShadowingRoom() {
           type="error"
           onClose={() => setToastMessage(null)}
         />
+      )}
+
+      {/* 미디어 체크 모달 (블러 배경) */}
+      {/* WebRTC 비활성화 시 미디어 체크 모달 표시 안 함 */}
+      {!DISABLE_WEBRTC && !isMediaChecked && (
+        <div className="fixed inset-0 z-[9999] backdrop-blur-sm bg-black/30">
+          <MediaCheckScreen onJoin={handleMediaCheckComplete} roomTitle={roomInfo.title} />
+        </div>
       )}
     </div>
   );

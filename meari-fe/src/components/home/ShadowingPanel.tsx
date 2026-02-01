@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import RoomCard from './RoomCard'
-import PasswordModal from './PasswordModal'
+import PasswordModal from '../webrtc/PasswordModal'
 import CreateRoomButton from './CreateRoomButton'
 import { getRooms, joinRoom, type RoomItem } from '../../api/rooms.api'
 import { getThemes, type Theme } from '../../api/contents.api'
@@ -28,6 +28,7 @@ const ShadowingPanel = () => {
   // 비밀번호 모달 상태
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
   const [selectedRoomId, setSelectedRoomId] = useState<number | string | null>(null)
+  const [selectedRoomTitle, setSelectedRoomTitle] = useState<string>('')
 
   // 방 목록 불러오기 함수
   const fetchRooms = useCallback(async (isFirstPage: boolean = false) => {
@@ -117,7 +118,6 @@ const ShadowingPanel = () => {
   // 무한 스크롤 Observer 설정
   useEffect(() => {
     if (!observerTarget.current || !hasNext || isFetchingNextPage || isInitialLoading) {
-      console.log('⏭️ Observer 설정 스킵:', { hasObserverTarget: !!observerTarget.current, hasNext, isFetchingNextPage, isInitialLoading })
       return
     }
 
@@ -140,6 +140,7 @@ const ShadowingPanel = () => {
   const handleRoomClick = (room: RoomItem) => {
     if (room.has_password) {
       setSelectedRoomId(room.room_id)
+      setSelectedRoomTitle(room.title)
       setIsPasswordModalOpen(true)
     } else {
       navigate(`/shadowing/${room.room_id}`)
@@ -150,18 +151,15 @@ const ShadowingPanel = () => {
   const handlePasswordSubmit = async (password: string) => {
     if (!selectedRoomId) return
 
-    try {
-      const response = await joinRoom({
-        room_id: selectedRoomId as number,
-        password,
-      })
-      if (response.data.success) {
-        setIsPasswordModalOpen(false)
-        navigate(`/shadowing/${selectedRoomId}`)
-      }
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { error?: { message?: string } } } }
-      alert(err.response?.data?.error?.message || '입장에 실패했습니다.')
+    const response = await joinRoom({
+      room_id: selectedRoomId as number,
+      password,
+    })
+    if (response.data.success) {
+      setIsPasswordModalOpen(false)
+      navigate(`/shadowing/${selectedRoomId}`)
+    } else {
+      throw new Error('비밀번호가 일치하지 않습니다.')
     }
   }
 
@@ -265,11 +263,13 @@ const ShadowingPanel = () => {
       )}
 
       {/* 비밀번호 모달 */}
-      <PasswordModal
-        isOpen={isPasswordModalOpen}
-        onClose={() => setIsPasswordModalOpen(false)}
-        onSubmit={handlePasswordSubmit}
-      />
+      {isPasswordModalOpen && (
+        <PasswordModal
+          roomTitle={selectedRoomTitle}
+          onCancel={() => setIsPasswordModalOpen(false)}
+          onSubmit={handlePasswordSubmit}
+        />
+      )}
     </section>
   )
 }
