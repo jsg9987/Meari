@@ -50,12 +50,11 @@ public class KopicAggregationService {
                 .findByKopicTotalReportOrderByKopicSentence_KopicSentenceIdAsc(totalReport);
 
         int avgAccuracy = (int) reports.stream().mapToInt(KopicReport::getAccuracy).average().orElse(0);
-        int avgIntonation = (int) reports.stream().mapToInt(KopicReport::getIntonation).average().orElse(0);
-        int totalScore = (avgAccuracy + avgIntonation) / 2;
+        int totalScore = avgAccuracy;
 
         String reportData = buildReportData(reports);
 
-        totalReport.updateAggregation(avgAccuracy, avgIntonation, totalScore, reports.size(), reportData);
+        totalReport.updateAggregation(avgAccuracy, totalScore, reports.size(), reportData);
 
         log.debug("코픽 세션 집계 완료: totalReportId={}, sentenceCount={}, totalScore={}",
                 kopicTotalReportId, reports.size(), totalScore);
@@ -71,7 +70,6 @@ public class KopicAggregationService {
                 node.put("kopic_sentence_id", report.getKopicSentence().getKopicSentenceId());
                 node.put("text_ko", report.getKopicSentence().getTextKo());
                 node.put("accuracy", report.getAccuracy());
-                node.put("intonation", report.getIntonation());
                 node.put("total_score", report.getTotalScore());
 
                 if (report.getDetailedAnalysis() != null) {

@@ -142,11 +142,8 @@ export default function MediaCheckScreen({ onJoin, roomTitle }: MediaCheckScreen
     };
   }, []);
 
-  const handleJoin = async () => {
+  const handleJoin = () => {
     setIsJoining(true);
-
-    // 목업: 실제 RTC 연결 시뮬레이션 (1.5초 지연)
-    await new Promise(resolve => setTimeout(resolve, 1500));
 
     // 미디어 스트림 정리
     if (mediaStream) {
@@ -167,8 +164,8 @@ export default function MediaCheckScreen({ onJoin, roomTitle }: MediaCheckScreen
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-blue-50 via-white to-purple-50 p-6">
-      <div className="bg-white/80 backdrop-blur-lg rounded-xl shadow-2xl w-full max-w-2xl p-6 border border-white/20">
+    <div className="flex items-center justify-center min-h-screen p-6">
+      <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl w-full max-w-2xl p-6 border border-gray-200">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">{roomTitle}</h1>
         <p className="text-gray-600 mb-6">입장하기 전에 카메라와 마이크를 확인해주세요</p>
 

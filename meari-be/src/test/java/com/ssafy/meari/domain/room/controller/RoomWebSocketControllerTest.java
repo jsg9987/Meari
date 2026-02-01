@@ -23,7 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
-import com.ssafy.meari.domain.room.dto.websocket.ChatMessage;
+import com.ssafy.meari.domain.room.dto.websocket.ChatMessageRequest;
 import com.ssafy.meari.domain.room.entity.Chat;
 import com.ssafy.meari.domain.room.repository.ChatRepository;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
@@ -53,9 +53,97 @@ class RoomWebSocketControllerTest {
         testMemberId = 100L;
     }
 
-    // chat 핸들러가 RoomWebSocketController에서 주석 처리되어 있어 테스트 비활성화
-    // @Nested
-    // @DisplayName("채팅 메시지")
-    // class ChatMessageTest { ... }
+    @Nested
+    @DisplayName("채팅 메시지")
+    class ChatMessageRequestTest {
+
+        @Test
+        @DisplayName("성공 - 채팅 메시지 전송 및 저장")
+        void chat_Success() {
+            // Given
+            ChatMessageRequest message = ChatMessageRequest.builder()
+                    .senderId(testMemberId)
+                    .nickname("테스터")
+                    .message("안녕하세요!")
+                    .timestamp(LocalDateTime.now())
+                    .build();
+
+            Chat savedChat = Chat.builder()
+                    .roomId(testRoomId)
+                    .senderId(testMemberId)
+                    .nickname("테스터")
+                    .message("안녕하세요!")
+                    .timestamp(LocalDateTime.now())
+                    .build();
+
+            given(chatRepository.save(any(Chat.class))).willReturn(savedChat);
+            doNothing().when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
+
+            // When
+            roomWebSocketController.chat(testRoomId, message);
+
+            // Then
+            verify(chatRepository).save(any(Chat.class));
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/1/chat"),
+                    any(Object.class)
+            );
+        }
+
+        @Test
+        @DisplayName("성공 - 채팅 메시지 저장 시 올바른 데이터 전달")
+        void chat_Success_CorrectDataSaved() {
+            // Given
+            ChatMessageRequest message = ChatMessageRequest.builder()
+                    .senderId(testMemberId)
+                    .nickname("테스터")
+                    .message("테스트 메시지")
+                    .timestamp(LocalDateTime.now())
+                    .build();
+
+            ArgumentCaptor<Chat> chatCaptor = ArgumentCaptor.forClass(Chat.class);
+            Chat savedChat = Chat.builder()
+                    .roomId(testRoomId)
+                    .senderId(testMemberId)
+                    .nickname("테스터")
+                    .message("테스트 메시지")
+                    .timestamp(LocalDateTime.now())
+                    .build();
+
+            when(chatRepository.save(chatCaptor.capture())).thenReturn(savedChat);
+            doNothing().when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
+
+            // When
+            roomWebSocketController.chat(testRoomId, message);
+
+            // Then
+            Chat capturedChat = chatCaptor.getValue();
+            assertThat(capturedChat.getRoomId()).isEqualTo(testRoomId);
+            assertThat(capturedChat.getSenderId()).isEqualTo(testMemberId);
+            assertThat(capturedChat.getNickname()).isEqualTo("테스터");
+            assertThat(capturedChat.getMessage()).isEqualTo("테스트 메시지");
+            assertThat(capturedChat.getTimestamp()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("실패 - 저장 실패 시 브로드캐스트 안됨")
+        void chat_Fail_SaveException() {
+            // Given
+            ChatMessageRequest message = ChatMessageRequest.builder()
+                    .senderId(testMemberId)
+                    .nickname("테스터")
+                    .message("안녕하세요!")
+                    .build();
+
+            given(chatRepository.save(any(Chat.class))).willThrow(new RuntimeException("Redis 연결 실패"));
+
+            // When
+            roomWebSocketController.chat(testRoomId, message);
+
+            // Then
+            verify(chatRepository).save(any(Chat.class));
+            verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
+        }
+    }
 
 }

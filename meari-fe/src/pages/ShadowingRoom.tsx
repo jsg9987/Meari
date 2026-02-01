@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2 } from "lucide-react";
+import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2, UserCircle } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
 import { useAuthStore } from "../store/auth.store";
@@ -8,11 +8,16 @@ import VideoControls from "../components/webrtc/VideoControls";
 import ChatPanel from "../components/webrtc/ChatPanel";
 import MediaCheckScreen from "../components/webrtc/MediaCheckScreen";
 import ContentSelectModal from "../components/webrtc/ContentSelectModal";
-import PasswordModal from "../components/webrtc/PasswordModal";
+import Toast from "../components/common/Toast";
+import RoleSelectModal from "../components/webrtc/RoleSelectModal";
 import { useVideoRoom } from "../hooks/useVideoRoom";
+import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type ChatMessage } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
-import { getRoomDetail, enterRoom, leaveRoom } from "../api/rooms.api";
+import { selectRoomContent, getContentRoles, type ContentRole } from "../api/contents.api";
+import { getRoomDetail, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
 import { useRoomStore } from "../store/room.store";
+import { useRoleStore } from "../store/role.store";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
 type SidebarTab = "video" | "chat";
 type LayoutMode = "narrow" | "grid" | "wide";
@@ -23,42 +28,339 @@ export default function ShadowingRoom() {
   const navigate = useNavigate();
   const { userInfo } = useAuthStore();
   const roomOwnerId = useRoomStore((state) => state.roomData?.owner_id);
-  const isOwner = userInfo?.member_id === roomOwnerId;
-  const { roomData, setRoomData, clearRoomData } = useRoomStore();
+  const isOwner = userInfo?.memberId === roomOwnerId;
+  const { roomData, setRoomData, setContentId, clearRoomData } = useRoomStore();
+  const {
+    availableRoles,
+    mySelectedRoleId,
+    setAvailableRoles,
+    setMySelectedRole,
+    setMemberRole,
+    getConfirmData,
+    clearRoles,
+  } = useRoleStore();
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("video");
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
   const [isRoomLoading, setIsRoomLoading] = useState(true);
   const [isEntered, setIsEntered] = useState(false);
-  const [roomPassword, setRoomPassword] = useState<string | undefined>(undefined);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("narrow");
   const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
   const [isMediaChecked, setIsMediaChecked] = useState(false);
-  const [, setInitialAudioEnabled] = useState(true);
-  const [, setInitialVideoEnabled] = useState(true);
-  const [, setInitialAudioDeviceId] = useState<string>();
-  const [, setInitialVideoDeviceId] = useState<string>();
   const [isContentSelectOpen, setIsContentSelectOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
-  const [isHost,] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isHost] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
   const [isReady, setIsReady] = useState(false); // 내 준비 상태
-  const [participantsReady, setParticipantsReady] = useState<Record<string, boolean>>({
-    me: false,
-    user1: false,
-    user2: false,
-    user3: false,
-  }); // 각 참가자의 준비 상태
+  const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false); // 역할 선택 모달 상태
+  const [isConfirmingRoles, setIsConfirmingRoles] = useState(false); // 역할 확정 로딩 상태
+  const [isRoleAssigned, setIsRoleAssigned] = useState(false); // 역할 선택 완료 여부
+  const [isGameStarting, setIsGameStarting] = useState(false); // 게임 시작 중 여부
+  const [isRoundStarting, setIsRoundStarting] = useState(false); // 라운드 시작 중 여부
+  const [currentRound, setCurrentRound] = useState(0); // 현재 라운드 (0: 시작 전)
+  const [isRoundInProgress, setIsRoundInProgress] = useState(false); // 라운드 진행 중 여부
+  const [isReadyLoading, setIsReadyLoading] = useState(false); // 준비 완료 로딩 상태
+  const [participantsReady, setParticipantsReady] = useState<Record<number, boolean>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
+  const readyTimeoutRef = useRef<number | null>(null);
+  const memberId = userInfo?.memberId ?? 0;
 
   // 영상 재생 관련 상태
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [currentSubtitle, setCurrentSubtitle] = useState<string>("");
-  const [subtitles, setSubtitles] = useState<Array<{ start: number; end: number; text: string }>>([]);
+  // Round용 자막 데이터 (여러 역할의 대본을 동시에 표시)
+  interface SubtitleItem {
+    roleName: string;
+    roleId: number;
+    text: string;
+    isMyRole: boolean;
+  }
+  const [currentSubtitles, setCurrentSubtitles] = useState<SubtitleItem[]>([]);
+  const [roleSegments, setRoleSegments] = useState<RoleSegment[]>([]);
+
+  // 시간대별로 재가공된 자막 데이터 (빠른 조회용)
+  interface TimeIndexedSubtitle {
+    sentence_id: number;
+    start_time: number;
+    end_time: number;
+    role_id: number;
+    role_name: string;
+    text_ko: string;
+    text_vn: string;
+  }
+  const timeIndexedSubtitlesRef = useRef<TimeIndexedSubtitle[]>([]);
+  const [timeUntilStart, setTimeUntilStart] = useState<number | null>(null);
+  const currentRecordingSentenceIdRef = useRef<number | null>(null);
+  const presignedUrlsRef = useRef<Map<number, string>>(new Map());
 
   const nickname = userInfo?.nickname || "User";
+
+  // 채팅 메시지 상태
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
+  // 녹음 핸들러
+  const handleRecordingComplete = async (audioBlob: Blob, sentenceId: number) => {
+    try {
+      console.log(`Uploading recording for sentence ${sentenceId}, size: ${audioBlob.size} bytes`);
+
+      // 미리 받아놓은 Presigned URL 사용
+      const presignedUrl = presignedUrlsRef.current.get(sentenceId);
+      if (!presignedUrl) {
+        console.error(`No presigned URL found for sentence ${sentenceId}`);
+        return;
+      }
+
+      // S3에 업로드
+      await uploadRecordingToS3(presignedUrl, audioBlob);
+      console.log(`Successfully uploaded recording for sentence ${sentenceId}`);
+
+      // 사용한 URL 삭제
+      presignedUrlsRef.current.delete(sentenceId);
+    } catch (error) {
+      console.error('Failed to upload recording:', error);
+    }
+  };
+
+  // 오디오 레코더
+  const { startRecording, stopRecording } = useAudioRecorder({
+    onRecordingComplete: (audioBlob) => {
+      const sentenceId = currentRecordingSentenceIdRef.current;
+      if (sentenceId !== null) {
+        handleRecordingComplete(audioBlob, sentenceId);
+        // 업로드 완료 후 sentenceId 초기화
+        currentRecordingSentenceIdRef.current = null;
+      } else {
+        console.warn('[ShadowingRoom] sentenceId is null, cannot upload');
+      }
+    },
+    onError: (error) => {
+      console.error('Recording error:', error);
+      setToastMessage('녹음에 실패했습니다');
+    },
+  });
+
+  // 녹음 함수 안정적 참조 (useEffect deps 재실행 방지)
+  const startRecordingRef = useRef(startRecording);
+  const stopRecordingRef = useRef(stopRecording);
+  useEffect(() => {
+    startRecordingRef.current = startRecording;
+    stopRecordingRef.current = stopRecording;
+  });
+
+  // 웹소켓 연결
+  const {
+    toggleReady: wsToggleReady,
+    assignRole,
+    sendChatMessage,
+  } = useRoomWebSocket({
+    roomId: Number(roomId),
+    memberId,
+    onReady: (message) => {
+      // 준비 상태 메시지 수신
+      if (message.member_id !== undefined && message.ready !== undefined) {
+        setParticipantsReady(prev => ({
+          ...prev,
+          [message.member_id!]: message.ready!,
+        }));
+
+        // 내 준비 상태 업데이트
+        if (message.member_id === memberId) {
+          // 타임아웃 클리어
+          if (readyTimeoutRef.current) {
+            clearTimeout(readyTimeoutRef.current);
+            readyTimeoutRef.current = null;
+          }
+          setIsReadyLoading(false); // 로딩 종료
+          setIsReady(message.ready);
+        }
+      }
+    },
+    onRolePick: async (message) => {
+      // store에서 최신 content_id 직접 가져오기 (클로저 문제 해결)
+      const storeContentId = useRoomStore.getState().contentId;
+      const currentContentId = storeContentId || message.content_id || selectedContent?.content_id;
+
+      if (!currentContentId) {
+        console.error('No content_id available to fetch roles');
+        setToastMessage('역할 정보를 불러올 수 없습니다');
+        return;
+      }
+
+      try {
+        const response = await getContentRoles(currentContentId);
+        if (response.data.success && response.data.data) {
+          // ContentRole을 Role 타입으로 변환
+          const roles: Role[] = response.data.data.map((role: ContentRole) => ({
+            id: role.content_id,
+            role_id: role.role_id,
+            name: role.name,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
+
+          setAvailableRoles(roles);
+          setIsRoleSelectOpen(true);
+        } else {
+          console.error('Failed to fetch roles:', response.data.error);
+          setToastMessage('역할 정보를 불러오는데 실패했습니다');
+        }
+      } catch (error) {
+        console.error('Failed to fetch roles:', error);
+        setToastMessage('역할 정보를 불러오는데 실패했습니다');
+      }
+    },
+    onRoleAssigned: (message) => {
+      // 역할 선점 성공 시 선택된 역할 ID 저장 (아직 확정은 아님)
+      if (message.role_id && message.member_id) {
+        setMySelectedRole(message.role_id);
+        setMemberRole(message.member_id, message.role_id);
+        setToastMessage('역할이 등록되었습니다');
+      }
+    },
+    onRoleReleased: (message) => {
+      console.log('Role released:', message);
+      // 역할 해제 시 선택된 역할 ID 초기화
+      setMySelectedRole(undefined);
+      setToastMessage('역할이 해제되었습니다');
+    },
+    onGameStart: (message) => {
+      console.log('Game starting:', message);
+
+      // segments 데이터를 시간대별로 재가공
+      if (message.segments) {
+        const allSubtitles: TimeIndexedSubtitle[] = [];
+
+        message.segments.forEach((segment) => {
+          segment.sentences.forEach((sentence) => {
+            allSubtitles.push({
+              sentence_id: sentence.sentence_id,
+              start_time: sentence.start_time,
+              end_time: sentence.end_time,
+              role_id: segment.role_id,
+              role_name: segment.role_name,
+              text_ko: sentence.text_ko,
+              text_vn: sentence.text_vn,
+            });
+          });
+        });
+
+        // 시작 시간순으로 정렬
+        allSubtitles.sort((a, b) => a.start_time - b.start_time);
+        timeIndexedSubtitlesRef.current = allSubtitles;
+      }
+
+      // 게임 시작 시 즉시 영상 재생
+      if (message.phase === 'WATCHING') {
+        setIsPlaying(true);
+      }
+    },
+    onPhaseWaiting: (message) => {
+      console.log('Phase WAITING received:', message);
+      // 대기 상태로 돌아가기
+      resetToWaitingState();
+    },
+    onRolesConfirmed: (message) => {
+      console.log('Roles confirmed:', message);
+      // 대본 데이터 저장
+      if (message.segments) {
+        setRoleSegments(message.segments);
+
+        // Round 모드용 시간대별 전처리 (모든 역할의 대본 포함)
+        const allSubtitles: TimeIndexedSubtitle[] = [];
+
+        message.segments.forEach((segment) => {
+          segment.sentences.forEach((sentence) => {
+            allSubtitles.push({
+              sentence_id: sentence.sentence_id,
+              start_time: sentence.start_time,
+              end_time: sentence.end_time,
+              role_id: segment.role_id,
+              role_name: segment.role_name,
+              text_ko: sentence.text_ko,
+              text_vn: sentence.text_vn,
+            });
+          });
+        });
+
+        // 시작 시간순으로 정렬
+        allSubtitles.sort((a, b) => a.start_time - b.start_time);
+        timeIndexedSubtitlesRef.current = allSubtitles;
+
+        console.log('Time-indexed subtitles prepared for Round:', allSubtitles);
+        setToastMessage('역할이 확정되었습니다');
+      }
+    },
+    onRoundStart: (message) => {
+      console.log('Round start received:', message);
+
+      // 대본 데이터 저장
+      if (message.segments) {
+        console.log('Saving segments from ROUND_START:', message.segments);
+        setRoleSegments(message.segments);
+      } else {
+        console.warn('No segments in ROUND_START message');
+      }
+
+      // 라운드 정보 업데이트
+      if (message.round) {
+        setCurrentRound(message.round);
+        setIsRoundInProgress(true);
+        setIsRoundStarting(false);
+      }
+
+      // server_time까지 대기
+      if (message.server_time) {
+        const currentTime = Date.now();
+        const timeLeft = message.server_time - currentTime;
+
+        if (timeLeft > 0) {
+          // 남은 시간을 초 단위로 표시 (카운트다운)
+          setTimeUntilStart(Math.ceil(timeLeft / 1000));
+        } else {
+          // 이미 시간이 지났으면 즉시 재생 (timeUntilStart를 0으로 설정하여 useEffect에서 처리)
+          setTimeUntilStart(0);
+        }
+      }
+    },
+    onGameFinished: (message) => {
+      console.log('Game finished:', message);
+      // 상태 초기화하여 컨텐츠 선택 화면으로 돌아가기
+      setIsPlaying(false);
+      setVideoReady(false);
+      setRoleSegments([]);
+      setCurrentSubtitles([]);
+      setParticipantsReady({});
+      currentRecordingSentenceIdRef.current = null;
+      presignedUrlsRef.current.clear();
+      timeIndexedSubtitlesRef.current = [];
+
+      // Store 초기화
+      setContentId(null);
+      clearRoles();
+
+      resetToWaitingState();
+      setToastMessage('게임이 종료되었습니다');
+    },
+    onMemberJoin: (message) => {
+      console.log('Member joined:', message);
+      // TODO: 멤버 입장 시 처리 로직
+    },
+    onConnect: () => {
+      console.log('WebSocket connected');
+    },
+    onDisconnect: () => {
+      console.log('WebSocket disconnected');
+    },
+    onError: (error) => {
+      console.error('WebSocket error:', error);
+    },
+    onChatMessage: (message) => {
+      console.log('Chat message received:', message);
+      setChatMessages(prev => [...prev, message]);
+    },
+  });
 
   // 방 정보 가져오기
   useEffect(() => {
@@ -78,28 +380,11 @@ export default function ShadowingRoom() {
         setRoomData(response.data.data);
 
         // 방장이면 enterRoom API 호출 없이 바로 입장
-        if (isOwner) {
+        if (userInfo?.memberId === response.data.data.owner_id) {
           setIsEntered(true);
         } else {
-          // 비밀번호가 있는 방이면 비밀번호 모달 표시
-          if (response.data.data.has_password) {
-            setIsPasswordModalOpen(true);
-          } else {
-            // 비밀번호 없는 방은 enterRoom 호출
-            try {
-              const enterResponse = await enterRoom(Number(roomId), {});
-              if (enterResponse.data.success) {
-                setIsEntered(true);
-              } else {
-                alert('방 입장에 실패했습니다.');
-                navigate('/');
-              }
-            } catch (error) {
-              console.error('Failed to enter room:', error);
-              alert('방 입장에 실패했습니다.');
-              navigate('/');
-            }
-          }
+          // 메인페이지에서 이미 joinRoom으로 비밀번호 검증을 했으므로 바로 입장
+          setIsEntered(true);
         }
       } catch (error) {
         console.error('Failed to fetch room detail:', error);
@@ -111,55 +396,9 @@ export default function ShadowingRoom() {
     };
 
     fetchRoomDetail();
-  }, [roomId, navigate, setRoomData]);
+  }, [roomId, navigate, setRoomData, userInfo?.memberId]);
 
-  // 방 퇴장 처리 (컴포넌트 언마운트 시)
-  useEffect(() => {
-    return () => {
-      if (roomId && isEntered) {
-        leaveRoom(Number(roomId)).catch((error) => {
-          console.error('Failed to leave room:', error);
-        });
-        clearRoomData();
-      }
-    };
-  }, [roomId, isEntered, clearRoomData]);
-
-  // 브라우저 닫기/새로고침 시 퇴장 처리
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (roomId && isEntered) {
-        leaveRoom(Number(roomId)).catch((error) => {
-          console.error('Failed to leave room on unload:', error);
-        });
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [roomId, isEntered]);
-
-  // 자막 데이터 로드
-  useEffect(() => {
-    const loadSubtitles = async () => {
-      if (selectedContent) {
-        try {
-          const useMock = import.meta.env.VITE_USE_MOCK_CONTENTS === 'true';
-          if (useMock) {
-            // Mock 자막 데이터 로드
-            const response = await fetch('/src/assets/video/description.txt');
-            const data = await response.json();
-            setSubtitles(data);
-          }
-        } catch (error) {
-          console.error('Failed to load subtitles:', error);
-        }
-      }
-    };
-    loadSubtitles();
-  }, [selectedContent]);
+  // 대본 데이터는 WebSocket ROLES_CONFIRMED 메시지로 받아서 roleSegments에 저장됨
 
   // 카운트다운 처리
   useEffect(() => {
@@ -176,28 +415,150 @@ export default function ShadowingRoom() {
         setIsPlaying(true);
       }
     }
-  }, [countdown]);
+  }, [countdown, roomId]);
 
-  // 영상 시간에 따른 자막 업데이트
+  // Round 시작 카운트다운 처리 및 영상 재생
+  useEffect(() => {
+    if (timeUntilStart !== null && timeUntilStart > 0) {
+      const timer = setTimeout(() => {
+        setTimeUntilStart(timeUntilStart - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (timeUntilStart === 0) {
+      // 카운트다운이 0이 되면 영상 재생
+      console.log('=== Round playback starting ===');
+      console.log('Current round:', currentRound);
+
+      setTimeUntilStart(null);
+      setIsPlaying(true); // 먼저 isPlaying을 true로 설정하여 video 요소 렌더링
+
+      // 다음 프레임에서 video.play() 호출 (video 요소가 렌더링된 후)
+      setTimeout(() => {
+        console.log('Attempting to play video, videoRef.current:', videoRef.current);
+        if (videoRef.current) {
+          console.log('Starting video playback for Round', currentRound);
+          videoRef.current.currentTime = 0;
+          videoRef.current.play().then(() => {
+            console.log('Video playing successfully');
+          }).catch((error) => {
+            console.error('Failed to play video:', error);
+          });
+        } else {
+          console.error('Video ref is still null after rendering');
+        }
+      }, 50); // 50ms 대기하여 렌더링 완료 보장
+    }
+  }, [timeUntilStart, currentRound]);
+
+  // 영상 시간에 따른 자막 업데이트 (WATCHING 및 Round 모드 공통)
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || timeIndexedSubtitlesRef.current.length === 0) {
+      console.log('Subtitle update skipped - video:', !!video,
+        'timeIndexed:', timeIndexedSubtitlesRef.current.length);
+      return;
+    }
+
+    console.log('Setting up subtitle update');
 
     const updateSubtitle = () => {
       const currentTime = video.currentTime;
-      const subtitle = subtitles.find(
-        (sub) => currentTime >= sub.start && currentTime <= sub.end
+      const subtitles: SubtitleItem[] = [];
+
+      // timeIndexedSubtitles 사용 (WATCHING 및 Round 모드 공통)
+      const activeSubtitles = timeIndexedSubtitlesRef.current.filter(
+        (sub) => currentTime >= sub.start_time && currentTime <= sub.end_time
       );
-      setCurrentSubtitle(subtitle ? subtitle.text : "");
+
+      activeSubtitles.forEach((sub) => {
+        subtitles.push({
+          roleName: sub.role_name,
+          roleId: sub.role_id,
+          text: sub.text_ko, // TODO: selectedNationality에 따라 text_vn 선택
+          isMyRole: currentRound >= 1 && sub.role_id === mySelectedRoleId, // Round 모드에서만 내 역할 표시
+        });
+      });
+
+      if (subtitles.length > 0) {
+        console.log(`Subtitles at ${currentTime}s:`, subtitles);
+      }
+      setCurrentSubtitles(subtitles);
     };
 
     video.addEventListener('timeupdate', updateSubtitle);
     return () => video.removeEventListener('timeupdate', updateSubtitle);
-  }, [subtitles]);
+  }, [mySelectedRoleId, isPlaying, currentRound]);
 
-  // 모든 참가자가 준비 완료되었는지 확인
-  // TODO: 실제 배포 시에는 Object.values(participantsReady).every(ready => ready)로 변경
-  const allParticipantsReady = participantsReady.me; // 테스트: 본인만 준비되면 시작 가능
+  // 녹음 스케줄링 (Round 진행 중, 내 역할의 문장에 대해서만)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!videoReady || !video || !isPlaying || currentRound < 1 || roleSegments.length === 0 || !mySelectedRoleId) {
+      return;
+    }
+
+    console.log('Setting up recording schedule for Round', currentRound);
+
+    const timeouts: number[] = [];
+
+    // 내 역할의 세그먼트 찾기
+    const mySegment = roleSegments.find(seg => seg.role_id === mySelectedRoleId);
+    if (!mySegment) {
+      console.log('No segment found for my role');
+      return;
+    }
+
+    // 각 문장에 대해 녹음 스케줄링
+    mySegment.sentences.forEach((sentence: Sentence) => {
+      const startTime = (sentence.start_time - 0.5) * 1000; // 500ms 전
+      const endTime = (sentence.end_time + 0.5) * 1000; // 500ms 후
+
+      // 녹음 시작 타이머
+      const startTimeout = setTimeout(async () => {
+        try {
+          console.log(`Getting presigned URL for sentence ${sentence.sentence_id}`);
+
+          // Presigned URL 받기
+          const response = await getPresignedUrl({
+            room_id: Number(roomId),
+            round: currentRound,
+            member_id: memberId,
+            sentence_id: sentence.sentence_id,
+          });
+
+          if (response.data.success && response.data.data) {
+            const { upload_url } = response.data.data;
+            presignedUrlsRef.current.set(sentence.sentence_id, upload_url);
+            console.log(`Presigned URL received for sentence ${sentence.sentence_id}`);
+
+            // 녹음 시작
+            console.log(`Starting recording for sentence ${sentence.sentence_id} at ${sentence.start_time - 0.5}s`);
+            currentRecordingSentenceIdRef.current = sentence.sentence_id;
+            startRecordingRef.current();
+          } else {
+            console.error('Failed to get presigned URL:', response.data.error);
+          }
+        } catch (error) {
+          console.error('Failed to get presigned URL:', error);
+        }
+      }, startTime);
+
+      // 녹음 종료 타이머
+      const endTimeout = setTimeout(() => {
+        console.log(`Stopping recording for sentence ${sentence.sentence_id} at ${sentence.end_time + 0.5}s`);
+        stopRecordingRef.current();
+        // sentenceId는 onRecordingComplete에서 초기화 (비동기 onstop 이벤트 이후)
+      }, endTime);
+
+      timeouts.push(startTimeout, endTimeout);
+    });
+
+    // 클린업
+    return () => {
+      console.log('Cleaning up recording schedule');
+      timeouts.forEach(timeout => clearTimeout(timeout));
+      stopRecordingRef.current();
+    };
+  }, [videoReady, isPlaying, currentRound, roleSegments, mySelectedRoleId, roomId, memberId]);
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -213,31 +574,6 @@ export default function ShadowingRoom() {
     };
   }, []);
 
-  // 비밀번호 검증 처리
-  const handlePasswordSubmit = async (password: string) => {
-    if (!roomId) return;
-
-    try {
-      const response = await enterRoom(Number(roomId), { password });
-
-      if (response.data.success) {
-        setRoomPassword(password);
-        setIsPasswordModalOpen(false);
-        setIsEntered(true);
-        setPasswordError('');
-      } else {
-        setPasswordError(response.data.error?.message || '비밀번호가 일치하지 않습니다.');
-        throw new Error('Invalid password');
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const handlePasswordCancel = () => {
-    navigate('/');
-  };
-
   // 방 정보 (store에서 가져오기)
   const roomInfo = roomData ? {
     isLocked: roomData.has_password,
@@ -251,36 +587,174 @@ export default function ShadowingRoom() {
     themeId: 1
   };
 
-  const handleContentSelect = (content: Content) => {
-    setSelectedContent(content);
-    setIsContentSelectOpen(false);
-    // 컨텐츠 선택 시 모든 참가자의 준비 상태 초기화
-    setIsReady(false);
-    setParticipantsReady({
-      me: false,
-      user1: false,
-      user2: false,
-      user3: false,
-    });
-    // TODO: 실제로는 선택한 컨텐츠의 비디오를 로드하고 재생
-    console.log('Selected content:', content);
+  const handleContentSelect = async (content: Content) => {
+    if (!roomId) return;
+
+    try {
+      // 방 컨텐츠 선택 API 호출 (실제 content_id 전달)
+      const response = await selectRoomContent(Number(roomId), content.content_id);
+
+      if (response.data.success) {
+        // content_id를 store에 저장
+        setContentId(content.content_id);
+
+        // 비디오 URL 가져오기
+        try {
+          const videoResponse = await getContentVideoUrl(content.content_id);
+          if (videoResponse.data.success && videoResponse.data.data) {
+            setVideoUrl(videoResponse.data.data.video_url);
+          }
+        } catch (error) {
+          console.error('Failed to get video URL:', error);
+        }
+
+        setSelectedContent(content);
+        setIsContentSelectOpen(false);
+        // 컨텐츠 선택 시 모든 참가자의 준비 상태 초기화
+        setIsReady(false);
+        setParticipantsReady({});
+      } else {
+        setToastMessage('컨텐츠 선택에 실패했어요');
+      }
+    } catch (error) {
+      setToastMessage('컨텐츠 선택에 실패했어요');
+    }
   };
 
   const handleToggleReady = () => {
-    const newReadyState = !isReady;
-    setIsReady(newReadyState);
-    setParticipantsReady(prev => ({
-      ...prev,
-      me: newReadyState,
-    }));
-    // TODO: WebSocket으로 준비 상태 전송
-    console.log('Ready state:', newReadyState);
+    if (isReadyLoading) return; // 이미 처리 중이면 무시
+
+    setIsReadyLoading(true);
+
+    // 기존 타임아웃 클리어
+    if (readyTimeoutRef.current) {
+      clearTimeout(readyTimeoutRef.current);
+    }
+
+    // 타임아웃 설정 (5초 후 응답 없으면 실패 처리)
+    readyTimeoutRef.current = setTimeout(() => {
+      setIsReadyLoading(false);
+      setToastMessage('준비 완료에 실패했어요');
+    }, 5000);
+
+    // WebSocket으로 준비 상태 전송
+    try {
+      wsToggleReady(!isReady);
+    } catch (error) {
+      if (readyTimeoutRef.current) {
+        clearTimeout(readyTimeoutRef.current);
+      }
+      setIsReadyLoading(false);
+      setToastMessage('준비 완료에 실패했어요');
+      console.error('Failed to toggle ready:', error);
+    }
   };
 
-  const handleStartShadowing = () => {
-    // 카운트다운 시작 (3초)
-    setCountdown(3);
-    console.log('Starting shadowing countdown...');
+  const handleStartShadowing = async () => {
+    if (!roomId) return;
+
+    try {
+      setIsGameStarting(true); // 게임 시작 중 상태로 변경
+      // 방장이 게임 시작 API 호출
+      const response = await startGame(Number(roomId));
+
+      if (response.data.success) {
+        console.log('Game start API called successfully');
+        // WebSocket에서 phase가 WATCHING으로 변경되면 카운트다운 시작
+      } else {
+        setIsGameStarting(false);
+        setToastMessage('게임 시작에 실패했어요');
+      }
+    } catch (error) {
+      console.error('Failed to start game:', error);
+      setIsGameStarting(false);
+      setToastMessage('게임 시작에 실패했어요');
+    }
+  };
+
+  const handleStartRound = async (round: number) => {
+    if (!roomId) return;
+
+    try {
+      setIsRoundStarting(true);
+      const response = await startRound(Number(roomId), { round });
+
+      if (response.data.success) {
+        console.log(`Round ${round} start API called successfully`);
+        // WebSocket ROUND_START 메시지를 기다림 (실제 영상 재생은 그때 처리)
+      } else {
+        setIsRoundStarting(false);
+        setToastMessage('라운드 시작에 실패했어요');
+      }
+    } catch (error) {
+      console.error('Failed to start round:', error);
+      setIsRoundStarting(false);
+      setToastMessage('라운드 시작에 실패했어요');
+    }
+  };
+
+  const handleRoleSelect = (role: Role) => {
+    // WebSocket으로 역할 선택 메시지 전송
+    assignRole(role.role_id);
+    console.log('Role selected:', role);
+  };
+
+  const handleConfirmRoles = async () => {
+    if (!roomId) return;
+
+    try {
+      setIsConfirmingRoles(true);
+      const confirmData = getConfirmData();
+
+      console.log('Confirming roles:', confirmData);
+      const response = await confirmRoles(Number(roomId), { roles: confirmData });
+
+      if (response.data.success) {
+        setToastMessage('역할 선택이 확정되었습니다');
+        setIsRoleSelectOpen(false);
+        setIsRoleAssigned(true); // 역할 확정 완료 - 이제 캐릭터 선택 버튼 숨김
+      } else {
+        setToastMessage('역할 확정에 실패했어요');
+      }
+    } catch (error) {
+      console.error('Failed to confirm roles:', error);
+      setToastMessage('역할 확정에 실패했어요');
+    } finally {
+      setIsConfirmingRoles(false);
+    }
+  };
+
+  // 상태 초기화 함수
+  const resetToWaitingState = () => {
+    console.log('Resetting to waiting state');
+    setIsRoleAssigned(false);
+    setCurrentRound(0);
+    setIsRoundInProgress(false);
+    setIsGameStarting(false);
+    setIsRoundStarting(false);
+    setIsReady(false);
+    setSelectedContent(null);
+    setVideoUrl(null);
+    setToastMessage('대기 상태로 돌아갔습니다');
+  };
+
+  const handleFinishRoom = async () => {
+    if (!roomId) return;
+
+    try {
+      console.log('Finishing room...');
+      const response = await finishRoom(Number(roomId));
+
+      if (response.data.success) {
+        console.log('Room finished successfully');
+        // WebSocket PHASE_CHANGE (WAITING) 메시지를 기다림
+      } else {
+        setToastMessage('처음으로 돌아가기에 실패했어요');
+      }
+    } catch (error) {
+      console.error('Failed to finish room:', error);
+      setToastMessage('처음으로 돌아가기에 실패했어요');
+    }
   };
 
   // WebRTC 연결
@@ -288,27 +762,42 @@ export default function ShadowingRoom() {
     status,
     error,
     tiles,
+    publisher,
     isAudioEnabled,
     isVideoEnabled,
     join,
     leave,
+    publishStream,
     toggleAudio,
     toggleVideo,
   } = useVideoRoom({
     roomId: Number(roomId),
     nickname,
-    password: roomPassword,
+    password: undefined,
     autoJoin: false,
+    autoPublish: false, // 세팅 완료 후 수동으로 publish
     isOwner
   });
+
+  // leave 함수의 안정적 참조 (useEffect deps 재실행 방지)
+  const leaveRef = useRef(leave);
+  useEffect(() => {
+    leaveRef.current = leave;
+  }, [leave]);
 
   const [volume, setVolume] = useState(100);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
   const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
 
   const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
+
+  // 모든 참가자가 준비 완료되었는지 확인
+  const totalParticipants = tiles.length;
+  const readyCount = Object.values(participantsReady).filter(ready => ready).length;
+  const allParticipantsReady = totalParticipants > 0 && readyCount === totalParticipants;
 
   const handleAudioDeviceChange = (deviceId: string) => {
     setSelectedAudioDevice(deviceId);
@@ -322,13 +811,55 @@ export default function ShadowingRoom() {
     console.log('Video device changed to:', deviceId);
   };
 
-  // 미디어 체크 완료 후 WebRTC 연결
+  // 방 입장 후 즉시 WebRTC 연결 (publisher 생성, 아직 publish 안 함)
   useEffect(() => {
-    if (isMediaChecked && isEntered && roomId && status === 'idle') {
+    if (isEntered && roomId && status === 'idle') {
       join();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMediaChecked, isEntered, roomId, status]);
+  }, [isEntered, roomId, status]);
+
+  // 브라우저 뒤로가기 감지 및 처리
+  useEffect(() => {
+    const handlePopState = async () => {
+      if (roomId && isEntered && !isLeaving) {
+        // 뒤로가기 방지 (일단 현재 위치 유지)
+        window.history.pushState(null, '', window.location.href);
+
+        // leave 완료 후 이동
+        await handleLeaveInternal();
+      }
+    };
+
+    // 초기 진입 시 히스토리 스택에 현재 위치 추가 (뒤로가기 감지용)
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [roomId, isEntered, isLeaving]);
+
+  // 방 퇴장 처리 (컴포넌트 언마운트 시 - 강제 종료 대비)
+  useEffect(() => {
+    return () => {
+      // useVideoRoom의 cleanup에서 미디어 트랙 정리가 이미 처리됨
+      // 여기서는 추가 정리 작업 없음
+    };
+  }, []);
+
+  // 브라우저 닫기/새로고침 시 퇴장 처리
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // useVideoRoom의 cleanup에서 미디어 트랙 정리가 자동으로 처리됨
+      // 백엔드는 WebSocket 연결 해제로 자동 정리됨
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   if (!roomId) {
     return (
@@ -344,17 +875,39 @@ export default function ShadowingRoom() {
     );
   }
 
-  const handleLeave = async () => {
-    if (roomId) {
-      try {
-        await leave();
+  // 내부 leave 처리 함수 (뒤로가기/나가기 버튼 공통)
+  const handleLeaveInternal = async () => {
+    if (isLeaving) return; // 이미 처리 중이면 무시
+
+    setIsLeaving(true);
+    setIsEntered(false); // useEffect 재실행 방지
+
+    try {
+      if (roomId) {
+        // 1. OpenVidu 세션 정리 (카메라/마이크 즉시 종료)
+        await leaveRef.current();
+
+        // 2. 방 퇴장 API 호출 (완료 대기)
         await leaveRoom(Number(roomId));
+
+        // 3. 로컬 데이터 정리
         clearRoomData();
-      } catch (error) {
-        console.error('Failed to leave room:', error);
       }
+
+      // 4. 모든 정리 완료 후 홈으로 이동
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error('Failed to leave room:', error);
+      // 에러 발생해도 페이지 이동
+      navigate("/", { replace: true });
+    } finally {
+      setIsLeaving(false);
     }
-    navigate("/");
+  };
+
+  // 나가기 버튼 클릭 핸들러
+  const handleLeave = () => {
+    handleLeaveInternal();
   };
 
   const handleCopyPassword = async () => {
@@ -384,15 +937,29 @@ export default function ShadowingRoom() {
     audioDeviceId?: string,
     videoDeviceId?: string
   ) => {
-    setInitialAudioEnabled(audioEnabled);
-    setInitialVideoEnabled(videoEnabled);
-    setInitialAudioDeviceId(audioDeviceId);
-    setInitialVideoDeviceId(videoDeviceId);
     setIsMediaChecked(true);
 
     // 선택된 장치 정보 저장
     setSelectedAudioDevice(audioDeviceId);
     setSelectedVideoDevice(videoDeviceId);
+
+    // 오디오/비디오 설정 반영
+    if (publisher) {
+      publisher.publishAudio(audioEnabled);
+      publisher.publishVideo(videoEnabled);
+    }
+
+    // useVideoRoom 상태 동기화 (VideoControls 반영용)
+    // 초기값이 true이므로 false인 경우만 토글
+    if (!audioEnabled && isAudioEnabled) {
+      toggleAudio();
+    }
+    if (!videoEnabled && isVideoEnabled) {
+      toggleVideo();
+    }
+
+    // 세팅 완료 후 스트림 publish (다른 사람들에게 보이기 시작)
+    publishStream();
   };
 
   // 방 정보 로딩 중
@@ -402,18 +969,6 @@ export default function ShadowingRoom() {
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         <p className="text-gray-600">방 정보를 불러오는 중...</p>
       </div>
-    );
-  }
-
-  // 비밀번호 입력 모달
-  if (isPasswordModalOpen) {
-    return (
-      <PasswordModal
-        roomTitle={roomInfo.title}
-        onSubmit={handlePasswordSubmit}
-        onCancel={handlePasswordCancel}
-        errorMessage={passwordError}
-      />
     );
   }
 
@@ -427,13 +982,8 @@ export default function ShadowingRoom() {
     );
   }
 
-  // 미디어 체크가 완료되지 않았으면 미디어 체크 화면 표시
-  if (!isMediaChecked) {
-    return <MediaCheckScreen onJoin={handleMediaCheckComplete} roomTitle={roomInfo.title} />;
-  }
-
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 relative">
       {/* 왼쪽 메인 영역 */}
       <div className="flex flex-1 flex-col">
         {/* 헤더 */}
@@ -506,23 +1056,76 @@ export default function ShadowingRoom() {
                   </div>
                 )}
 
+                {/* Round 시작 대기 오버레이 */}
+                {timeUntilStart !== null && timeUntilStart > 0 && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 rounded-lg">
+                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+                    <p className="text-white text-2xl font-semibold mb-2">
+                      Round {currentRound} 준비 중
+                    </p>
+                    <p className="text-gray-300 text-lg">
+                      {timeUntilStart}초 후 시작
+                    </p>
+                  </div>
+                )}
+
                 {/* 영상 재생 중 */}
-                {isPlaying && selectedContent && (
-                  <div className="relative w-full h-full">
+                {isPlaying && selectedContent && videoUrl && (
+                  <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
                     <video
                       ref={videoRef}
-                      src={selectedContent.video_url}
-                      className="w-full h-full object-contain"
+                      src={videoUrl}
+                      className="absolute inset-0 w-full h-full object-contain"
+                      autoPlay
+                      playsInline
                       onContextMenu={(e) => e.preventDefault()}
                       style={{ pointerEvents: 'none' }}
+                      onLoadedMetadata={() => setVideoReady(true)}
+                      onPlay={() => setVideoReady(true)}
+                      onEnded={async () => {
+                        // 영상 재생 완료 시 처리
+                        setIsPlaying(false);
+
+                        // Round 진행 중이면 라운드 종료
+                        if (currentRound >= 1 && isRoundInProgress) {
+                          setIsRoundInProgress(false);
+                          setToastMessage(`Round ${currentRound} 완료`);
+                        } else if (roomId) {
+                          // 첫 번째 시청 완료 시 finishWatching API 호출
+                          try {
+                            const response = await finishWatching(Number(roomId));
+                            if (response.data.success) {
+                              console.log('Watching finished successfully');
+                              setIsGameStarting(false);
+                            } else {
+                              console.error('Failed to finish watching:', response.data.error?.message);
+                            }
+                          } catch (error) {
+                            console.error('Failed to finish watching:', error);
+                          }
+                        }
+                      }}
                     />
 
-                    {/* 자막 표시 */}
-                    {isSubtitleEnabled && currentSubtitle && (
-                      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 px-6 py-3 rounded-lg">
-                        <p className="text-white text-xl font-medium text-center whitespace-pre-line">
-                          {currentSubtitle}
-                        </p>
+                    {/* 대본 표시 (WATCHING 및 Round 모드) */}
+                    {currentSubtitles.length > 0 && (
+                      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-4xl px-4">
+                        <div className="space-y-2">
+                          {currentSubtitles.map((subtitle, index) => (
+                            <div
+                              key={`${subtitle.roleId}-${index}`}
+                              className="bg-black/70 px-5 py-3 rounded-lg text-center flex justify-center items-center gap-4"
+                            >
+                              <p className="text-sm text-gray-300 mb-1">
+                                {subtitle.roleName}
+                                {subtitle.isMyRole && ' (내 역할)'}
+                              </p>
+                              <p className="text-white text-xl font-medium">
+                                {subtitle.text}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -530,56 +1133,125 @@ export default function ShadowingRoom() {
 
                 {/* 영상 재생 전 */}
                 {!isPlaying && (
-                  <div className="flex flex-col items-center gap-4">
-                    {!selectedContent ? (
-                      <div className="text-center">
-                        <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
-                        {isHost && (
-                          <p className="text-gray-400 text-xs">컨텐츠를 선택해주세요</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <p className="text-gray-600 font-medium mb-2">현재 컨텐츠</p>
-                        <p className="text-gray-900 text-lg font-semibold mb-4">{selectedContent.title}</p>
-
-                        <div className="flex flex-col items-center gap-3">
-                          {/* 준비 완료 버튼 (모든 참가자) */}
-                          <button
-                            onClick={handleToggleReady}
-                            className={`px-6 py-3 rounded-lg font-semibold transition-all ${isReady
-                              ? "bg-green-500 hover:bg-green-600 text-white"
-                              : "bg-blue-600 hover:bg-blue-700 text-white"
-                              }`}
-                          >
-                            {isReady ? "준비 완료" : "준비하기"}
-                          </button>
-
-                          {/* 시작 버튼 (방장만) */}
-                          {isHost && (
-                            <div className="flex flex-col items-center gap-2 mt-2">
-                              <div className="text-sm text-gray-600 mb-1">
-                                준비 완료: {Object.values(participantsReady).filter(r => r).length} / {Object.keys(participantsReady).length}
-                              </div>
-                              <button
-                                onClick={handleStartShadowing}
-                                disabled={!allParticipantsReady}
-                                className={`px-8 py-3 rounded-lg font-semibold transition-all ${allParticipantsReady
-                                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  }`}
-                              >
-                                쉐도잉 시작
-                              </button>
-                              {!allParticipantsReady && (
-                                <p className="text-xs text-gray-500">모든 참가자가 준비될 때까지 기다려주세요</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                  <>
+                    {/* 비디오 배경 (blur 처리) */}
+                    {selectedContent && videoUrl && (
+                      <div className="absolute inset-0 overflow-hidden">
+                        <video
+                          src={videoUrl}
+                          className="w-full h-full object-cover"
+                          style={{ filter: 'blur(20px)', transform: 'scale(1.1)' }}
+                          muted
+                          playsInline
+                        />
+                        <div className="absolute inset-0 bg-black/40" />
                       </div>
                     )}
-                  </div>
+
+                    <div className="relative flex flex-col items-center gap-4 z-10">
+                      {!selectedContent ? (
+                        <div className="text-center">
+                          <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
+                          {isHost && (
+                            <p className="text-gray-400 text-xs">컨텐츠를 선택해주세요</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-gray-200 font-medium mb-2">현재 컨텐츠</p>
+                          <p className="text-white text-lg font-semibold mb-4">{selectedContent.title}</p>
+
+                        <div className="flex flex-col items-center gap-3">
+                          {/* 게임 시작 전: 준비 완료 및 시작 버튼 */}
+                          {!isGameStarting && !isRoleAssigned && (
+                            <>
+                              {/* 준비 완료 버튼 (모든 참가자) */}
+                              <button
+                                onClick={handleToggleReady}
+                                disabled={isReadyLoading}
+                                className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                                  isReadyLoading
+                                    ? "bg-gray-400 cursor-not-allowed text-white"
+                                    : isReady
+                                    ? "bg-green-500 hover:bg-green-600 text-white"
+                                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                                }`}
+                              >
+                                {isReadyLoading && (
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                )}
+                                {isReadyLoading ? "처리 중..." : isReady ? "준비 완료" : "준비하기"}
+                              </button>
+
+                              {/* 시작 버튼 (방장만) */}
+                              {isHost && (
+                                <div className="flex flex-col items-center gap-2 mt-2">
+                                  {totalParticipants > 0 && (
+                                    <div className="text-sm text-gray-600 mb-1">
+                                      준비 완료: {readyCount} / {totalParticipants}
+                                    </div>
+                                  )}
+                                  <button
+                                    onClick={handleStartShadowing}
+                                    disabled={!allParticipantsReady}
+                                    className={`px-8 py-3 rounded-lg font-semibold transition-all ${
+                                      allParticipantsReady
+                                        ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    }`}
+                                  >
+                                    쉐도잉 시작
+                                  </button>
+                                  {!allParticipantsReady && (
+                                    <p className="text-xs text-gray-500">모든 참가자가 준비될 때까지 기다려주세요</p>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {/* 역할 선택 완료 후: Round 버튼 (방장만) */}
+                          {isRoleAssigned && isHost && (
+                            <>
+                              {/* 라운드 시작 버튼 (Round 2까지만) */}
+                              {!isRoundInProgress && !isRoundStarting && currentRound < 2 && (
+                                <button
+                                  onClick={() => handleStartRound(currentRound + 1)}
+                                  disabled={isRoundStarting}
+                                  className={`px-8 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                                    isRoundStarting
+                                      ? "bg-gray-400 cursor-not-allowed text-white"
+                                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                                  }`}
+                                >
+                                  {isRoundStarting && (
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  )}
+                                  {isRoundStarting ? "시작 중..." : `Round ${currentRound + 1} 시작하기`}
+                                </button>
+                              )}
+
+                              {/* Round 2 완료 후 메시지 및 버튼 */}
+                              {!isRoundInProgress && currentRound === 2 && (
+                                <div className="flex flex-col items-center gap-4">
+                                  <p className="text-gray-700 text-lg font-semibold">
+                                    모든 라운드가 완료되었습니다
+                                  </p>
+                                  <button
+                                    onClick={handleFinishRoom}
+                                    className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
+                                  >
+                                    처음으로 돌아가기
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -592,13 +1264,24 @@ export default function ShadowingRoom() {
               </button>
             )}
 
-            {/* 컨텐츠 변경 버튼 (방장만) - 영상 재생 중이 아닐 때만 표시 */}
-            {status === "connected" && isHost && !isPlaying && (
+            {/* 컨텐츠 변경 버튼 (방장만) - 게임 시작 전에만 표시 */}
+            {status === "connected" && isHost && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && (
               <button
                 onClick={() => setIsContentSelectOpen(true)}
                 className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
               >
                 컨텐츠 변경
+              </button>
+            )}
+
+            {/* 캐릭터 선택 버튼 - 역할 선택 완료 전까지만 표시 */}
+            {status === "connected" && !isPlaying && !isGameStarting && countdown === null && !isRoleAssigned && availableRoles.length > 0 && (
+              <button
+                onClick={() => setIsRoleSelectOpen(true)}
+                className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
+              >
+                <UserCircle size={20} />
+                캐릭터 선택
               </button>
             )}
           </div>
@@ -689,7 +1372,7 @@ export default function ShadowingRoom() {
 
         {/* 탭 콘텐츠 */}
         <div className="flex-1 overflow-hidden bg-white">
-          {sidebarTab === "video" && (
+          {sidebarTab === "video" && isMediaChecked && (
             <div className={`h-full overflow-y-auto p-3 ${layoutMode === "grid" ? "grid grid-cols-2 gap-3 auto-rows-min" : "space-y-3"
               }`}>
               {status === "connected" && tiles.length > 0 ? (
@@ -700,7 +1383,8 @@ export default function ShadowingRoom() {
                     muted={t.muted}
                     label={t.label}
                     isSpeaker={t.isSpeaker}
-                    isReady={t.isReady}
+                    isReady={t.id === "me" ? (isReady && !isGameStarting && !isPlaying) : false}
+                    isSettingUp={t.isSettingUp}
                     videoClassName={layoutMode === "wide" ? "aspect-[21/9]" : undefined}
                   />
                 ))
@@ -713,7 +1397,12 @@ export default function ShadowingRoom() {
           )}
           {sidebarTab === "chat" && (
             <div className="h-full">
-              <ChatPanel roomId={roomId} />
+              <ChatPanel
+                messages={chatMessages}
+                onSendMessage={sendChatMessage}
+                nickname={nickname}
+                currentUserId={memberId}
+              />
             </div>
           )}
         </div>
@@ -726,6 +1415,35 @@ export default function ShadowingRoom() {
           onClose={() => setIsContentSelectOpen(false)}
           onSelect={handleContentSelect}
         />
+      )}
+
+      {/* 역할 선택 모달 */}
+      {isRoleSelectOpen && (
+        <RoleSelectModal
+          roles={availableRoles}
+          onSelect={handleRoleSelect}
+          onClose={() => setIsRoleSelectOpen(false)}
+          onConfirm={handleConfirmRoles}
+          selectedRoleId={mySelectedRoleId}
+          isHost={isHost}
+          isConfirming={isConfirmingRoles}
+        />
+      )}
+
+      {/* 토스트 알림 */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type="error"
+          onClose={() => setToastMessage(null)}
+        />
+      )}
+
+      {/* 미디어 체크 모달 (블러 배경) */}
+      {!isMediaChecked && (
+        <div className="fixed inset-0 z-[9999] backdrop-blur-sm bg-black/30">
+          <MediaCheckScreen onJoin={handleMediaCheckComplete} roomTitle={roomInfo.title} />
+        </div>
       )}
     </div>
   );
