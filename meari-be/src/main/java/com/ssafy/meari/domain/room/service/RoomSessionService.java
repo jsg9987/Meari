@@ -496,6 +496,14 @@ public class RoomSessionService {
     }
 
     /**
+     * 멤버가 녹음한 문장 개수 조회
+     */
+    public Long getRecordedCount(Long roomId, Integer round, Long memberId) {
+        String recordingsKey = String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId);
+        return redisTemplate.opsForSet().size(recordingsKey);
+    }
+
+    /**
      * 모든 멤버의 모든 문장 녹음이 완료되었는지 확인
      */
     public boolean isAllRecordingsComplete(Long roomId, Integer round) {
