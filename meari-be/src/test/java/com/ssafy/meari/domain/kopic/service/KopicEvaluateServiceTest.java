@@ -9,10 +9,7 @@ import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.report.entity.KopicReport;
 import com.ssafy.meari.domain.report.entity.ReportStatus;
 import com.ssafy.meari.domain.report.repository.KopicReportRepository;
-import com.ssafy.meari.domain.report.repository.KopicTotalReportRepository;
-import com.ssafy.meari.domain.report.entity.KopicTotalReport;
 import com.ssafy.meari.domain.theme.entity.Theme;
-import com.ssafy.meari.domain.theme.repository.ThemeRepository;
 import com.ssafy.meari.global.error.exception.BusinessException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -46,12 +43,6 @@ class KopicEvaluateServiceTest {
     private KopicReportRepository kopicReportRepository;
 
     @Mock
-    private KopicTotalReportRepository kopicTotalReportRepository;
-
-    @Mock
-    private ThemeRepository themeRepository;
-
-    @Mock
     private GeminiAnalysisService geminiAnalysisService;
 
     @Nested
@@ -72,16 +63,10 @@ class KopicEvaluateServiceTest {
             given(sentence.getTheme()).willReturn(theme);
             given(sentence.getTextKo()).willReturn("오늘 점심 메뉴는 뭐예요?");
 
-            KopicTotalReport totalReport = mock(KopicTotalReport.class);
-            given(totalReport.getKopicTotalReportId()).willReturn(1L);
-
             KopicEvaluateRequest request = mock(KopicEvaluateRequest.class);
-            given(request.getKopicTotalReportId()).willReturn(1L);
             given(request.getKopicSentenceId()).willReturn(501L);
+            given(request.getAudioUrl()).willReturn("https://s3.../test.wav");
 
-            byte[] audioData = "fake-audio-data".getBytes();
-
-            given(kopicTotalReportRepository.findById(1L)).willReturn(Optional.of(totalReport));
             given(kopicSentenceRepository.findById(501L)).willReturn(Optional.of(sentence));
             given(kopicReportRepository.save(any(KopicReport.class))).willAnswer(invocation -> {
                 KopicReport report = invocation.getArgument(0);
@@ -90,11 +75,12 @@ class KopicEvaluateServiceTest {
             });
 
             // When
-            KopicEvaluateResponse response = kopicEvaluateService.evaluate(member, request, audioData);
+            KopicEvaluateResponse response = kopicEvaluateService.evaluate(member, request);
 
             // Then
             assertThat(response.getKopicReportId()).isEqualTo(1001L);
             assertThat(response.getStatus()).isEqualTo("PROCESSING");
+            verify(geminiAnalysisService).analyze(1001L, "오늘 점심 메뉴는 뭐예요?", "https://s3.../test.wav", );
         }
 
         @Test
@@ -102,19 +88,12 @@ class KopicEvaluateServiceTest {
         void evaluate_notFoundSentence() {
             // Given
             Member member = mock(Member.class);
-            byte[] audioData = "fake-audio-data".getBytes();
-
-            KopicTotalReport totalReport = mock(KopicTotalReport.class);
-
             KopicEvaluateRequest request = mock(KopicEvaluateRequest.class);
-            given(request.getKopicTotalReportId()).willReturn(1L);
             given(request.getKopicSentenceId()).willReturn(999L);
-
-            given(kopicTotalReportRepository.findById(1L)).willReturn(Optional.of(totalReport));
             given(kopicSentenceRepository.findById(999L)).willReturn(Optional.empty());
 
             // When & Then
-            assertThatThrownBy(() -> kopicEvaluateService.evaluate(member, request, audioData))
+            assertThatThrownBy(() -> kopicEvaluateService.evaluate(member, request))
                     .isInstanceOf(BusinessException.class);
         }
     }

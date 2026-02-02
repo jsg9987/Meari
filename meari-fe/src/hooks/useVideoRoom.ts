@@ -37,7 +37,7 @@ export function useVideoRoom({
   roleId = null
 }: UseVideoRoomOptions) {
   const { userInfo } = useAuthStore();
-  const memberId = userInfo?.memberId;
+  const memberId = userInfo?.member_id;
   const [session, setSession] = useState<Session | null>(null);
   const [publisher, setPublisher] = useState<Publisher | null>(null);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);

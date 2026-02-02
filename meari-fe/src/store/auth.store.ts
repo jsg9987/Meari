@@ -56,7 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
             }
         } catch (err: any) {
             console.error('[AuthStore] Login failed', err);
-            const errorMessage = err.response?.data?.error?.message || err.message || '로그인에 실패했습니다.';
+            const errorMessage = err.response?.data?.message || '로그인에 실패했습니다.';
             set({
                 isAuthenticated: false,
                 user: null,
@@ -88,7 +88,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         if (!token) return;
 
         try {
-            const response = await getUserInfo();
+            const response = await getUserInfo() as { data: { success: boolean; data: UserInfo | null; error: { code: string; message: string } | null } };
             if (response.data.success && response.data.data) {
                 set({ userInfo: response.data.data });
             }

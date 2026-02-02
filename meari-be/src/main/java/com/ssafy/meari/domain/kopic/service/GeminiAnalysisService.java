@@ -13,8 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Base64;
-
 @Slf4j
 @Service
 public class GeminiAnalysisService {
@@ -46,25 +44,30 @@ public class GeminiAnalysisService {
 
     private static final String SYSTEM_PROMPT = """
             ## 역할
-            너는 외국인을 위한 전문 한국어 발음 교정 AI 가이드야. 사용자가 제공한 질문(텍스트)과 답변(음성)을 비교하여, 발음의 정확도와 자연스러움을 분석하고 피드백을 제공해야 해.
+            너는 외국인의 한국어 회화 능력을 평가하는 AI 채점관이야. 사용자가 제공한 질문(텍스트)에 대해 답변(음성)이 문맥상 적절한 응답인지 판단하고 피드백을 제공해야 해.
 
             ## 지시 사항
-            1. **음성 분석**: 사용자의 음성을 듣고, 실제 발음한 그대로를 텍스트로 변환해(잘못 발음한 부분도 그대로 반영).
-            2. **문장 유추**: 사용자가 의도했을 '정답 문장'이 무엇인지 문맥상 유추해서 확정해.
-            3. **상세 비교**: 문장 단위로 끊어서 분석하고, 특히 발음이 어색하거나 틀린 단어를 찾아내.
+            1. **음성 분석**: 사용자의 음성을 듣고, 실제 말한 내용을 텍스트로 변환해(잘못된 부분도 그대로 반영).
+            2. **문맥 판단**: 주어진 질문에 대해 사용자의 답변이 문맥상 적절한 응답인지 평가해. 정확한 정답 문장이 정해져 있지 않으므로, 질문의 의도에 맞는 자연스러운 답변이면 높은 점수를 줘.
+            3. **상세 비교**: 답변의 내용 적절성, 문법 정확성, 표현의 자연스러움을 종합적으로 분석해.
             4. **평가 불가 판정**: 음성이 너무 짧거나, 소리가 너무 작거나, 잡음만 있어서 의미 있는 발화가 감지되지 않으면 accuracy를 0점으로 주고 detailed_analysis의 각 feedback 필드에 평가 불가 사유를 명시해.
             5. **결과 출력**: 반드시 아래 지정된 JSON 형식으로만 응답해. 다른 텍스트는 절대 포함하지 마.
+
+            ## 채점 기준
+            - **내용 적절성 (50%)**: 질문의 의도를 정확히 파악하고 문맥에 맞는 답변을 했는가
+            - **문법 정확성 (30%)**: 한국어 문법에 맞게 답변했는가
+            - **표현 자연스러움 (20%)**: 한국어 원어민이 자연스럽게 느낄 수 있는 표현인가
 
             ## JSON 결과 규격
             {
               "accuracy": 0~100 정수,
               "detailed_analysis": {
-                "original_sentence": "사용자가 발음한 그대로의 텍스트 (오류 포함, 평가 불가 시 빈 문자열)",
-                "target_sentence": "교정된 정답 문장",
+                "original_sentence": "사용자가 실제로 말한 텍스트 (오류 포함, 평가 불가 시 빈 문자열)",
+                "target_sentence": "질문에 대한 모범 답변 예시",
                 "feedback": {
-                  "missed_point": "발음에서 아쉬운 점 (평가 불가 시 사유 명시)",
-                  "correction": "어떻게 발음해야 하는지에 대한 피드백 (평가 불가 시 사유 명시)",
-                  "tip": "더 자연스럽게 들리기 위한 고급 발음 팁 (평가 불가 시 사유 명시)"
+                  "missed_point": "답변에서 부족하거나 문맥에 맞지 않는 부분 (평가 불가 시 사유 명시)",
+                  "correction": "더 적절한 답변 방향에 대한 피드백 (평가 불가 시 사유 명시)",
+                  "tip": "더 자연스러운 한국어 표현을 위한 팁 (평가 불가 시 사유 명시)"
                 }
               }
             }
@@ -72,7 +75,7 @@ public class GeminiAnalysisService {
 
     @Async("geminiAnalysisExecutor")
     @Transactional
-    public void analyze(Long kopicReportId, String textKo, byte[] audioData, Long kopicTotalReportId) {
+    public void analyze(Long kopicReportId, String textKo, String audioUrl, Long kopicTotalReportId) {
         KopicReport report = kopicReportRepository.findById(kopicReportId)
                 .orElse(null);
 
@@ -83,12 +86,11 @@ public class GeminiAnalysisService {
 
         try {
             String userMessage = String.format(
-                    "원문: \"%s\"\n\n위 음성을 분석하여 JSON 형식으로 응답하세요.",
-                    textKo
+                    "원문: \"%s\"\n음성 파일 URL: \"%s\"\n\n위 음성을 분석하여 JSON 형식으로 응답하세요.",
+                    textKo, audioUrl
             );
 
-            String base64Audio = Base64.getEncoder().encodeToString(audioData);
-            String requestBody = buildGeminiRequest(userMessage, base64Audio);
+            String requestBody = buildGeminiRequest(userMessage);
             String url = String.format("%s/models/%s:generateContent", baseUrl, model);
 
             HttpHeaders headers = new HttpHeaders();
@@ -120,7 +122,7 @@ public class GeminiAnalysisService {
         }
     }
 
-    private String buildGeminiRequest(String userMessage, String base64Audio) {
+    private String buildGeminiRequest(String userMessage) {
         try {
             ObjectNode root = objectMapper.createObjectNode();
 
@@ -131,20 +133,12 @@ public class GeminiAnalysisService {
             systemInstruction.set("parts", objectMapper.createArrayNode().add(systemPart));
             root.set("system_instruction", systemInstruction);
 
-            // contents - text part + audio inlineData part
+            // contents
             ObjectNode content = objectMapper.createObjectNode();
             content.put("role", "user");
-
-            ObjectNode textPart = objectMapper.createObjectNode();
-            textPart.put("text", userMessage);
-
-            ObjectNode audioPart = objectMapper.createObjectNode();
-            ObjectNode inlineData = objectMapper.createObjectNode();
-            inlineData.put("mimeType", "audio/wav");
-            inlineData.put("data", base64Audio);
-            audioPart.set("inlineData", inlineData);
-
-            content.set("parts", objectMapper.createArrayNode().add(textPart).add(audioPart));
+            ObjectNode userPart = objectMapper.createObjectNode();
+            userPart.put("text", userMessage);
+            content.set("parts", objectMapper.createArrayNode().add(userPart));
             root.set("contents", objectMapper.createArrayNode().add(content));
 
             // generationConfig
