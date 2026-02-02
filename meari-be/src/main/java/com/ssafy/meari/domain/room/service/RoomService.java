@@ -168,7 +168,12 @@ public class RoomService {
                 })
                 .collect(Collectors.toList());
 
-        return RoomDetailResponse.from(room, members);
+        // Redis에서 게임 상태 정보 조회
+        Long contentId = roomSessionService.getContentId(roomId);
+        GamePhase phase = roomSessionService.getPhase(roomId);
+        Boolean rolesConfirmed = roomSessionService.isRolesConfirmed(roomId) ? true : null;
+
+        return RoomDetailResponse.from(room, members, contentId, phase, rolesConfirmed);
     }
 
     /**
