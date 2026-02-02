@@ -137,6 +137,11 @@ pipeline {
                 ]) {
                     script {
                         sh '''
+                            # docker-compose.yml을 배포 서버로 복사
+                            cp docker-compose.yml /home/ubuntu/docker-compose.yml
+                           '''
+
+                        sh '''
                             cd /home/ubuntu
                             echo "DB_PASSWORD=${DB_PW}" > .env
                             echo "JWT_SECRET_KEY=${JWT_KEY}" >> .env
