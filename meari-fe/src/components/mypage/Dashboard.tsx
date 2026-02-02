@@ -1,4 +1,5 @@
 import MyActivityFeed from './MyActivityFeed'
+import ShadowingProgressChart from './ShadowingProgressChart'
 
 const Dashboard = () => {
   return (
@@ -8,7 +9,10 @@ const Dashboard = () => {
         <p className='text-gray-500'>Track your recent learning activity.</p>
       </div>
 
-      <MyActivityFeed />
+      <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+        <ShadowingProgressChart />
+        <MyActivityFeed />
+      </div>
     </div>
   )
 }

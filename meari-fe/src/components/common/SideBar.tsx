@@ -11,6 +11,13 @@ type SideBarProps = {
   userInitial?: string
 }
 
+const menuItems = [
+  { id: 'dashboard' as SideBarMenu, icon: LayoutDashboard, label: '대시보드' },
+  { id: 'profile' as SideBarMenu, icon: User, label: '프로필' },
+  { id: 'report' as SideBarMenu, icon: FileText, label: '리포트' },
+  { id: 'settings' as SideBarMenu, icon: Settings, label: '설정' }
+]
+
 const SideBar = ({ activeMenu = 'dashboard', onMenuChange, userInitial = 'U' }: SideBarProps) => {
   const [selectedMenu, setSelectedMenu] = useState<SideBarMenu>(activeMenu)
   const navigate = useNavigate()
@@ -26,7 +33,7 @@ const SideBar = ({ activeMenu = 'dashboard', onMenuChange, userInitial = 'U' }: 
 
   return (
     <div
-      className='h-full w-32 flex flex-col items-center py-6'
+      className='h-screen w-64 flex flex-col py-6 px-4 fixed left-0 top-0'
       style={{ backgroundColor: 'var(--color-bg-root)' }}
     >
       {/* 로고 */}
@@ -36,79 +43,45 @@ const SideBar = ({ activeMenu = 'dashboard', onMenuChange, userInitial = 'U' }: 
         className='pt-8 pb-12 cursor-pointer hover:opacity-80 transition-opacity'
         aria-label='홈으로 이동'
       >
-        <img src={logoWhite} alt='Meari' className='h-4' />
+        <img src={logoWhite} alt='Meari' className='h-5' />
       </button>
 
-      {/* 대시보드 */}
-      <div className='mb-10'>
-        <button
-          type='button'
-          onClick={() => handleMenuClick('dashboard')}
-          className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
-            selectedMenu === 'dashboard'
-              ? 'text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/10'
-          }`}
-          style={selectedMenu === 'dashboard' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
-          title='대시보드'
-          aria-label='대시보드'
-        >
-          <LayoutDashboard size={26} />
-        </button>
-      </div>
-
       {/* 메뉴 그룹 */}
-      <div className='flex flex-col gap-3 mb-auto'>
-        <button
-          type='button'
-          onClick={() => handleMenuClick('profile')}
-          className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
-            selectedMenu === 'profile'
-              ? 'text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/10'
-          }`}
-          style={selectedMenu === 'profile' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
-          title='프로필'
-          aria-label='프로필'
-        >
-          <User size={26} />
-        </button>
+      <div className='flex flex-col gap-2'>
+        {menuItems.map((item) => {
+          const Icon = item.icon
+          const isActive = selectedMenu === item.id
 
-        <button
-          type='button'
-          onClick={() => handleMenuClick('report')}
-          className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
-            selectedMenu === 'report'
-              ? 'text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/10'
-          }`}
-          style={selectedMenu === 'report' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
-          title='리포트'
-          aria-label='리포트'
-        >
-          <FileText size={26} />
-        </button>
-
-        <button
-          type='button'
-          onClick={() => handleMenuClick('settings')}
-          className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
-            selectedMenu === 'settings'
-              ? 'text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/10'
-          }`}
-          style={selectedMenu === 'settings' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
-          title='설정'
-          aria-label='설정'
-        >
-          <Settings size={26} />
-        </button>
+          return (
+            <button
+              key={item.id}
+              type='button'
+              onClick={() => handleMenuClick(item.id)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                isActive
+                  ? 'text-white'
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              }`}
+              style={isActive ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
+              title={item.label}
+              aria-label={item.label}
+            >
+              <Icon size={22} />
+              <span className='text-sm font-medium'>{item.label}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* 프로필 이미지 */}
       <div className='mt-auto'>
-        <div className='flex items-center justify-center w-16 h-16 rounded-full bg-blue-500 text-white font-semibold text-xl'>
-          {userInitial.charAt(0).toUpperCase()}
+        <div className='flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl'>
+          <div className='flex items-center justify-center w-10 h-10 rounded-full bg-blue-500 text-white font-semibold text-sm'>
+            {userInitial.charAt(0).toUpperCase()}
+          </div>
+          <div className='text-white text-sm font-medium'>
+            {userInitial}
+          </div>
         </div>
       </div>
     </div>
