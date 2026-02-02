@@ -88,7 +88,8 @@ services:
   openvidu:
     image: openvidu/openvidu-server:2.29.0
     container_name: meari-openvidu
-    network_mode: host
+    network_mode: host 
+    # restart 삭제
     environment:
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
       DOMAIN_OR_PUBLIC_IP: ${DOMAIN}
