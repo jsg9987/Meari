@@ -11,8 +11,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.meari.domain.word.entity.Word;
 import com.ssafy.meari.global.pipeline.videosaving.anthropic.service.AnthropicService;
-import com.ssafy.meari.global.pipeline.videosaving.dto.HomonymWordDto;
-import com.ssafy.meari.global.pipeline.videosaving.dto.WordMatchingInfo;
+import com.ssafy.meari.global.pipeline.videosaving.anthropic.dto.HomonymWordDto;
+import com.ssafy.meari.global.pipeline.videosaving.anthropic.dto.WordMatchingInfo;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -121,7 +121,7 @@ public class HomonymDisambiguationService {
 
 		if (selections.size() != homonymList.size()) {
 			log.warn("[Homonym] LLM 응답 개수 불일치 - 요청: {}, 응답: {} (일부만 처리합니다)",
-					homonymList.size(), selections.size());
+				homonymList.size(), selections.size());
 		}
 
 		// 응답 개수가 부족해도 있는 만큼은 처리
@@ -138,7 +138,7 @@ public class HomonymDisambiguationService {
 				// null인 경우 스킵 (LLM이 문맥상 무관하다고 판단)
 				if (selectedIndex == null) {
 					log.info("  - '{}' → [SKIP] 문맥상 무관 (문장[{}])",
-							homonymDto.getWordKr(), homonymDto.getSentence().getSequence());
+						homonymDto.getWordKr(), homonymDto.getSentence().getSequence());
 					skippedCount++;
 					continue;
 				}
@@ -158,32 +158,32 @@ public class HomonymDisambiguationService {
 
 					String type = candidates.size() == 1 ? "SINGLE" : "HOMONYM";
 					log.info("  - '{}' ({}) → {} (문장[{}])",
-							homonymDto.getWordKr(), type, candidatesLog.toString().trim(),
-							homonymDto.getSentence().getSequence());
+						homonymDto.getWordKr(), type, candidatesLog.toString().trim(),
+						homonymDto.getSentence().getSequence());
 
 					// WordMatchingInfo 생성 (즉시 저장하지 않음)
 					WordMatchingInfo matchingInfo = WordMatchingInfo.builder()
-							.sentence(homonymDto.getSentence())
-							.word(selectedWord)
-							.originalSequence(homonymDto.getWordSequence())
-							.build();
+						.sentence(homonymDto.getSentence())
+						.word(selectedWord)
+						.originalSequence(homonymDto.getWordSequence())
+						.build();
 					wordMatchingInfos.add(matchingInfo);
 
 					processedCount++;
 				} else {
 					log.warn("[Homonym] 선택 범위 초과 - wordKr: {}, 선택: {}, 후보 수: {}",
-							homonymDto.getWordKr(), selectedIndex, candidates.size());
+						homonymDto.getWordKr(), selectedIndex, candidates.size());
 					skippedCount++;
 				}
 			} catch (Exception e) {
 				log.error("[Homonym] 단어 처리 실패 - wordKr: {}, error: {}",
-						homonymDto.getWordKr(), e.getMessage());
+					homonymDto.getWordKr(), e.getMessage());
 				skippedCount++;
 			}
 		}
 
 		log.info("[Homonym] LLM 검증 완료 - 전체: {}개, 통과: {}개, 스킵: {}개",
-				homonymList.size(), processedCount, skippedCount);
+			homonymList.size(), processedCount, skippedCount);
 
 		return wordMatchingInfos;
 	}
@@ -204,7 +204,7 @@ public class HomonymDisambiguationService {
 			HomonymWordDto dto = homonymList.get(i);
 			sb.append("### ").append(i + 1).append(". '").append(dto.getWordKr()).append("'\n");
 			sb.append("등장 위치: [").append(dto.getSentence().getSequence()).append("] ")
-					.append(dto.getSentence().getTextKo()).append("\n");
+				.append(dto.getSentence().getTextKo()).append("\n");
 			sb.append("후보:\n");
 
 			List<Word> candidates = dto.getHomonymWords();
