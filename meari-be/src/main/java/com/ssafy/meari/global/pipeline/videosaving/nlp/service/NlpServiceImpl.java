@@ -7,6 +7,11 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 import com.ssafy.meari.global.pipeline.videosaving.nlp.dto.MorphemeAnalysisResponseDto;
+
+import kr.co.shineware.nlp.komoran.constant.DEFAULT_MODEL;
+import kr.co.shineware.nlp.komoran.core.Komoran;
+import kr.co.shineware.nlp.komoran.model.KomoranResult;
+import kr.co.shineware.nlp.komoran.model.Token;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j

@@ -20,8 +20,11 @@ configurations {
     }
 }
 
-repositories {
-    mavenCentral()
+allprojects {
+    repositories {
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
 }
 
 dependencies {
@@ -73,13 +76,18 @@ dependencies {
     // 9. Swagger (SpringDoc OpenAPI UI)
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4'
 
-    // 10. Test
+    // 10. NLP (KOMORAN - via JitPack)
+    implementation 'com.github.shin285:KOMORAN:3.3.4'
+    // JDK 9+ 호환성 해결을 위한 JAXB 의존성 추가
+    implementation 'javax.xml.bind:jaxb-api:2.3.1'
+    implementation 'com.sun.xml.bind:jaxb-core:2.3.0'
+    implementation 'com.sun.xml.bind:jaxb-impl:2.3.0'
+    implementation 'javax.activation:activation:1.1.1'
+
+    // 11. Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    // 11. NLP (KOMORAN)
-    implementation 'com.github.shin285:KOMORAN:3.3.4'
 
 
     // 12. csv 처리
