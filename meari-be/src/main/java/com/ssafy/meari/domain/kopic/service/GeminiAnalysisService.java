@@ -13,8 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Base64;
-
 @Slf4j
 @Service
 public class GeminiAnalysisService {
@@ -77,7 +75,7 @@ public class GeminiAnalysisService {
 
     @Async("geminiAnalysisExecutor")
     @Transactional
-    public void analyze(Long kopicReportId, String textKo, byte[] audioData, Long kopicTotalReportId) {
+    public void analyze(Long kopicReportId, String textKo, String audioUrl, Long kopicTotalReportId) {
         KopicReport report = kopicReportRepository.findById(kopicReportId)
                 .orElse(null);
 
@@ -88,12 +86,11 @@ public class GeminiAnalysisService {
 
         try {
             String userMessage = String.format(
-                    "원문: \"%s\"\n\n위 음성을 분석하여 JSON 형식으로 응답하세요.",
-                    textKo
+                    "원문: \"%s\"\n음성 파일 URL: \"%s\"\n\n위 음성을 분석하여 JSON 형식으로 응답하세요.",
+                    textKo, audioUrl
             );
 
-            String base64Audio = Base64.getEncoder().encodeToString(audioData);
-            String requestBody = buildGeminiRequest(userMessage, base64Audio);
+            String requestBody = buildGeminiRequest(userMessage);
             String url = String.format("%s/models/%s:generateContent", baseUrl, model);
 
             HttpHeaders headers = new HttpHeaders();
@@ -125,7 +122,7 @@ public class GeminiAnalysisService {
         }
     }
 
-    private String buildGeminiRequest(String userMessage, String base64Audio) {
+    private String buildGeminiRequest(String userMessage) {
         try {
             ObjectNode root = objectMapper.createObjectNode();
 
@@ -136,20 +133,12 @@ public class GeminiAnalysisService {
             systemInstruction.set("parts", objectMapper.createArrayNode().add(systemPart));
             root.set("system_instruction", systemInstruction);
 
-            // contents - text part + audio inlineData part
+            // contents
             ObjectNode content = objectMapper.createObjectNode();
             content.put("role", "user");
-
-            ObjectNode textPart = objectMapper.createObjectNode();
-            textPart.put("text", userMessage);
-
-            ObjectNode audioPart = objectMapper.createObjectNode();
-            ObjectNode inlineData = objectMapper.createObjectNode();
-            inlineData.put("mimeType", "audio/wav");
-            inlineData.put("data", base64Audio);
-            audioPart.set("inlineData", inlineData);
-
-            content.set("parts", objectMapper.createArrayNode().add(textPart).add(audioPart));
+            ObjectNode userPart = objectMapper.createObjectNode();
+            userPart.put("text", userMessage);
+            content.set("parts", objectMapper.createArrayNode().add(userPart));
             root.set("contents", objectMapper.createArrayNode().add(content));
 
             // generationConfig

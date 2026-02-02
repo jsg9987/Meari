@@ -1,7 +1,5 @@
 import axiosInstance from "./axiosInstance";
 import { apiConfig } from './apiConfig';
-import type { AxiosResponse } from 'axios';
-import type { ApiResponse } from './auth.api';
 
 // 세션 생성
 export interface CreateSessionRequest {
@@ -9,14 +7,19 @@ export interface CreateSessionRequest {
   room_id: number;
 }
 
-export interface CreateSessionData {
-  session_id: string;
+export interface CreateSessionResponse {
+  success: boolean;
+  data: {
+    session_id: string;
+  } | null;
+  error: {
+    code: string;
+    message: string;
+  } | null;
 }
 
-export type CreateSessionResponse = AxiosResponse<ApiResponse<CreateSessionData>>;
-
-export const createSession = async (payload: CreateSessionRequest): Promise<CreateSessionResponse> => {
-  const response = await axiosInstance.post<ApiResponse<CreateSessionData>>('/openvidu/sessions', payload);
+export const createSession = async (payload: CreateSessionRequest) => {
+  const response = await axiosInstance.post('/openvidu/sessions', payload);
   return response;
 };
 
@@ -27,19 +30,24 @@ export interface CreateConnectionRequest {
   role_id: number | null;
 }
 
-export interface CreateConnectionData {
-  session_id: string;
-  token: string;
-  connection_id: string;
+export interface CreateConnectionResponse {
+  success: boolean;
+  data: {
+    session_id: string;
+    token: string;
+    connection_id: string;
+  } | null;
+  error: {
+    code: string;
+    message: string;
+  } | null;
 }
-
-export type CreateConnectionResponse = AxiosResponse<ApiResponse<CreateConnectionData>>;
 
 export const createConnection = async (
   sessionId: string,
   payload: CreateConnectionRequest
-): Promise<CreateConnectionResponse> => {
-  const response = await axiosInstance.post<ApiResponse<CreateConnectionData>>(`/openvidu/sessions/${sessionId}/connections`, payload);
+) => {
+  const response = await axiosInstance.post(`/openvidu/sessions/${sessionId}/connections`, payload);
   return response;
 };
 
