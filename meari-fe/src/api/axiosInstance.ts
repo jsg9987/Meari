@@ -12,7 +12,9 @@ axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const isAuthFree =
       config.url?.includes('/auth/login') ||
-      config.url?.includes('/auth/signup');
+      config.url?.includes('/auth/signup') ||
+      config.url?.includes('/auth/email/check') ||
+      config.url?.includes('/auth/nickname/check');
 
     if (isAuthFree) return config;
 

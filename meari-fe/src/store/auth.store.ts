@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { login, type LoginCredentials, type UserInfo, getUserInfo } from '../api/auth.api';
 
 interface AuthState {
-    user: { email: string } | null;
     userInfo: UserInfo | null;
     isAuthenticated: boolean;
     isLoading: boolean;
@@ -15,7 +14,6 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-    user: null,
     userInfo: null,
     isAuthenticated: false,
     isLoading: false,
@@ -26,7 +24,6 @@ export const useAuthStore = create<AuthState>((set) => ({
         try {
             const response = await login(credentials) as any;
 
-            // 다양한 응답 구조에서 토큰 추출
             const token = response.data?.access_token ||
                 response.data?.data?.access_token ||
                 response.access_token ||
@@ -40,11 +37,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
             set({
                 isAuthenticated: true,
-                user: { email: credentials.email },
                 isLoading: false
             });
 
-            // 사용자 정보 동기화 (배경 작업)
             try {
                 const userResponse = await getUserInfo() as any;
                 const userInfo = userResponse.data?.data || userResponse.data;
@@ -59,7 +54,6 @@ export const useAuthStore = create<AuthState>((set) => ({
             const errorMessage = err.response?.data?.error?.message || err.message || '로그인에 실패했습니다.';
             set({
                 isAuthenticated: false,
-                user: null,
                 error: errorMessage,
                 isLoading: false
             });
@@ -68,13 +62,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     logout: () => {
         localStorage.removeItem('access_token');
-        set({ user: null, userInfo: null, isAuthenticated: false, error: null });
+        localStorage.removeItem('last_active_at');
+        set({ userInfo: null, isAuthenticated: false, error: null });
     },
 
     checkAuth: () => {
         const token = localStorage.getItem('access_token');
         if (token) {
-            // 토큰 존재 시 인증된 상태로 설정하되, 실제 사용자 정보는 fetchUserInfo에서 가져옴
             set({ isAuthenticated: true });
         }
     },
@@ -95,8 +89,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         } catch (error: any) {
             console.error('[AuthStore] Failed to fetch user info:', error);
             if (error.response?.status === 401) {
-                // 토큰이 유효하지 않은 경우 로그아웃 처리
-                set({ user: null, userInfo: null, isAuthenticated: false });
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('last_active_at');
+                set({ userInfo: null, isAuthenticated: false });
             }
         }
     }

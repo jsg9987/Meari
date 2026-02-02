@@ -14,7 +14,7 @@ import { useVideoRoom } from "../hooks/useVideoRoom";
 import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type ChatMessage } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
 import { selectRoomContent, getContentRoles, type ContentRole } from "../api/contents.api";
-import { getRoomDetail, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
+import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
 import { useRoomStore } from "../store/room.store";
 import { useRoleStore } from "../store/role.store";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
@@ -39,9 +39,11 @@ export default function ShadowingRoom() {
   const {
     availableRoles,
     mySelectedRoleId,
+    selectedRoles,
     setAvailableRoles,
     setMySelectedRole,
     setMemberRole,
+    removeMemberRole,
     getConfirmData,
     clearRoles,
   } = useRoleStore();
@@ -56,7 +58,6 @@ export default function ShadowingRoom() {
   const [isContentSelectOpen, setIsContentSelectOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isHost] = useState(true); // Mock: 방장 여부 (실제로는 API나 WebSocket에서 설정)
   const [isReady, setIsReady] = useState(false); // 내 준비 상태
   const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false); // 역할 선택 모달 상태
   const [isConfirmingRoles, setIsConfirmingRoles] = useState(false); // 역할 확정 로딩 상태
@@ -71,6 +72,8 @@ export default function ShadowingRoom() {
   const [videoReady, setVideoReady] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
   const readyTimeoutRef = useRef<number | null>(null);
+  const hasEnteredRef = useRef(false); // enterRoom API 중복 호출 방지용
+  const previousMembersRef = useRef<Array<{member_id: number; nickname: string}>>([]);
   const memberId = userInfo?.memberId ?? 0;
 
   // 영상 재생 관련 상태
@@ -103,6 +106,10 @@ export default function ShadowingRoom() {
   const presignedUrlsRef = useRef<Map<number, string>>(new Map());
 
   const nickname = userInfo?.nickname || "User";
+
+  // 디버깅: memberId와 userInfo 확인
+  useEffect(() => {
+  }, [userInfo, memberId]);
 
   // 채팅 메시지 상태
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -164,6 +171,52 @@ export default function ShadowingRoom() {
   } = useRoomWebSocket({
     roomId: Number(roomId),
     memberId,
+    onContentSelected: async (message) => {
+      // 모든 사용자가 content_id를 받아서 비디오 URL 가져오기
+      if (!message.content_id) return;
+
+      const contentId = message.content_id;
+
+      // content_id를 store에 저장
+      setContentId(contentId);
+
+      let videoUrlFromApi = '';
+      try {
+        const videoResponse = await getContentVideoUrl(contentId);
+        if (videoResponse.data.success && videoResponse.data.data) {
+          videoUrlFromApi = videoResponse.data.data.video_url;
+          setVideoUrl(videoUrlFromApi);
+        }
+      } catch (error) {
+        console.error('[CONTENT_SELECTED] Failed to get video URL:', error);
+        setToastMessage('비디오를 불러오는데 실패했습니다');
+        return;
+      }
+
+      // 모든 사용자가 비디오를 볼 수 있도록 selectedContent 설정
+      // 참가자들은 WebSocket 메시지로만 컨텐츠 정보를 받음
+      setSelectedContent((prev) => {
+        // 방장이 이미 setSelectedContent를 호출한 경우 덮어쓰지 않음
+        if (prev && prev.content_id === contentId) {
+          return prev;
+        }
+
+        // 참가자들은 임시 객체 생성
+        return {
+          content_id: contentId,
+          theme_id: roomData?.theme_id || 1,
+          title: '선택된 컨텐츠', // 실제 제목은 방장이 선택한 컨텐츠에서만 표시됨
+          description: '',
+          video_url: videoUrlFromApi,
+          thumbnail_url: '',
+          duration: 0,
+        };
+      });
+
+      // 컨텐츠 선택 시 모든 참가자의 준비 상태 초기화
+      setIsReady(false);
+      setParticipantsReady({});
+    },
     onReady: (message) => {
       // 준비 상태 메시지 수신
       if (message.member_id !== undefined && message.ready !== undefined) {
@@ -220,21 +273,42 @@ export default function ShadowingRoom() {
     },
     onRoleAssigned: (message) => {
       // 역할 선점 성공 시 선택된 역할 ID 저장 (아직 확정은 아님)
+      console.log('[onRoleAssigned] Message received:', message);
+      console.log('[onRoleAssigned] Current memberId:', memberId);
+      console.log('[onRoleAssigned] Message member_id:', message.member_id);
+      console.log('[onRoleAssigned] Type comparison - memberId type:', typeof memberId, 'message.member_id type:', typeof message.member_id);
+      console.log('[onRoleAssigned] Equality check:', message.member_id === memberId);
+
       if (message.role_id && message.member_id) {
-        setMySelectedRole(message.role_id);
+        // 모든 멤버의 역할 선택 상태는 항상 업데이트
         setMemberRole(message.member_id, message.role_id);
-        setToastMessage('역할이 등록되었습니다');
+        console.log('[onRoleAssigned] setMemberRole called for member:', message.member_id, 'role:', message.role_id);
+
+        // 본인이 선택한 경우에만 mySelectedRole 업데이트 및 toast 표시
+        if (message.member_id === memberId) {
+          console.log('[onRoleAssigned] This is MY selection!');
+          setMySelectedRole(message.role_id);
+          setToastMessage('역할이 등록되었습니다');
+        } else {
+          console.log('[onRoleAssigned] This is NOT my selection. Someone else selected.');
+        }
       }
     },
     onRoleReleased: (message) => {
       console.log('Role released:', message);
-      // 역할 해제 시 선택된 역할 ID 초기화
-      setMySelectedRole(undefined);
-      setToastMessage('역할이 해제되었습니다');
+      // 역할 해제 시 처리
+      if (message.member_id) {
+        // 모든 멤버의 역할 선택 상태에서 해당 멤버 제거
+        removeMemberRole(message.member_id);
+
+        // 본인이 해제한 경우에만 mySelectedRole 초기화 및 toast 표시
+        if (message.member_id === memberId) {
+          setMySelectedRole(undefined);
+          setToastMessage('역할이 해제되었습니다');
+        }
+      }
     },
     onGameStart: (message) => {
-      console.log('Game starting:', message);
-
       // segments 데이터를 시간대별로 재가공
       if (message.segments) {
         const allSubtitles: TimeIndexedSubtitle[] = [];
@@ -296,6 +370,10 @@ export default function ShadowingRoom() {
         timeIndexedSubtitlesRef.current = allSubtitles;
 
         console.log('Time-indexed subtitles prepared for Round:', allSubtitles);
+
+        // 모든 사용자 화면에서 캐릭터 선택 모달과 버튼 닫기
+        setIsRoleSelectOpen(false);
+        setIsRoleAssigned(true);
         setToastMessage('역할이 확정되었습니다');
       }
     },
@@ -351,13 +429,47 @@ export default function ShadowingRoom() {
       setToastMessage('게임이 종료되었습니다');
     },
     onMemberJoin: async (message) => {
-      console.log('Member joined:', message);
+      // 시스템 메시지 추가 (백엔드에서 nickname을 보내주는 경우)
+      if (message.nickname) {
+        const systemMessage: ChatMessage = {
+          sender_id: 0,
+          nickname: 'System',
+          message: `${message.nickname}님이 입장하셨습니다`,
+          timestamp: new Date().toISOString(),
+          isSystem: true,
+        };
+        setChatMessages(prev => [...prev, systemMessage]);
+      }
+
       // 멤버 입장 시 방 정보 다시 가져오기 (members 업데이트)
       if (roomId) {
         try {
           const response = await getRoomDetail(Number(roomId));
           if (response.data.success && response.data.data) {
             setRoomData(response.data.data);
+
+            // 백엔드에서 nickname을 안 보내주는 경우, 새로운 멤버 찾기
+            if (!message.nickname && message.member_id) {
+              const newMember = response.data.data.members.find(
+                m => m.member_id === message.member_id
+              );
+              if (newMember) {
+                const systemMessage: ChatMessage = {
+                  sender_id: 0,
+                  nickname: 'System',
+                  message: `${newMember.nickname}님이 입장하셨습니다`,
+                  timestamp: new Date().toISOString(),
+                  isSystem: true,
+                };
+                setChatMessages(prev => [...prev, systemMessage]);
+              }
+            }
+
+            // 현재 멤버 목록 저장
+            previousMembersRef.current = response.data.data.members.map(m => ({
+              member_id: m.member_id,
+              nickname: m.nickname,
+            }));
           }
         } catch (error) {
           console.error('Failed to refresh room detail:', error);
@@ -365,30 +477,62 @@ export default function ShadowingRoom() {
       }
     },
     onMemberLeave: async (message) => {
-      console.log('Member left:', message);
+      // 백엔드에서 nickname을 보내주는 경우
+      let leavingNickname = message.nickname;
+
+      // 백엔드에서 nickname을 안 보내주는 경우, 이전 멤버 목록에서 찾기
+      if (!leavingNickname && message.member_id) {
+        const previousMember = previousMembersRef.current.find(
+          m => m.member_id === message.member_id
+        );
+        if (previousMember) {
+          leavingNickname = previousMember.nickname;
+        }
+      }
+
+      // 시스템 메시지 추가
+      if (leavingNickname) {
+        const systemMessage: ChatMessage = {
+          sender_id: 0,
+          nickname: 'System',
+          message: `${leavingNickname}님이 퇴장하셨습니다`,
+          timestamp: new Date().toISOString(),
+          isSystem: true,
+        };
+        setChatMessages(prev => [...prev, systemMessage]);
+      }
+
+      // 나간 멤버의 준비 상태 제거
+      if (message.member_id) {
+        setParticipantsReady(prev => {
+          const newReady = { ...prev };
+          delete newReady[message.member_id!];
+          return newReady;
+        });
+      }
+
       // 멤버 퇴장 시 방 정보 다시 가져오기 (members 업데이트)
       if (roomId) {
         try {
           const response = await getRoomDetail(Number(roomId));
           if (response.data.success && response.data.data) {
             setRoomData(response.data.data);
+
+            // 현재 멤버 목록 저장
+            previousMembersRef.current = response.data.data.members.map(m => ({
+              member_id: m.member_id,
+              nickname: m.nickname,
+            }));
           }
         } catch (error) {
           console.error('Failed to refresh room detail:', error);
         }
       }
     },
-    onConnect: () => {
-      console.log('WebSocket connected');
-    },
-    onDisconnect: () => {
-      console.log('WebSocket disconnected');
-    },
     onError: (error) => {
       console.error('WebSocket error:', error);
     },
     onChatMessage: (message) => {
-      console.log('Chat message received:', message);
       setChatMessages(prev => [...prev, message]);
     },
   });
@@ -397,6 +541,12 @@ export default function ShadowingRoom() {
   useEffect(() => {
     const fetchRoomDetail = async () => {
       if (!roomId) return;
+
+      // React Strict Mode에서 중복 호출 방지
+      if (hasEnteredRef.current) {
+        return;
+      }
+      hasEnteredRef.current = true;
 
       try {
         setIsRoomLoading(true);
@@ -410,12 +560,38 @@ export default function ShadowingRoom() {
 
         setRoomData(response.data.data);
 
+        // 초기 멤버 목록 저장
+        previousMembersRef.current = response.data.data.members.map(m => ({
+          member_id: m.member_id,
+          nickname: m.nickname,
+        }));
+
         // 방장이면 enterRoom API 호출 없이 바로 입장
         if (userInfo?.memberId === response.data.data.owner_id) {
           setIsEntered(true);
         } else {
-          // 메인페이지에서 이미 joinRoom으로 비밀번호 검증을 했으므로 바로 입장
-          setIsEntered(true);
+          // 방장이 아니면 enterRoom API 호출
+          try {
+            await enterRoom(Number(roomId), {});
+
+            // 입장 후 최신 방 정보 다시 가져오기 (members 업데이트)
+            const updatedResponse = await getRoomDetail(Number(roomId));
+            if (updatedResponse.data.success && updatedResponse.data.data) {
+              setRoomData(updatedResponse.data.data);
+
+              // 업데이트된 멤버 목록 저장
+              previousMembersRef.current = updatedResponse.data.data.members.map(m => ({
+                member_id: m.member_id,
+                nickname: m.nickname,
+              }));
+            }
+
+            setIsEntered(true);
+          } catch (error) {
+            console.error('Failed to enter room:', error);
+            alert('방 입장에 실패했습니다.');
+            navigate('/');
+          }
         }
       } catch (error) {
         console.error('Failed to fetch room detail:', error);
@@ -485,8 +661,6 @@ export default function ShadowingRoom() {
   useEffect(() => {
     const video = videoRef.current;
     if (!video || timeIndexedSubtitlesRef.current.length === 0) {
-      console.log('Subtitle update skipped - video:', !!video,
-        'timeIndexed:', timeIndexedSubtitlesRef.current.length);
       return;
     }
 
@@ -510,9 +684,6 @@ export default function ShadowingRoom() {
         });
       });
 
-      if (subtitles.length > 0) {
-        console.log(`Subtitles at ${currentTime}s:`, subtitles);
-      }
       setCurrentSubtitles(subtitles);
     };
 
@@ -623,22 +794,11 @@ export default function ShadowingRoom() {
 
     try {
       // 방 컨텐츠 선택 API 호출 (실제 content_id 전달)
+      // 서버가 CONTENT_SELECTED 메시지를 모든 사용자에게 브로드캐스트함
       const response = await selectRoomContent(Number(roomId), content.content_id);
 
       if (response.data.success) {
-        // content_id를 store에 저장
-        setContentId(content.content_id);
-
-        // 비디오 URL 가져오기
-        try {
-          const videoResponse = await getContentVideoUrl(content.content_id);
-          if (videoResponse.data.success && videoResponse.data.data) {
-            setVideoUrl(videoResponse.data.data.video_url);
-          }
-        } catch (error) {
-          console.error('Failed to get video URL:', error);
-        }
-
+        // content_id와 videoUrl은 WebSocket CONTENT_SELECTED 메시지에서 처리됨
         setSelectedContent(content);
         setIsContentSelectOpen(false);
         // 컨텐츠 선택 시 모든 참가자의 준비 상태 초기화
@@ -690,7 +850,6 @@ export default function ShadowingRoom() {
       const response = await startGame(Number(roomId));
 
       if (response.data.success) {
-        console.log('Game start API called successfully');
         // WebSocket에서 phase가 WATCHING으로 변경되면 카운트다운 시작
       } else {
         setIsGameStarting(false);
@@ -766,6 +925,10 @@ export default function ShadowingRoom() {
     setIsReady(false);
     setSelectedContent(null);
     setVideoUrl(null);
+
+    // 역할 정보 초기화
+    clearRoles();
+
     setToastMessage('대기 상태로 돌아갔습니다');
   };
 
@@ -807,7 +970,7 @@ export default function ShadowingRoom() {
     password: undefined,
     autoJoin: false,
     autoPublish: false, // 세팅 완료 후 수동으로 publish
-    isOwner
+    isOwner: isOwner
   });
 
   // leave 함수의 안정적 참조 (useEffect deps 재실행 방지)
@@ -927,6 +1090,7 @@ export default function ShadowingRoom() {
 
         // 3. 로컬 데이터 정리
         clearRoomData();
+        clearRoles(); // 역할 정보 초기화
       }
 
       // 4. 모든 정리 완료 후 홈으로 이동
@@ -1126,12 +1290,11 @@ export default function ShadowingRoom() {
                         if (currentRound >= 1 && isRoundInProgress) {
                           setIsRoundInProgress(false);
                           setToastMessage(`Round ${currentRound} 완료`);
-                        } else if (roomId) {
-                          // 첫 번째 시청 완료 시 finishWatching API 호출
+                        } else if (roomId && isOwner) {
+                          // 첫 번째 시청 완료 시 finishWatching API 호출 (방장만)
                           try {
                             const response = await finishWatching(Number(roomId));
                             if (response.data.success) {
-                              console.log('Watching finished successfully');
                               setIsGameStarting(false);
                             } else {
                               console.error('Failed to finish watching:', response.data.error?.message);
@@ -1188,7 +1351,7 @@ export default function ShadowingRoom() {
                       {!selectedContent ? (
                         <div className="text-center">
                           <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
-                          {isHost && (
+                          {isOwner && (
                             <p className="text-gray-400 text-xs">컨텐츠를 선택해주세요</p>
                           )}
                         </div>
@@ -1220,7 +1383,7 @@ export default function ShadowingRoom() {
                               </button>
 
                               {/* 시작 버튼 (방장만) */}
-                              {isHost && (
+                              {isOwner && (
                                 <div className="flex flex-col items-center gap-2 mt-2">
                                   {totalParticipants > 0 && (
                                     <div className="text-sm text-gray-600 mb-1">
@@ -1247,7 +1410,7 @@ export default function ShadowingRoom() {
                           )}
 
                           {/* 역할 선택 완료 후: Round 버튼 (방장만) */}
-                          {isRoleAssigned && isHost && (
+                          {isRoleAssigned && isOwner && (
                             <>
                               {/* 라운드 시작 버튼 (Round 2까지만) */}
                               {!isRoundInProgress && !isRoundStarting && currentRound < 2 && (
@@ -1302,7 +1465,7 @@ export default function ShadowingRoom() {
             )}
 
             {/* 컨텐츠 변경 버튼 (방장만) - 게임 시작 전에만 표시 */}
-            {(DISABLE_WEBRTC || status === "connected") && isHost && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && (
+            {(DISABLE_WEBRTC || status === "connected") && isOwner && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && (
               <button
                 onClick={() => setIsContentSelectOpen(true)}
                 className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
@@ -1470,9 +1633,11 @@ export default function ShadowingRoom() {
           onSelect={handleRoleSelect}
           onClose={() => setIsRoleSelectOpen(false)}
           onConfirm={handleConfirmRoles}
-          selectedRoleId={mySelectedRoleId}
-          isHost={isHost}
+          isHost={isOwner}
           isConfirming={isConfirmingRoles}
+          roomMembers={roomData?.members}
+          selectedRoles={selectedRoles}
+          currentUserId={memberId}
         />
       )}
 

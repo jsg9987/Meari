@@ -9,5 +9,9 @@
       "Bash(pnpm install:*)",
       "Bash(pnpm build:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "sequential-thinking"
+  ],
+  "enableAllProjectMcpServers": true
 }

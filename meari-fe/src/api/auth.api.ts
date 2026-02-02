@@ -2,7 +2,7 @@ import axiosInstance from './axiosInstance';
 import { apiConfig } from './apiConfig';
 import type { AxiosResponse } from 'axios';
 
-// 공통 API 응답 타입
+// ?? API ?? ??
 export interface ApiResponse<T> {
     success: boolean;
     data: T | null;
@@ -28,14 +28,14 @@ const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginRe
     console.log('[API] Mock Login Requested:', { email, password });
     return new Promise((resolve, reject) => {
         setTimeout(() => {
-            if (email === "user@gmail.com" && password === "1234") {
+            if (email == 'user@gmail.com' && password == '1234') {
                 resolve({
                     data: {
                         success: true,
                         data: {
-                            access_token: "mock-jwt-access-token-eyJhbGciOi-mock",
+                            access_token: 'mock-jwt-access-token-eyJhbGciOi-mock'
                         },
-                        error: null,
+                        error: null
                     }
                 } as LoginResponse);
                 return;
@@ -48,11 +48,11 @@ const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginRe
                         success: false,
                         data: null,
                         error: {
-                            code: "AUTH_INVALID_CREDENTIALS",
-                            message: "이메일 또는 비밀번호가 올바르지 않습니다.",
+                            code: 'AUTH_INVALID_CREDENTIALS',
+                            message: '??? ?? ????? ???? ????.'
                         }
-                    },
-                },
+                    }
+                }
             });
         }, 700);
     });
@@ -62,7 +62,7 @@ const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginRe
 const loginReal = async ({ email, password }: LoginCredentials): Promise<LoginResponse> => {
     const response = await axiosInstance.post<ApiResponse<LoginData>>('/auth/login', {
         email,
-        password,
+        password
     });
     return response;
 };
@@ -82,12 +82,39 @@ export interface SignupData {
 
 export type SignupResponse = AxiosResponse<ApiResponse<SignupData>>;
 
+// --- Email/Nickname Check ---
+export interface EmailCheckResponse {
+    success: boolean;
+    data: { has_email: boolean } | null;
+    error: { code: string; message: string } | null;
+}
+
+export interface NicknameCheckResponse {
+    success: boolean;
+    data: { has_nickname: boolean } | null;
+    error: { code: string; message: string } | null;
+}
+
+const checkEmailReal = async (email: string) => {
+    const response = await axiosInstance.get<EmailCheckResponse>('/auth/email/check', {
+        params: { email }
+    });
+    return response;
+};
+
+const checkNicknameReal = async (nickname: string) => {
+    const response = await axiosInstance.get<NicknameCheckResponse>('/auth/nickname/check', {
+        params: { nickname }
+    });
+    return response;
+};
+
 const signupMock = async (credentials: SignupCredentials): Promise<SignupResponse> => {
     console.log('[API] Mock Signup Requested:', credentials);
     return new Promise((resolve, reject) => {
         setTimeout(() => {
-            // 중복 이메일 시뮬레이션
-            if (credentials.email === "user@gmail.com") {
+            // ??? ??
+            if (credentials.email === 'user@gmail.com') {
                 reject({
                     response: {
                         status: 409,
@@ -95,21 +122,21 @@ const signupMock = async (credentials: SignupCredentials): Promise<SignupRespons
                             success: false,
                             data: null,
                             error: {
-                                code: "AUTH_EMAIL_DUPLICATED",
-                                message: "이미 사용 중인 이메일입니다.",
-                            },
-                        },
-                    },
+                                code: 'AUTH_EMAIL_DUPLICATED',
+                                message: '?? ?? ?? ??????.'
+                            }
+                        }
+                    }
                 });
                 return;
             }
 
-            // 성공
+            // ??
             resolve({
                 data: {
                     success: true,
-                    data: { message: "회원가입 성공" },
-                    error: null,
+                    data: { message: '???? ??' },
+                    error: null
                 }
             } as SignupResponse);
         }, 700);
@@ -119,6 +146,34 @@ const signupMock = async (credentials: SignupCredentials): Promise<SignupRespons
 const signupReal = async (credentials: SignupCredentials): Promise<SignupResponse> => {
     const response = await axiosInstance.post<ApiResponse<SignupData>>('/auth/signup', credentials);
     return response;
+};
+
+const checkEmailMock = async (email: string) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                data: {
+                    success: true,
+                    data: { has_email: email === 'user@gmail.com' },
+                    error: null
+                }
+            });
+        }, 300);
+    });
+};
+
+const checkNicknameMock = async (nickname: string) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                data: {
+                    success: true,
+                    data: { has_nickname: nickname === '???' },
+                    error: null
+                }
+            });
+        }, 300);
+    });
 };
 
 // --- Get User Info ---
@@ -139,9 +194,9 @@ const getUserInfoMock = async (): Promise<UserInfoResponse> => {
                 data: {
                     success: true,
                     data: {
-                        email: "user@gmail.com",
-                        profile_url: "http://",
-                        nickname: "김싸피"
+                        email: 'user@gmail.com',
+                        profile_url: 'http://',
+                        nickname: '???'
                     },
                     error: null
                 }
@@ -156,9 +211,11 @@ const getUserInfoReal = async (): Promise<UserInfoResponse> => {
 };
 
 const useMock = apiConfig.shouldMock('AUTH');
-    
+
 export const login = useMock ? loginMock : loginReal;
 export const signup = useMock ? signupMock : signupReal;
 export const getUserInfo = useMock ? getUserInfoMock : getUserInfoReal;
+export const checkEmail = useMock ? checkEmailMock : checkEmailReal;
+export const checkNickname = useMock ? checkNicknameMock : checkNicknameReal;
 
 console.log(`[AuthAPI] Initialized. Mode: ${useMock ? 'MOCK' : 'REAL'}`);
