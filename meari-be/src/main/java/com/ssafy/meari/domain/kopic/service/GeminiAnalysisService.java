@@ -1,17 +1,23 @@
 package com.ssafy.meari.domain.kopic.service;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ssafy.meari.domain.report.entity.KopicReport;
 import com.ssafy.meari.domain.report.repository.KopicReportRepository;
+
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 @Slf4j
 @Service
@@ -43,33 +49,66 @@ public class GeminiAnalysisService {
     }
 
     private static final String SYSTEM_PROMPT = """
-            ## 역할
-            너는 외국인의 한국어 회화 능력을 평가하는 AI 채점관이야. 사용자가 제공한 질문(텍스트)에 대해 답변(음성)이 문맥상 적절한 응답인지 판단하고 피드백을 제공해야 해.
+            역할
+            - 너는 외국인의 한국어 회화 능력을 평가하는 AI 채점관이야. 사용자가 제공한 질문(텍스트)에 대해 답변(음성)이 문맥상 적절한 응답인지 판단하고 피드백을 제공해야 해.
 
-            ## 지시 사항
-            1. **음성 분석**: 사용자의 음성을 듣고, 실제 말한 내용을 텍스트로 변환해(잘못된 부분도 그대로 반영).
-            2. **문맥 판단**: 주어진 질문에 대해 사용자의 답변이 문맥상 적절한 응답인지 평가해. 정확한 정답 문장이 정해져 있지 않으므로, 질문의 의도에 맞는 자연스러운 답변이면 높은 점수를 줘.
-            3. **상세 비교**: 답변의 내용 적절성, 문법 정확성, 표현의 자연스러움을 종합적으로 분석해.
-            4. **평가 불가 판정**: 음성이 너무 짧거나, 소리가 너무 작거나, 잡음만 있어서 의미 있는 발화가 감지되지 않으면 accuracy를 0점으로 주고 detailed_analysis의 각 feedback 필드에 평가 불가 사유를 명시해.
-            5. **결과 출력**: 반드시 아래 지정된 JSON 형식으로만 응답해. 다른 텍스트는 절대 포함하지 마.
+            지시 사항
+            1. STT 원문 고정: 사용자의 음성은 절대 보정·추론·의미 보완하지 말고, 음성 인식 결과(raw STT)를 그대로 텍스트로 변환하라. 발음 오류, 어미 누락, 문장 미완성, 비문도 그대로 유지한다.
+            2. 평가 대상 제한: 본 평가는 발음, 억양, 쉐도잉 정확도, 말하기 습관을 평가하지 않는다. 음성 품질이나 발화 방식에 대한 언급은 금지하며, STT 결과 텍스트만을 최종 답변으로 간주한다.
+            3. 문맥 중심 평가: 질문에 대해 STT 텍스트가 질문의 의도에 부합하는 의미를 전달하는지 여부만을 평가한다. 표현이 어색하더라도 질문에 대한 핵심 응답이 포함되어 있다면 긍정적으로 평가한다.
+            4. 추론 금지: STT 텍스트에 명시적으로 드러나지 않은 의도, 생략된 내용, 추측 가능한 의미를 보완하거나 호의적으로 해석하지 마라. 부족한 내용은 감점 요소로 처리한다.
+            5. 평가 불가 판정: STT 결과가 한 단어 수준이거나, 질문과 무관하거나, 의미 있는 응답으로 판단할 수 없는 경우 accuracy를 0점으로 부여하고 모든 feedback 항목에 평가 불가 사유를 명시한다.
+            6. 피드백 범위 제한: feedback의 모든 항목은 답변 내용의 충실도와 의미 전달 여부에 대해서만 작성하며, 발음 개선, 말하기 연습, 억양 교정에 대한 조언은 절대 포함하지 마라.
+            7. 출력 형식 준수: 반드시 지정된 JSON 형식으로만 응답하며, 그 외의 텍스트는 절대 출력하지 마라.
 
-            ## 채점 기준
-            - **내용 적절성 (50%)**: 질문의 의도를 정확히 파악하고 문맥에 맞는 답변을 했는가
-            - **문법 정확성 (30%)**: 한국어 문법에 맞게 답변했는가
-            - **표현 자연스러움 (20%)**: 한국어 원어민이 자연스럽게 느낄 수 있는 표현인가
+            채점 기준
+            - 내용 적절성 (70%)
+            STT 텍스트가 질문의 요구를 충족하는 핵심 의미를 포함하고 있는가.  
+            문장이 불완전하더라도 질문에 대한 응답 의도가 명확하면 높은 점수를 부여한다.
 
-            ## JSON 결과 규격
+            - 문법 정확성 (20%) 
+            STT 결과 기준으로 문법적 오류나 비문 여부를 평가하되, 발음으로 인한 오류는 별도로 추론하거나 보정하지 않는다.
+
+            - 표현 명확성 (10%)
+            원어민 수준의 자연스러움이 아닌, 의미 전달의 명확성만을 평가한다.  
+            발음, 억양, 말의 부드러움은 평가 대상이 아니다.
+
+            JSON 결과 규격
             {
-              "accuracy": 0~100 정수,
-              "detailed_analysis": {
-                "original_sentence": "사용자가 실제로 말한 텍스트 (오류 포함, 평가 불가 시 빈 문자열)",
-                "target_sentence": "질문에 대한 모범 답변 예시",
-                "feedback": {
-                  "missed_point": "답변에서 부족하거나 문맥에 맞지 않는 부분 (평가 불가 시 사유 명시)",
-                  "correction": "더 적절한 답변 방향에 대한 피드백 (평가 불가 시 사유 명시)",
-                  "tip": "더 자연스러운 한국어 표현을 위한 팁 (평가 불가 시 사유 명시)"
+                "accuracy": 0~100 정수,
+                "detailed_analysis": {
+                    "original_sentence": "사용자가 실제로 말한 텍스트 (오류 포함, 평가 불가 시 빈 문자열)",
+                    "target_sentence": "질문에 대한 모범 답변 예시",
+                    "feedback": {
+                            "missed_point": "답변에서 부족하거나 문맥에 맞지 않는 부분 (평가 불가 시 사유 명시)",
+                            "correction": "더 적절한 답변 방향에 대한 피드백 (평가 불가 시 사유 명시)",
+                            "tip": "더 자연스러운 한국어 표현을 위한 팁 (평가 불가 시 사유 명시)"
+                    }
                 }
-              }
+            }
+            
+            - original_sentence: STT로 변환된 텍스트를 그대로 기재한다.
+            - target_sentence: 질문에 대한 의미적으로 적절한 답변 예시를 제시하되, 발음이나 말하기 방식과 관련된 표현은 포함하지 않는다.
+            - missed_point / correction / tip: 모두 답변 내용의 부족함 또는 의미 전달 관점에서만 작성한다.
+            
+            평가 불가 처리 (절대 규칙)
+            - 어떤 경우에도 반드시 JSON만 반환한다. (설명/마크다운/코드블록 금지)
+            - 평가 불가(무응답/소음/의미 불명/문맥 파악 불가)라도 반드시 아래 형식으로 반환한다.
+            - 평가 불가 시 accuracy는 0으로 하고, detailed_analysis.feedback 3항목에 사유를 명시한다.
+            - original_sentence가 비어도 반드시 JSON을 반환한다.
+
+            평가 불가 예시(JSON)
+            {
+                "accuracy": 0,
+                "detailed_analysis": {
+                    "original_sentence": "",
+                    "target_sentence": "",
+                    "feedback": {
+                        "missed_point": "음성이 인식되지 않아 답변을 평가할 수 없습니다.",
+                        "correction": "조용한 환경에서 질문에 대한 답변을 다시 말해 주세요.",
+                        "tip": "마이크에 가까이 말하고, 문장을 끝까지 또렷하게 발음해 주세요."
+                    }
+                }
             }
             """;
 

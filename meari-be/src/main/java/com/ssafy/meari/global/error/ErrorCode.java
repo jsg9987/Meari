@@ -8,9 +8,9 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum ErrorCode {
-	
 
-	// Invalid Argument Error(BAD_REQUEST): 400 
+
+    // Invalid Argument Error(BAD_REQUEST): 400
     MISSING_PATH_VARIABLE(HttpStatus.BAD_REQUEST, "필수 경로 변수가 누락되었습니다."),
     MISSING_REQUEST_PARAMETER(HttpStatus.BAD_REQUEST, "필수 파라미터가 누락되었습니다."),
     INVALID_ARGUMENT(HttpStatus.BAD_REQUEST, "유효하지 않은 인자입니다."),
@@ -25,6 +25,11 @@ public enum ErrorCode {
     DUPLICATED_USER(HttpStatus.BAD_REQUEST, "중복된 사용자입니다."),
     DUPLICATED_USER_NICKNAME(HttpStatus.BAD_REQUEST, "중복된 사용자 닉네임입니다."),
     NO_FILE_EXTENSION(HttpStatus.BAD_REQUEST, "파일에 확장자가 없습니다."),
+    CSV_PARSE_ERROR(HttpStatus.BAD_REQUEST, "CSV 파일 파싱 중 오류가 발생했습니다."),
+    CSV_INVALID_FORMAT(HttpStatus.BAD_REQUEST, "CSV 파일 형식이 올바르지 않습니다."),
+    CSV_INVALID_HEADER(HttpStatus.BAD_REQUEST, "CSV 헤더가 올바르지 않습니다."),
+    CSV_INVALID_DATA_TYPE(HttpStatus.BAD_REQUEST, "CSV 데이터 타입이 올바르지 않습니다."),
+    CSV_EMPTY_FILE(HttpStatus.BAD_REQUEST, "빈 CSV 파일입니다."),
 
     // Unauthorized Error: 401
     UNAUTHORIZED_MEMBER(HttpStatus.UNAUTHORIZED, "인증되지 않은 사용자입니다."),
@@ -48,9 +53,9 @@ public enum ErrorCode {
     NOT_ROOM_MEMBER(HttpStatus.FORBIDDEN, "방 참여자가 아닙니다."),
     OWNER_CANNOT_READY(HttpStatus.BAD_REQUEST, "방장은 준비 상태를 변경할 수 없습니다."),
 
-	// Not Found Error: 404
-	NOT_FOUND(HttpStatus.NOT_FOUND, "Not Found "),
-	NOT_FOUND_END_POINT(HttpStatus.NOT_FOUND, "존재하지 않는 API 엔드포인트입니다."),
+    // Not Found Error: 404
+    NOT_FOUND(HttpStatus.NOT_FOUND, "Not Found "),
+    NOT_FOUND_END_POINT(HttpStatus.NOT_FOUND, "존재하지 않는 API 엔드포인트입니다."),
     NOT_FOUND_RESOURCE(HttpStatus.NOT_FOUND, "해당 리소스가 존재하지 않습니다."),
     NOT_FOUND_AUTHORIZATION_HEADER(HttpStatus.NOT_FOUND, "Authorization 헤더가 존재하지 않습니다."),
     NOT_FOUND_MEMBER(HttpStatus.NOT_FOUND, "존재하지 않는 사용자입니다."),
@@ -61,16 +66,16 @@ public enum ErrorCode {
     NOT_FOUND_SENTENCE(HttpStatus.NOT_FOUND, "존재하지 않는 문장입니다."),
     NOT_FOUND_MEMBER_ROOM(HttpStatus.NOT_FOUND, "방에 참여하지 않은 사용자입니다."),
     NOT_FOUND_KOPIC_SENTENCE(HttpStatus.NOT_FOUND, "해당 테마에 코픽 문장이 존재하지 않습니다."),
-    NOT_FOUND_SHADOWING_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 쉐도잉 리포트입니다."),
     NOT_FOUND_KOPIC_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 코픽 리포트입니다."),
+    NOT_FOUND_SHADOWING_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 쉐도잉 리포트입니다."),
     NOT_FOUND_KOPIC_TOTAL_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 코픽 통합 리포트입니다."),
     NOT_FOUND_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 리포트입니다."),
     NOT_FOUND_AUDIO_URL(HttpStatus.NOT_FOUND, "녹음 파일 URL을 찾을 수 없습니다."),
     OPENVIDU_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "OpenVidu 세션을 찾을 수 없습니다."),
 
-	// Method Not Allowed Error: 405
-	METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메소드입니다."),
-    
+    // Method Not Allowed Error: 405
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메소드입니다."),
+
     // Conflict: 409
     DATA_ALREADY_EXISTS(HttpStatus.CONFLICT, "데이터가 이미 존재합니다."),
     ROOM_FULL(HttpStatus.CONFLICT, "방 정원이 가득 찼습니다."),
@@ -93,12 +98,12 @@ public enum ErrorCode {
     DUPLICATE_MEMBER_ROLE(HttpStatus.BAD_REQUEST, "한 멤버에게 여러 역할을 할당할 수 없습니다."),
     DUPLICATE_ROLE_ASSIGNMENT(HttpStatus.CONFLICT, "같은 역할을 여러 멤버에게 할당할 수 없습니다."),
 
-	
-	// Unsupported Media Type: 415
-	
-	
+
+    // Unsupported Media Type: 415
+
+
     // Internal Server Error: 500
-	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 에러입니다."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 에러입니다."),
     FILE_READ_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "파일을 읽어들이다 에러 발생"),
     OPENVIDU_SESSION_CREATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 생성에 실패했습니다."),
     OPENVIDU_CONNECTION_CREATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 연결(토큰) 생성에 실패했습니다."),
@@ -106,12 +111,12 @@ public enum ErrorCode {
     OPENVIDU_DISCONNECT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 연결 강제 종료에 실패했습니다."),
     OPENVIDU_FETCH_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 정보 조회에 실패했습니다."),
     GEMINI_ANALYSIS_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Gemini AI 분석에 실패했습니다."),
-	CHAT_SAVE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 저장에 실패했습니다."),
-	CHAT_BROADCAST_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 브로드캐스트에 실패했습니다."),
+    CHAT_SAVE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 저장에 실패했습니다."),
+    CHAT_BROADCAST_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 브로드캐스트에 실패했습니다."),
 
-	// External Server Error(BAD_GATEWAY): 502
-	EXTERNAL_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "서버 외부 에러입니다.");
-	
-	private final HttpStatus httpStatus;
-	private final String message;
+    // External Server Error(BAD_GATEWAY): 502
+    EXTERNAL_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "서버 외부 에러입니다.");
+
+    private final HttpStatus httpStatus;
+    private final String message;
 }
