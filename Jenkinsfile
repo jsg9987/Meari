@@ -203,6 +203,9 @@
                               # COTURN 시크릿 파일 생성
                               echo "${COTURN_SECRET}" > ./openvidu/coturn/shared_secret.txt
 
+                               # 기존 컨테이너 정리 (orphan 포함)
+                               docker-compose down --remove-orphans
+
                               # Docker Compose 실행 (OpenVidu 포함)
                               docker-compose up -d --force-recreate
                           '''
