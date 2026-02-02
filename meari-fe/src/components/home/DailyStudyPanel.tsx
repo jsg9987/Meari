@@ -17,7 +17,7 @@ const CARDS = [
   {
     id: 2,
     title: '문장 순서 맞추기',
-    subtitle: '단어 조각을 올바른 순서로 배열해보세요.',
+    subtitle: '문장을 올바른 순서로 배열해보세요.',
     badge: '5 quizzes',
     themeColor: 'gradient-teal',
     image: illustratorCard1,
@@ -136,7 +136,7 @@ const DailyStudyPanel = () => {
             >
               {isActive ? (
                 <div className="p-6 h-full flex flex-col">
-                  <div className="flex justify-between items-start mb-11">
+                  <div className="flex justify-between items-start mb-12">
                     <div className="w-10 h-10 bg-[#56CCF2] rounded-full flex items-center justify-center">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <path
@@ -153,7 +153,7 @@ const DailyStudyPanel = () => {
 
                   <p className="text-gray-400 text-md mb-2">{card.subtitle}</p>
 
-                  <h3 className="text-[26px] font-bold text-[#1A1A1A] mb-10">{card.title}</h3>
+                  <h3 className="text-3xl font-bold text-[#1A1A1A] mb-12">{card.title}</h3>
 
                   <button
                     onClick={(e) => handleStart(card.path, card.isLocked, e)}
@@ -170,7 +170,7 @@ const DailyStudyPanel = () => {
                 </div>
               ) : (
                 <div className="p-6 h-full flex flex-col">
-                  <div className="flex justify-between items-start mb-11">
+                  <div className="flex justify-between items-start mb-12">
                     <div
                       className={`w-10 h-10 ${
                         card.themeColor === 'dark' ? 'bg-white/20' : 'bg-white/30'
@@ -191,7 +191,7 @@ const DailyStudyPanel = () => {
 
                   <p className="text-sm opacity-80 mb-4">{card.subtitle}</p>
 
-                  <h3 className="text-xl font-bold mb-auto">{card.title}</h3>
+                  <h3 className="text-2xl font-bold mb-auto">{card.title}</h3>
 
                   <img
                     src={card.image}

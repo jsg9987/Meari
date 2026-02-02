@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Volume2 } from 'lucide-react'
 import logoWhite from '../../assets/images/common/logo-white.svg'
-import progressBarBg from '../../assets/images/daily/word-study/상단 동적 이미지 프레임.svg'
+import progressBarBg from '../../assets/images/daily/word-study/word-study-top-frame.svg'
 import dailyCharacter from '../../assets/images/daily/word-study/daily-study-character.svg'
 import goalTrophy from '../../assets/images/daily/word-study/goal-trophy.svg'
 import { getWordStudy, type WordStudyWord } from '../../api/word-study.api'
@@ -17,7 +17,7 @@ const NAV_BUTTON_BASE =
 const NAV_BUTTON_ENABLED = 'bg-white text-gray-700 border border-gray-200 hover:border-[#2D9CDB]'
 const NAV_BUTTON_DISABLED = 'cursor-not-allowed bg-gray-100 text-gray-400'
 
-const hasHangul = (value: string) => /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(value)
+const hasHangul = (value: string) => /[\uAC00-\uD7A3]/.test(value)
 
 const WordStudy = () => {
   const navigate = useNavigate()
@@ -151,7 +151,14 @@ const WordStudy = () => {
       {/* 헤더 */}
       <header className="relative z-20 h-[50px] w-full bg-[#4F4F4F]">
         <div className="mx-auto flex h-full w-full max-w-[75rem] items-center px-6">
-          <img src={logoWhite} alt="Meari" className="h-[16px]" />
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="inline-flex items-center"
+            aria-label="메인 페이지로 이동"
+          >
+            <img src={logoWhite} alt="Meari" className="h-[16px] cursor-pointer" />
+          </button>
         </div>
       </header>
 
