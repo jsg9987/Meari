@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signup } from '../api/auth.api';
+import { signup, checkEmail, checkNickname } from '../api/auth.api';
 
 // Assets
 import logoDark from '../assets/images/common/logo-dark.svg';
@@ -21,19 +21,83 @@ const Signup = () => {
 
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [emailCheckStatus, setEmailCheckStatus] = useState<'idle' | 'checking' | 'available' | 'duplicate' | 'error'>('idle');
+    const [emailCheckMessage, setEmailCheckMessage] = useState<string | null>(null);
+    const [nicknameCheckStatus, setNicknameCheckStatus] = useState<'idle' | 'checking' | 'available' | 'duplicate' | 'error'>('idle');
+    const [nicknameCheckMessage, setNicknameCheckMessage] = useState<string | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+
+        if (name === 'email') {
+            setEmailCheckStatus('idle');
+            setEmailCheckMessage(null);
+        }
+
+        if (name === 'nickname') {
+            setNicknameCheckStatus('idle');
+            setNicknameCheckMessage(null);
+        }
+    };
+
+    const handleEmailCheck = async () => {
+        if (!formData.email) {
+            setEmailCheckStatus('error');
+            setEmailCheckMessage('이메일을 입력해주세요.');
+            return;
+        }
+
+        try {
+            setEmailCheckStatus('checking');
+            setEmailCheckMessage('확인 중...');
+            const response = await checkEmail(formData.email);
+            const hasEmail = response.data.data?.has_email ?? false;
+            if (hasEmail) {
+                setEmailCheckStatus('duplicate');
+                setEmailCheckMessage('이미 사용 중인 이메일입니다.');
+            } else {
+                setEmailCheckStatus('available');
+                setEmailCheckMessage('사용 가능한 이메일입니다.');
+            }
+        } catch (err: any) {
+            setEmailCheckStatus('error');
+            setEmailCheckMessage('중복 확인에 실패했습니다.');
+        }
+    };
+
+    const handleNicknameCheck = async () => {
+        if (!formData.nickname) {
+            setNicknameCheckStatus('error');
+            setNicknameCheckMessage('닉네임을 입력해주세요.');
+            return;
+        }
+
+        try {
+            setNicknameCheckStatus('checking');
+            setNicknameCheckMessage('확인 중...');
+            const response = await checkNickname(formData.nickname);
+            const hasNickname = response.data.data?.has_nickname ?? false;
+            if (hasNickname) {
+                setNicknameCheckStatus('duplicate');
+                setNicknameCheckMessage('이미 사용 중인 닉네임입니다.');
+            } else {
+                setNicknameCheckStatus('available');
+                setNicknameCheckMessage('사용 가능한 닉네임입니다.');
+            }
+        } catch (err: any) {
+            setNicknameCheckStatus('error');
+            setNicknameCheckMessage('중복 확인에 실패했습니다.');
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
 
-        // 유효성 검사
+        // 기본 검증
         if (!formData.email || !formData.nickname || !formData.password) {
-            setError('모든 필수 항목을 입력해주세요.');
+            setError('모든 항목을 입력해주세요.');
             return;
         }
 
@@ -47,6 +111,16 @@ const Signup = () => {
             return;
         }
 
+        if (emailCheckStatus !== 'available') {
+            setError('이메일 중복확인을 완료해주세요.');
+            return;
+        }
+
+        if (nicknameCheckStatus !== 'available') {
+            setError('닉네임 중복확인을 완료해주세요.');
+            return;
+        }
+
         try {
             setIsLoading(true);
             // API 호출
@@ -54,11 +128,11 @@ const Signup = () => {
                 email: formData.email,
                 password: formData.password,
                 nickname: formData.nickname,
-                sex: 'M', // 성별 필드 제거로 인해 임시 기본값 설정 (API 요구사항에 따라 조정 필요)
+                sex: 'M', // 성별 고정값 (API 스펙에 맞춰 유지)
                 native_language: formData.native_language
             });
 
-            // 성공 시 로그인 페이지로 이동
+            // 가입 성공 시 로그인 페이지 이동
             alert('회원가입이 완료되었습니다. 로그인해주세요.');
             navigate('/login');
         } catch (err: any) {
@@ -80,6 +154,12 @@ const Signup = () => {
     const checkButtonClass =
         'text-[10px] bg-[#e5e5e5] text-[#666] px-2 py-1 rounded font-pretendard transition ' +
         'hover:bg-[#d5d5d5] shadow-[0_1px_1px_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-[1px]';
+
+    const getCheckMessageClass = (status: typeof emailCheckStatus) => {
+        if (status === 'available') return 'text-green-600';
+        if (status === 'duplicate' || status === 'error') return 'text-red-600';
+        return 'text-gray-500';
+    };
 
     return (
         <div className="min-h-screen bg-white flex">
@@ -104,55 +184,79 @@ const Signup = () => {
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="mb-6 space-y-2">
                                 <h2 className="text-2xl font-bold font-pretendard text-[#001C27]">회원가입</h2>
-                                <p className="text-xs font-pretendard text-[#666]">개인정보는 Meari에서 안전하게 보호됩니다.</p>
+                                <p className="text-xs font-pretendard text-[#666]">처음이신가요? Meari와 함께 시작해요.</p>
                             </div>
 
                             {/* Email */}
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                     <label htmlFor="email" className={labelClass}>이메일</label>
-                                    <button type="button" className={checkButtonClass}>중복확인</button>
+                                    <button
+                                        type="button"
+                                        className={checkButtonClass}
+                                        onClick={handleEmailCheck}
+                                        disabled={emailCheckStatus === 'checking' || !formData.email}
+                                    >
+                                        중복확인
+                                    </button>
                                 </div>
                                 <input
                                     id="email"
                                     type="email"
                                     name="email"
                                     className={inputClass}
-                                    placeholder="이메일을 입력 해주세요."
+                                    placeholder="이메일을 입력해주세요."
                                     value={formData.email}
                                     onChange={handleChange}
                                 />
+                                {emailCheckMessage && (
+                                    <p className={`text-xs mt-1 ${getCheckMessageClass(emailCheckStatus)}`}>
+                                        {emailCheckMessage}
+                                    </p>
+                                )}
                             </div>
 
-                            {/* 닉네임 */}
+                            {/* Nickname */}
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                     <label htmlFor="nickname" className={labelClass}>
                                         닉네임
                                     </label>
-                                    <button type="button" className={checkButtonClass}>중복확인</button>
+                                    <button
+                                        type="button"
+                                        className={checkButtonClass}
+                                        onClick={handleNicknameCheck}
+                                        disabled={nicknameCheckStatus === 'checking' || !formData.nickname}
+                                    >
+                                        중복확인
+                                    </button>
                                 </div>
                                 <input
                                     id="nickname"
                                     type="text"
                                     name="nickname"
                                     className={inputClass}
-                                    placeholder="닉네임을 입력 해주세요."
+                                    placeholder="닉네임을 입력해주세요."
                                     value={formData.nickname}
                                     onChange={handleChange}
                                 />
+                                {nicknameCheckMessage && (
+                                    <p className={`text-xs mt-1 ${getCheckMessageClass(nicknameCheckStatus)}`}>
+                                        {nicknameCheckMessage}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Password */}
                             <div className="space-y-2">
-                                <label htmlFor="password" className={labelClass}>비밀번호 입력</label>
+                                <label htmlFor="password" className={labelClass}>비밀번호</label>
                                 <div className="relative">
                                     <input
                                         id="password"
-                                        type={showPassword ? "text" : "password"}
+                                        type={showPassword ? 'text' : 'password'}
                                         name="password"
                                         className={inputClass}
-                                        placeholder="비밀번호를 입력 해주세요."
+                                        placeholder="비밀번호를 입력해주세요."
                                         value={formData.password}
                                         onChange={handleChange}
                                     />
@@ -175,10 +279,10 @@ const Signup = () => {
                                 <div className="relative">
                                     <input
                                         id="confirmPassword"
-                                        type={showConfirmPassword ? "text" : "password"}
+                                        type={showConfirmPassword ? 'text' : 'password'}
                                         name="confirmPassword"
                                         className={inputClass}
-                                        placeholder="비밀번호를 입력 해주세요."
+                                        placeholder="비밀번호를 다시 입력해주세요."
                                         value={formData.confirmPassword}
                                         onChange={handleChange}
                                     />
@@ -197,7 +301,7 @@ const Signup = () => {
 
                             {/* Native Language */}
                             <div className="space-y-2">
-                                <label htmlFor="native_language" className={labelClass}>모국어 선택</label>
+                                <label htmlFor="native_language" className={labelClass}>모국어</label>
                                 <div className="relative">
                                     <select
                                         id="native_language"
@@ -218,7 +322,7 @@ const Signup = () => {
                                 disabled={isLoading}
                                 className="mt-8 h-12 w-full rounded-lg bg-[#2D9CDB] text-white font-semibold shadow-sm transition hover:bg-[#1B85C4] disabled:bg-[#ccc]"
                             >
-                                {isLoading ? '가입 중...' : '회원가입'}
+                                {isLoading ? '가입 중...' : '가입하기'}
                             </button>
 
                             {/* Login Redirect */}
@@ -229,7 +333,7 @@ const Signup = () => {
                                     className="ml-1 font-bold text-[#2D9CDB] hover:underline"
                                     onClick={() => navigate('/login')}
                                 >
-                                    로그인하기
+                                    로그인
                                 </button>
                             </p>
 
@@ -253,4 +357,4 @@ const Signup = () => {
     );
 };
 
-export default Signup; 
+export default Signup;

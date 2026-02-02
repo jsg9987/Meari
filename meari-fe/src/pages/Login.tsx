@@ -80,7 +80,7 @@ const Login = () => {
                             </div>
 
                             {/* 비밀번호 */}
-                            <div className="space-y-2">
+                            <div className="space-y-2 mb-12">
                                 <label htmlFor="password" className={labelClass}>
                                     비밀번호
                                 </label>
@@ -94,15 +94,6 @@ const Login = () => {
                                     autoComplete="current-password"
                                 />
                             </div>
-
-                            {/* remember me */}
-                            <label className="mt-2 flex items-center gap-2 text-sm text-[#666] cursor-pointer select-none">
-                                <input
-                                    type="checkbox"
-                                    className="h-4 w-4 rounded border-[#e5e5e5] accent-[#001C27]"
-                                />
-                                remember me?
-                            </label>
 
                             {/* 로그인 버튼 */}
                             <button
