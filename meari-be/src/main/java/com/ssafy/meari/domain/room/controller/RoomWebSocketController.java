@@ -201,6 +201,21 @@ public class RoomWebSocketController {
     }
 
     /**
+     * 영상 시청 완료
+     * 클라이언트: /app/room/{roomId}/watching/complete
+     */
+    @MessageMapping("/room/{roomId}/watching/complete")
+    public void watchingComplete(
+            @DestinationVariable Long roomId,
+            @Payload WatchingCompleteMessage message
+    ) {
+        log.info("영상 시청 완료 메시지 수신: roomId={}, memberId={}", roomId, message.getMemberId());
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
+
+        roomService.watchingComplete(roomId, message);
+    }
+
+    /**
      * 재연결 시 disconnected 마킹 해제
      * WebSocket 메시지 핸들러에서 호출하여 Grace Period 내 재연결 감지
      */

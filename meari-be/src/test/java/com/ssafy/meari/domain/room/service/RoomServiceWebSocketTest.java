@@ -72,6 +72,9 @@ class RoomServiceWebSocketTest {
     @Mock
     private RoomSessionService roomSessionService;
 
+    @Mock
+    private com.ssafy.meari.domain.analysis.service.AnalysisProducer analysisProducer;
+
     private Member testMember;
     private Theme testTheme;
     private Room testRoom;
@@ -342,8 +345,8 @@ class RoomServiceWebSocketTest {
     class FinishGameBroadcast {
 
         @Test
-        @DisplayName("성공 - PHASE_CHANGE(null) 메시지 브로드캐스트 (WAITING 복귀)")
-        void finishGame_Success_BroadcastPhaseChange() {
+        @DisplayName("성공 - GAME_FINISHED 메시지 브로드캐스트 (WAITING 복귀)")
+        void finishGame_Success_BroadcastGameFinished() {
             // Given
             Long roomId = 1L;
             testRoom.updateStatus(RoomStatus.IN_PROGRESS);
@@ -362,7 +365,7 @@ class RoomServiceWebSocketTest {
             );
 
             RoomStateMessage sentMessage = messageCaptor.getValue();
-            assertThat(sentMessage.getType()).isEqualTo("PHASE_CHANGE");
+            assertThat(sentMessage.getType()).isEqualTo("GAME_FINISHED");
             assertThat(sentMessage.getPhase()).isNull();
         }
     }
@@ -491,6 +494,10 @@ class RoomServiceWebSocketTest {
 
             given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_1);
             given(roomSessionService.isMember(roomId, 2L)).willReturn(true);
+            given(roomSessionService.isMemberRecordingsComplete(roomId, 1, 2L)).willReturn(false);
+            given(roomSessionService.isRoundCompleted(roomId, 1)).willReturn(false);
+            given(roomSessionService.getRoundTimeout(roomId, 1)).willReturn(null);
+            given(roomSessionService.isAllWatchingComplete(roomId, 1)).willReturn(true);
             given(roomSessionService.isAllRecordingsComplete(roomId, 1)).willReturn(true);
 
             // When
@@ -521,7 +528,10 @@ class RoomServiceWebSocketTest {
 
             given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_2);
             given(roomSessionService.isMember(roomId, 1L)).willReturn(true);
-            given(roomSessionService.isAllRecordingsComplete(roomId, 2)).willReturn(false);
+            given(roomSessionService.isMemberRecordingsComplete(roomId, 2, 1L)).willReturn(false);
+            given(roomSessionService.isRoundCompleted(roomId, 2)).willReturn(false);
+            given(roomSessionService.getRoundTimeout(roomId, 2)).willReturn(null);
+            given(roomSessionService.isAllWatchingComplete(roomId, 2)).willReturn(false);
 
             // When
             roomService.recordingComplete(roomId, message);

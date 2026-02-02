@@ -43,7 +43,7 @@ public class RoomSessionService {
     private static final String KEY_MEMBER_AUDIO_URLS = "room:%d:round:%d:member:%d:audio_urls";
     private static final String KEY_ROUND_TIMEOUT = "room:%d:round:%d:timeout";
     private static final String KEY_ROUND_COMPLETED = "room:%d:round:%d:completed";
-    private static final String KEY_WATCHING_COMPLETE = "room:%d:watching_complete";
+    private static final String KEY_WATCHING_COMPLETE = "room:%d:round:%d:watching_complete";
 
     // === 참여자 관리 ===
 
@@ -561,6 +561,38 @@ public class RoomSessionService {
     }
 
     /**
+     * 영상 시청 완료 마킹 (WATCHING_COMPLETE 수신 시)
+     */
+    public void addMemberWatchingComplete(Long roomId, Integer round, Long memberId) {
+        String key = String.format(KEY_WATCHING_COMPLETE, roomId, round);
+        redisTemplate.opsForSet().add(key, memberId.toString());
+        setExpire(key);
+        log.debug("방 {} Round {} 멤버 {} 영상 시청 완료 마킹", roomId, round, memberId);
+    }
+
+    /**
+     * 모든 멤버가 영상 시청 완료 메시지를 보냈는지 확인
+     */
+    public boolean isAllWatchingComplete(Long roomId, Integer round) {
+        Set<String> members = getMembers(roomId);
+        if (members == null || members.isEmpty()) {
+            return false;
+        }
+        String key = String.format(KEY_WATCHING_COMPLETE, roomId, round);
+        Long setSize = redisTemplate.opsForSet().size(key);
+        if (setSize == null || setSize < members.size()) {
+            return false;
+        }
+        for (String memberIdStr : members) {
+            Boolean inSet = redisTemplate.opsForSet().isMember(key, memberIdStr);
+            if (!Boolean.TRUE.equals(inSet)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Round 관련 녹음 추적 데이터 초기화
      */
     public void clearRoundRecordings(Long roomId, Integer round) {
@@ -573,6 +605,7 @@ public class RoomSessionService {
             }
         }
         redisTemplate.delete(String.format(KEY_ROUND_START_TIME, roomId));
+        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE, roomId, round));
         log.debug("방 {} Round {} 녹음 추적 데이터 초기화", roomId, round);
     }
 
