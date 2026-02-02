@@ -86,8 +86,11 @@ class ShadowingReportServiceTest {
                 .maxPeople(4)
                 .build());
 
-        content = contentRepository.findById(2L)
-                .orElseThrow(() -> new RuntimeException("Content ID 2가 존재하지 않습니다"));
+        content = contentRepository.findById(1L)
+                .orElseGet(() -> contentRepository.save(Content.builder()
+                        .theme(theme)
+                        .title("테스트 콘텐츠")
+                        .build()));
     }
 
     @Test
@@ -320,6 +323,178 @@ class ShadowingReportServiceTest {
                 savedReport.getShadowingReportId(), member.getMemberId()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.ACCESS_DENIED.getMessage());
+    }
+
+    @Test
+    @DisplayName("쉐도잉 리포트 상세 조회 - 정확한 DetailedAnalysis 파싱")
+    void getShadowingReportDetail_DetailedAnalysis_Parsing() {
+        // Given: 상세한 JSON 구조의 리포트
+        String detailedAnalysisJson = "{\"sentences\": [{\"sentence_id\": 1, \"text_expected\": \"안녕하세요\", \"text_recognized\": \"안녕하세요\", \"accuracy\": 95, \"mean_confidence\": 0.95}], \"summary\": {\"total_sentences\": 1, \"analyzed_sentences\": 1, \"average_accuracy\": 95, \"average_confidence\": 0.95}}";
+
+        Role role = roleRepository.findById(1L).orElseThrow();
+        ShadowingReport report = ShadowingReport.builder()
+                .member(member)
+                .room(room)
+                .role(role)
+                .content(content)
+                .round(1)
+                .build();
+        ShadowingReport savedReport = shadowingReportRepository.save(report);
+        savedReport.updateAnalysisResult(95, 90, detailedAnalysisJson);
+
+        // When
+        ShadowingReportDetailResponse response = shadowingReportService.getShadowingReportDetail(
+                savedReport.getShadowingReportId(), member.getMemberId());
+
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.getDetailedAnalysis()).isNotNull();
+        assertThat(response.getDetailedAnalysis().getSummary()).isNotNull();
+        assertThat(response.getDetailedAnalysis().getSummary().getTotalSentences()).isEqualTo(1);
+        assertThat(response.getDetailedAnalysis().getSummary().getAverageAccuracy()).isEqualTo(95);
+    }
+
+    @Test
+    @DisplayName("쉐도잉 리포트 상세 조회 - 총점 계산 검증")
+    void getShadowingReportDetail_TotalScoreCalculation() {
+        // Given
+        Role role = roleRepository.findById(1L).orElseThrow();
+        ShadowingReport report = ShadowingReport.builder()
+                .member(member)
+                .room(room)
+                .role(role)
+                .content(content)
+                .round(1)
+                .build();
+        ShadowingReport savedReport = shadowingReportRepository.save(report);
+        savedReport.updateAnalysisResult(90, 80, "{}");
+
+        // When
+        ShadowingReportDetailResponse response = shadowingReportService.getShadowingReportDetail(
+                savedReport.getShadowingReportId(), member.getMemberId());
+
+        // Then: totalScore = (accuracy + intonation) / 2 = (90 + 80) / 2 = 85
+        assertThat(response.getTotalScore()).isEqualTo(85);
+    }
+
+    @Test
+    @DisplayName("쉐도잉 리포트 상세 조회 - Null DetailedAnalysis 처리")
+    void getShadowingReportDetail_NullDetailedAnalysis() {
+        // Given
+        Role role = roleRepository.findById(1L).orElseThrow();
+        ShadowingReport report = ShadowingReport.builder()
+                .member(member)
+                .room(room)
+                .role(role)
+                .content(content)
+                .round(1)
+                .build();
+        ShadowingReport savedReport = shadowingReportRepository.save(report);
+        savedReport.updateAnalysisResult(85, 80, null);
+
+        // When
+        ShadowingReportDetailResponse response = shadowingReportService.getShadowingReportDetail(
+                savedReport.getShadowingReportId(), member.getMemberId());
+
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.getDetailedAnalysis()).isNull();
+    }
+
+    @Test
+    @DisplayName("쉐도잉 리포트 상세 조회 - 응답 필드 완전성 검증")
+    void getShadowingReportDetail_ResponseCompletion() {
+        // Given
+        Role role = roleRepository.findById(1L).orElseThrow();
+        ShadowingReport report = ShadowingReport.builder()
+                .member(member)
+                .room(room)
+                .role(role)
+                .content(content)
+                .round(3)
+                .build();
+        ShadowingReport savedReport = shadowingReportRepository.save(report);
+        savedReport.updateAnalysisResult(82, 78, "{}");
+
+        assertThat(savedReport.getIsRead()).isFalse();
+
+        // When
+        ShadowingReportDetailResponse response = shadowingReportService.getShadowingReportDetail(
+                savedReport.getShadowingReportId(), member.getMemberId());
+
+        // Then: 모든 필드 검증
+        assertThat(response.getShadowingReportId()).isEqualTo(savedReport.getShadowingReportId());
+        assertThat(response.getMemberId()).isEqualTo(member.getMemberId());
+        assertThat(response.getMemberNickname()).isEqualTo(member.getNickname());
+        assertThat(response.getRoomId()).isEqualTo(room.getRoomId());
+        assertThat(response.getRoomTitle()).isEqualTo(room.getTitle());
+        assertThat(response.getContentId()).isEqualTo(content.getContentId());
+        assertThat(response.getContentTitle()).isEqualTo(content.getTitle());
+        assertThat(response.getRoleId()).isEqualTo(role.getRoleId());
+        assertThat(response.getRoleName()).isEqualTo(role.getName());
+        assertThat(response.getAccuracy()).isEqualTo(82);
+        assertThat(response.getIntonation()).isEqualTo(78);
+        assertThat(response.getTotalScore()).isEqualTo(80);
+        assertThat(response.getStatus()).isEqualTo(ReportStatus.COMPLETED);
+        assertThat(response.getCreatedAt()).isNotNull();
+
+        // Then: 자동으로 읽음 처리됨
+        ShadowingReport updated = shadowingReportRepository.findById(savedReport.getShadowingReportId()).orElseThrow();
+        assertThat(updated.getIsRead()).isTrue();
+    }
+
+    @Test
+    @DisplayName("쉐도잉 리포트 목록 조회 - 페이지 크기 경계값 (size=1)")
+    void getShadowingReportList_BoundaryCase_MinSize() {
+        // Given: 5개의 리포트 생성
+        for (int i = 0; i < 5; i++) {
+            Role role = roleRepository.findById(i % 2 == 0 ? 1L : 2L).orElseThrow();
+            ShadowingReport report = ShadowingReport.builder()
+                    .member(member)
+                    .room(room)
+                    .role(role)
+                    .content(content)
+                    .round(1)
+                    .build();
+            ShadowingReport saved = shadowingReportRepository.save(report);
+            saved.updateAnalysisResult(85, 85, "{}");
+        }
+
+        // When: size=1로 조회
+        CursorPageResponse<ShadowingReportListItemResponse> response = shadowingReportService.getShadowingReportList(
+                member.getMemberId(), null, 1);
+
+        // Then
+        assertThat(response.getContents()).hasSize(1);
+        assertThat(response.isHasNext()).isTrue();
+        assertThat(response.getNextCursor()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("쉐도잉 리포트 목록 조회 - 페이지 크기 경계값 (size=정확한 개수)")
+    void getShadowingReportList_BoundaryCase_ExactSize() {
+        // Given: 3개의 리포트 생성
+        for (int i = 0; i < 3; i++) {
+            Role role = roleRepository.findById(1L).orElseThrow();
+            ShadowingReport report = ShadowingReport.builder()
+                    .member(member)
+                    .room(room)
+                    .role(role)
+                    .content(content)
+                    .round(1)
+                    .build();
+            ShadowingReport saved = shadowingReportRepository.save(report);
+            saved.updateAnalysisResult(85, 85, "{}");
+        }
+
+        // When: size=3으로 조회
+        CursorPageResponse<ShadowingReportListItemResponse> response = shadowingReportService.getShadowingReportList(
+                member.getMemberId(), null, 3);
+
+        // Then: 정확히 3개만 반환되고 다음 페이지 없음
+        assertThat(response.getContents()).hasSize(3);
+        assertThat(response.isHasNext()).isFalse();
+        assertThat(response.getNextCursor()).isNull();
     }
 
 }
