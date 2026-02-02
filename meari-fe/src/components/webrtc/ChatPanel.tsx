@@ -1,11 +1,59 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ChatMessage } from '../../hooks/useRoomWebSocket';
+import LinkPreview from './LinkPreview';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   onSendMessage: (message: string, nickname: string) => void;
   nickname: string;
   currentUserId: number;
+}
+
+// URL 감지 정규식 (http, https 프로토콜 포함)
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+// 메시지에서 첫 번째 URL 추출
+function extractFirstUrl(text: string): string | null {
+  const match = text.match(URL_REGEX);
+  return match ? match[0] : null;
+}
+
+// 메시지 텍스트를 파싱하여 링크를 <a> 태그로 변환
+function parseMessageWithLinks(text: string): (string | JSX.Element)[] {
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = URL_REGEX.exec(text)) !== null) {
+    // URL 이전 텍스트 추가
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+
+    // URL을 링크로 변환
+    const url = match[0];
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline hover:text-blue-300 break-all"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {url}
+      </a>
+    );
+
+    lastIndex = match.index + url.length;
+  }
+
+  // 남은 텍스트 추가
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
 }
 
 export default function ChatPanel({ messages, onSendMessage, nickname, currentUserId }: ChatPanelProps) {
@@ -40,7 +88,21 @@ export default function ChatPanel({ messages, onSendMessage, nickname, currentUs
           </p>
         ) : (
           messages.map((msg, index) => {
+            // 시스템 메시지인 경우
+            if (msg.isSystem) {
+              return (
+                <div key={index} className="flex justify-center">
+                  <div className="px-3 py-1.5 bg-gray-200 text-gray-600 rounded-full text-xs">
+                    {msg.message}
+                  </div>
+                </div>
+              );
+            }
+
+            // 일반 메시지
             const isMyMessage = msg.sender_id === currentUserId;
+            const firstUrl = extractFirstUrl(msg.message);
+
             return (
               <div
                 key={index}
@@ -57,14 +119,22 @@ export default function ChatPanel({ messages, onSendMessage, nickname, currentUs
                     })}
                   </span>
                 </div>
-                <div
-                  className={`mt-1 px-3 py-2 rounded-lg max-w-[70%] ${
-                    isMyMessage
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                  }`}
-                >
-                  <p className="text-sm wrap-break-word">{msg.message}</p>
+                <div className="max-w-[85%] flex flex-col">
+                  <div
+                    className={`mt-1 px-3 py-2 rounded-lg inline-block ${
+                      isMyMessage
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-900'
+                    }`}
+                  >
+                    <p className="text-sm wrap-break-word">
+                      {parseMessageWithLinks(msg.message)}
+                    </p>
+                  </div>
+                  {/* 링크 미리보기 (첫 번째 URL에 대해서만) */}
+                  {firstUrl && (
+                    <LinkPreview url={firstUrl} isMyMessage={isMyMessage} />
+                  )}
                 </div>
               </div>
             );

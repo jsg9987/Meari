@@ -33,3 +33,4 @@ dist/
 
 # AI Agent
 .claude/
+.mcp.json
