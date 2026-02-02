@@ -1,6 +1,5 @@
 package com.ssafy.meari.domain.report.controller;
 
-import com.ssafy.meari.domain.report.dto.response.ReportResponse;
 import com.ssafy.meari.domain.report.dto.response.ShadowingReportDetailResponse;
 import com.ssafy.meari.domain.report.dto.response.ShadowingReportListItemResponse;
 import com.ssafy.meari.domain.report.service.ShadowingReportService;
@@ -19,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.List;
 
 @Tag(name = "Report", description = "쉐도잉 분석 리포트 API")
 @Slf4j
@@ -69,35 +67,4 @@ public class ReportController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-
-    @Operation(summary = "방별 리포트 조회", description = "특정 방의 모든 멤버 리포트를 조회합니다.")
-    @GetMapping("/room/{roomId}")
-    public ResponseEntity<ApiResponse<List<ReportResponse>>> getReportsByRoom(
-            @Parameter(description = "방 ID") @PathVariable Long roomId
-    ) {
-        log.info("방 {} 리포트 조회", roomId);
-        List<ReportResponse> reports = shadowingReportService.getReportsByRoom(roomId);
-        return ResponseEntity.ok(ApiResponse.success(reports));
-    }
-
-    @Operation(summary = "내 리포트 목록 조회", description = "로그인한 사용자의 모든 리포트를 조회합니다.")
-    @GetMapping("/my")
-    public ResponseEntity<ApiResponse<List<ReportResponse>>> getMyReports(
-            @AuthenticationPrincipal UserDetailsImpl userDetails
-    ) {
-        Long memberId = userDetails.getMember().getMemberId();
-        log.info("멤버 {} 리포트 조회", memberId);
-        List<ReportResponse> reports = shadowingReportService.getReportsByMember(memberId);
-        return ResponseEntity.ok(ApiResponse.success(reports));
-    }
-
-    @Operation(summary = "특정 멤버 리포트 조회", description = "특정 멤버의 모든 리포트를 조회합니다.")
-    @GetMapping("/member/{memberId}")
-    public ResponseEntity<ApiResponse<List<ReportResponse>>> getReportsByMember(
-            @Parameter(description = "멤버 ID") @PathVariable Long memberId
-    ) {
-        log.info("멤버 {} 리포트 조회", memberId);
-        List<ReportResponse> reports = shadowingReportService.getReportsByMember(memberId);
-        return ResponseEntity.ok(ApiResponse.success(reports));
-    }
 }

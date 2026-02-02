@@ -52,8 +52,6 @@ public class ShadowingReportDetailResponse {
     @Schema(description = "억양 점수 (0-100)", example = "90")
     private final Integer intonation;
 
-    // TODO 추후 평가항목 검토하여 수정 (현재 발음 필드 누락상태)
-
     @Schema(description = "총 점수", example = "87")
     private Integer totalScore;
 
