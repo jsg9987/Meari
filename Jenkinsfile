@@ -133,7 +133,7 @@ pipeline {
                     string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
                     string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
                     string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
-                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET')
+                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
                     string(credentialsId: 'DOMAIN', variable: 'DOMAIN')
                 ]) {
                     script {
