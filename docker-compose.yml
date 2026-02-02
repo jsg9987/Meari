@@ -83,30 +83,104 @@ services:
       retries: 5
 
   # ============================================================
-  # 4. OpenVidu - WebRTC 미디어 서버 포트범위 수정
+  # 4. OpenVidu CE Platform 2.32.1 - WebRTC 미디어 서버
   # ============================================================
-  openvidu:
-    image: openvidu/openvidu-server:2.29.0
-    container_name: meari-openvidu
-    environment:
-      OPENVIDU_SECRET: ${OPENVIDU_SECRET}
-    ports:
-      - "4443:4443"
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-      - "40000-40100:40000-40100/tcp"
-      - "40000-40100:40000-40100/udp"
-    volumes:
-      - openvidu_recordings:/opt/openvidu/recordings
-      - openvidu_config:/opt/openvidu/config
+
+  # 4-1. OpenVidu Server
+  openvidu-server:
+    image: openvidu/openvidu-server:2.32.1
+    container_name: meari-openvidu-server
+    restart: on-failure
     networks:
       - meari-network
-    restart: unless-stopped
+    entrypoint: ['/usr/local/bin/entrypoint.sh']
+    volumes:
+      - ./openvidu/coturn:/run/secrets/coturn
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${OPENVIDU_RECORDING_PATH}:${OPENVIDU_RECORDING_PATH}
+      - ${OPENVIDU_RECORDING_CUSTOM_LAYOUT}:${OPENVIDU_RECORDING_CUSTOM_LAYOUT}
+      - ${OPENVIDU_CDR_PATH}:${OPENVIDU_CDR_PATH}
+    environment:
+      - SERVER_SSL_ENABLED=false
+      - SERVER_PORT=5443
+      - KMS_URIS=["ws://kms:8888/kurento"]
+      - COTURN_IP=${COTURN_IP:-auto-ipv4}
+      - COTURN_PORT=${COTURN_PORT:-3478}
+      - OPENVIDU_SECRET=${OPENVIDU_SECRET}
+    ports:
+      - "5443:5443"
+    logging:
+      options:
+        max-size: "${DOCKER_LOGS_MAX_SIZE:-100M}"
     deploy:
       resources:
         limits:
           memory: 2G
-  
+
+  # 4-2. Kurento Media Server
+  kms:
+    image: ${KMS_IMAGE:-kurento/kurento-media-server:7.3.0}
+    container_name: meari-kms
+    restart: always
+    networks:
+      - meari-network
+    ulimits:
+      core: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - /opt/openvidu/kms-crashes:/opt/openvidu/kms-crashes
+      - ${OPENVIDU_RECORDING_PATH}:${OPENVIDU_RECORDING_PATH}
+      - /opt/openvidu/kurento-logs:/opt/openvidu/kurento-logs
+    environment:
+      - KMS_MIN_PORT=40000
+      - KMS_MAX_PORT=57000
+      - GST_DEBUG=${KMS_DOCKER_ENV_GST_DEBUG:-}
+      - KURENTO_LOG_FILE_SIZE=${KMS_DOCKER_ENV_KURENTO_LOG_FILE_SIZE:-100}
+      - KURENTO_LOGS_PATH=/opt/openvidu/kurento-logs
+    ports:
+      - "8888:8888"
+      - "40000-57000:40000-57000/udp"
+    logging:
+      options:
+        max-size: "${DOCKER_LOGS_MAX_SIZE:-100M}"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # 4-3. COTURN (TURN/STUN Server)
+  coturn:
+    image: openvidu/openvidu-coturn:2.32.1
+    container_name: meari-coturn
+    restart: on-failure
+    networks:
+      - meari-network
+    ports:
+      - "${COTURN_PORT:-3478}:${COTURN_PORT:-3478}/tcp"
+      - "${COTURN_PORT:-3478}:${COTURN_PORT:-3478}/udp"
+      - "${COTURN_MIN_PORT:-57001}-${COTURN_MAX_PORT:-65535}:${COTURN_MIN_PORT:-57001}-${COTURN_MAX_PORT:-65535}/udp"
+    volumes:
+      - ./openvidu/coturn:/run/secrets/coturn
+    command:
+      - --log-file=stdout
+      - --listening-port=${COTURN_PORT:-3478}
+      - --fingerprint
+      - --min-port=${COTURN_MIN_PORT:-57001}
+      - --max-port=${COTURN_MAX_PORT:-65535}
+      - --realm=openvidu
+      - --verbose
+      - --use-auth-secret
+      - --static-auth-secret=${COTURN_SHARED_SECRET_KEY}
+    logging:
+      options:
+        max-size: "${DOCKER_LOGS_MAX_SIZE:-100M}"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
   # ============================================================
   # 5. Frontend (Nginx + React)
   # ============================================================
@@ -142,7 +216,7 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ssafy
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      OPENVIDU_URL: https:localhost:4443
+      OPENVIDU_URL: http://openvidu-server:5443
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ACCESS_TOKEN_EXPIRE_PERIOD: ${JWT_ACCESS_TOKEN_EXPIRE_PERIOD}
@@ -168,12 +242,12 @@ services:
       - meari-network
     #depends_on:
     #   - openvidu
-#      postgres:
-#        condition: service_healthy
-#      redis:
-#        condition: service_healthy
-#      rabbitmq:
-#        condition: service_healthy
+    #      postgres:
+    #        condition: service_healthy
+    #      redis:
+    #        condition: service_healthy
+    #      rabbitmq:
+    #        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
@@ -194,13 +268,13 @@ services:
       - "8000:8000"
     networks:
       - meari-network
-#    depends_on:
-#      postgres:
-#        condition: service_healthy
-#      redis:
-#        condition: service_healthy
-#      rabbitmq:
-#        condition: service_healthy
+    #    depends_on:
+    #      postgres:
+    #        condition: service_healthy
+    #      redis:
+    #        condition: service_healthy
+    #      rabbitmq:
+    #        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
