@@ -44,7 +44,6 @@ pipeline {
                                           --build-arg AWS_SECRET_KEY="${AWS_SECRET}" \
                                           --build-arg AWS_S3_BUCKET="${S3_BUCKET}" \
                                           --build-arg GEMINI_API_KEY="${GEMINI_KEY}" \
-
                                           -t backend-image:latest .
                                         '''
                                     }
