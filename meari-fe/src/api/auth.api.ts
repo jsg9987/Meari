@@ -1,43 +1,26 @@
 import axiosInstance from './axiosInstance';
 import { apiConfig } from './apiConfig';
-import type { AxiosResponse } from 'axios';
-
-// 공통 API 응답 타입
-export interface ApiResponse<T> {
-    success: boolean;
-    data: T | null;
-    error: {
-        code: string;
-        message: string;
-    } | null;
-}
 
 export interface LoginCredentials {
     email: string;
     password: string;
 }
 
-export interface LoginData {
+export interface LoginResponse {
     access_token: string;
 }
 
-export type LoginResponse = AxiosResponse<ApiResponse<LoginData>>;
-
 // Mock API
-const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginResponse> => {
+const loginMock = async ({ email, password }: LoginCredentials) => {
     console.log('[API] Mock Login Requested:', { email, password });
     return new Promise((resolve, reject) => {
         setTimeout(() => {
             if (email === "user@gmail.com" && password === "1234") {
                 resolve({
                     data: {
-                        success: true,
-                        data: {
-                            access_token: "mock-jwt-access-token-eyJhbGciOi-mock",
-                        },
-                        error: null,
+                        access_token: "mock-jwt-access-token-eyJhbGciOi-mock",
                     }
-                } as LoginResponse);
+                });
                 return;
             }
 
@@ -45,12 +28,7 @@ const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginRe
                 response: {
                     status: 401,
                     data: {
-                        success: false,
-                        data: null,
-                        error: {
-                            code: "AUTH_INVALID_CREDENTIALS",
-                            message: "이메일 또는 비밀번호가 올바르지 않습니다.",
-                        }
+                        message: "이메일 또는 비밀번호가 올바르지 않습니다.",
                     },
                 },
             });
@@ -59,8 +37,8 @@ const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginRe
 };
 
 // Real API
-const loginReal = async ({ email, password }: LoginCredentials): Promise<LoginResponse> => {
-    const response = await axiosInstance.post<ApiResponse<LoginData>>('/auth/login', {
+const loginReal = async ({ email, password }: LoginCredentials) => {
+    const response = await axiosInstance.post<LoginResponse>('/auth/login', {
         email,
         password,
     });
@@ -76,13 +54,16 @@ export interface SignupCredentials {
     native_language: string; // 'TOPIC_KR' ... (DB Schema: VARCHAR(10))
 }
 
-export interface SignupData {
-    message: string;
+export interface SignupResponse {
+    success: boolean;
+    data: any | null;
+    error: {
+        code: string;
+        message: string;
+    } | null;
 }
 
-export type SignupResponse = AxiosResponse<ApiResponse<SignupData>>;
-
-const signupMock = async (credentials: SignupCredentials): Promise<SignupResponse> => {
+const signupMock = async (credentials: SignupCredentials) => {
     console.log('[API] Mock Signup Requested:', credentials);
     return new Promise((resolve, reject) => {
         setTimeout(() => {
@@ -111,27 +92,34 @@ const signupMock = async (credentials: SignupCredentials): Promise<SignupRespons
                     data: { message: "회원가입 성공" },
                     error: null,
                 }
-            } as SignupResponse);
+            });
         }, 700);
     });
 };
 
-const signupReal = async (credentials: SignupCredentials): Promise<SignupResponse> => {
-    const response = await axiosInstance.post<ApiResponse<SignupData>>('/auth/signup', credentials);
+const signupReal = async (credentials: SignupCredentials) => {
+    const response = await axiosInstance.post<SignupResponse>('/auth/signup', credentials);
     return response;
 };
 
 // --- Get User Info ---
 export interface UserInfo {
-    memberId: number;
+    member_id: number;
     email: string;
     profile_url: string;
     nickname: string;
 }
 
-export type UserInfoResponse = AxiosResponse<ApiResponse<UserInfo>>;
+export interface UserInfoResponse {
+    success: boolean;
+    data: UserInfo | null;
+    error: {
+        code: string;
+        message: string;
+    } | null;
+}
 
-const getUserInfoMock = async (): Promise<UserInfoResponse> => {
+const getUserInfoMock = async () => {
     console.log('[API] Mock Get User Info Requested');
     return new Promise((resolve) => {
         setTimeout(() => {
@@ -145,18 +133,18 @@ const getUserInfoMock = async (): Promise<UserInfoResponse> => {
                     },
                     error: null
                 }
-            } as UserInfoResponse);
+            });
         }, 300);
     });
 };
 
-const getUserInfoReal = async (): Promise<UserInfoResponse> => {
-    const response = await axiosInstance.get<ApiResponse<UserInfo>>('/members/me');
+const getUserInfoReal = async () => {
+    const response = await axiosInstance.get<UserInfoResponse>('/members/me');
     return response;
 };
 
 const useMock = apiConfig.shouldMock('AUTH');
-    
+
 export const login = useMock ? loginMock : loginReal;
 export const signup = useMock ? signupMock : signupReal;
 export const getUserInfo = useMock ? getUserInfoMock : getUserInfoReal;

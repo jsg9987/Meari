@@ -1,5 +1,6 @@
 package com.ssafy.meari.domain.room.service;
 
+import com.ssafy.meari.domain.analysis.service.AnalysisProducer;
 import com.ssafy.meari.domain.content.entity.Content;
 import com.ssafy.meari.domain.content.entity.Role;
 import com.ssafy.meari.domain.content.entity.Sentence;
@@ -20,6 +21,7 @@ import com.ssafy.meari.domain.room.dto.response.RoomResponse;
 import com.ssafy.meari.domain.room.dto.websocket.MemberSegmentInfo;
 import com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
+import com.ssafy.meari.domain.room.dto.websocket.WatchingCompleteMessage;
 import com.ssafy.meari.domain.room.dto.websocket.SentenceSegmentInfo;
 import com.ssafy.meari.global.common.CursorPageResponse;
 import com.ssafy.meari.domain.room.entity.GamePhase;
@@ -62,6 +64,7 @@ public class RoomService {
     private final ShadowingReportRepository shadowingReportRepository;
     private final RoomSessionService roomSessionService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final AnalysisProducer analysisProducer;
 
     /**
      * 방 생성
@@ -166,7 +169,12 @@ public class RoomService {
                 })
                 .collect(Collectors.toList());
 
-        return RoomDetailResponse.from(room, members);
+        // Redis에서 게임 상태 정보 조회
+        Long contentId = roomSessionService.getContentId(roomId);
+        GamePhase phase = roomSessionService.getPhase(roomId);
+        Boolean rolesConfirmed = roomSessionService.isRolesConfirmed(roomId) ? true : null;
+
+        return RoomDetailResponse.from(room, members, contentId, phase, rolesConfirmed);
     }
 
     /**
@@ -317,6 +325,7 @@ public class RoomService {
         // 방 상태 변경
         room.updateStatus(RoomStatus.IN_PROGRESS);
         roomSessionService.setPhase(roomId, GamePhase.WATCHING);
+        roomSessionService.clearWatchingComplete(roomId);
 
         // 전체 스크립트(자막) 조회 및 segments 생성
         List<Sentence> sentences = sentenceRepository.findByContent_ContentId(contentId);
@@ -420,6 +429,45 @@ public class RoomService {
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
 
         log.info("영상 시청 완료, 역할 선택 단계 전환: roomId={}", roomId);
+    }
+
+    /**
+     * 영상 시청 완료 (참여자 개인)
+     * 각 참여자가 시청 완료 시 호출. 4명 모두 완료 시 WATCHING → ROLE_PICK 전환 및 브로드캐스트
+     */
+    @Transactional
+    public void watchingComplete(Long roomId, Long memberId) {
+        log.info("영상 시청 완료 수신: roomId={}, memberId={}", roomId, memberId);
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
+
+        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
+        }
+
+        GamePhase currentPhase = roomSessionService.getPhase(roomId);
+        if (currentPhase != GamePhase.WATCHING) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
+        }
+
+        if (!roomSessionService.isMember(roomId, memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_MEMBER);
+        }
+
+        roomSessionService.markWatchingComplete(roomId, memberId);
+
+        if (!roomSessionService.isAllWatchingComplete(roomId)) {
+            log.debug("영상 시청 완료: 아직 전체 미완료, roomId={}", roomId);
+            return;
+        }
+
+        log.info("모든 참여자 영상 시청 완료, 역할 선택 단계 전환: roomId={}", roomId);
+        roomSessionService.clearWatchingComplete(roomId);
+        roomSessionService.setPhase(roomId, GamePhase.ROLE_PICK);
+
+        RoomStateMessage message = RoomStateMessage.phaseChange(GamePhase.ROLE_PICK);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
     }
 
     /**
@@ -655,8 +703,8 @@ public class RoomService {
      */
     @Transactional
     public void recordingComplete(Long roomId, RecordingCompleteMessage message) {
-        log.info("녹음 완료 요청: roomId={}, memberId={}, sentenceId={}",
-                roomId, message.getMemberId(), message.getSentenceId());
+        log.info("녹음 완료 요청: roomId={}, memberId={}, sentenceId={}, audioUrl={}",
+                roomId, message.getMemberId(), message.getSentenceId(), message.getAudioUrl());
 
         // 현재 phase가 ROUND인지 확인
         GamePhase currentPhase = roomSessionService.getPhase(roomId);
@@ -674,21 +722,69 @@ public class RoomService {
         // 문장 녹음 완료 마킹
         roomSessionService.markRecordingComplete(roomId, round, message.getMemberId(), message.getSentenceId());
 
+        // 오디오 URL 저장
+        if (message.getAudioUrl() != null) {
+            roomSessionService.saveAudioUrl(roomId, round, message.getMemberId(), message.getSentenceId(), message.getAudioUrl());
+        }
+
+        // 이 멤버의 모든 문장이 완료되었는지 체크
+        if (roomSessionService.isMemberRecordingsComplete(roomId, round, message.getMemberId())) {
+            log.info("멤버 {} 모든 녹음 완료, 분석 요청", message.getMemberId());
+
+            // 멤버별 발음 분석 요청 (비동기)
+            analysisProducer.requestMemberAnalysis(roomId, round, message.getMemberId());
+        }
+
         // 타임아웃 체크
         if (checkAndHandleRecordingTimeout(roomId, round, currentPhase)) {
             return; // 타임아웃 처리됨
         }
 
-        // 모든 멤버의 모든 문장이 완료되었는지 확인
-        if (roomSessionService.isAllRecordingsComplete(roomId, round)) {
-            log.info("모든 멤버 녹음 완료: roomId={}, round={}", roomId, round);
+        // 전원 영상 시청 완료 + 전원 녹음 전송 완료 시 영상 시청 끝남 브로드캐스트
+        tryBroadcastRecordingsComplete(roomId, round, currentPhase);
+    }
 
-            // 완료 플래그 설정 (중복 처리 방지)
-            roomSessionService.markRoundCompleted(roomId, round);
+    /**
+     * 영상 시청 완료 처리 (WATCHING_COMPLETE 수신 시)
+     * 전원 WATCHING_COMPLETE + 전원 녹음 전송 완료 시 RECORDINGS_COMPLETE 브로드캐스트
+     */
+    @Transactional
+    public void watchingComplete(Long roomId, WatchingCompleteMessage message) {
+        log.info("영상 시청 완료 요청: roomId={}, memberId={}", roomId, message.getMemberId());
 
-            RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
-            messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+        GamePhase currentPhase = roomSessionService.getPhase(roomId);
+        if (currentPhase != GamePhase.ROUND_1 && currentPhase != GamePhase.ROUND_2) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
         }
+        if (!roomSessionService.isMember(roomId, message.getMemberId())) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_MEMBER);
+        }
+
+        int round = currentPhase == GamePhase.ROUND_1 ? 1 : 2;
+        roomSessionService.addMemberWatchingComplete(roomId, round, message.getMemberId());
+
+        if (checkAndHandleRecordingTimeout(roomId, round, currentPhase)) {
+            return;
+        }
+
+        tryBroadcastRecordingsComplete(roomId, round, currentPhase);
+    }
+
+    /**
+     * 전원 영상 시청 완료 + 전원 녹음 전송 완료 시 RECORDINGS_COMPLETE 브로드캐스트 (중복 방지)
+     */
+    private void tryBroadcastRecordingsComplete(Long roomId, int round, GamePhase currentPhase) {
+        if (roomSessionService.isRoundCompleted(roomId, round)) {
+            return;
+        }
+        if (!roomSessionService.isAllWatchingComplete(roomId, round)
+                || !roomSessionService.isAllRecordingsComplete(roomId, round)) {
+            return;
+        }
+        log.info("모든 멤버 영상 시청 및 녹음 전송 완료: roomId={}, round={}", roomId, round);
+        roomSessionService.markRoundCompleted(roomId, round);
+        RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
     }
 
     /**
@@ -894,6 +990,27 @@ public class RoomService {
         if (currentTime > timeoutMillis) {
             log.warn("녹음 완료 타임아웃: roomId={}, round={}, 경과시간={}ms",
                     roomId, round, currentTime - (timeoutMillis - 40000));
+
+            // 부분 완료 멤버도 분석 요청
+            Set<String> members = roomSessionService.getMembers(roomId);
+            if (members != null) {
+                for (String memberIdStr : members) {
+                    Long memberId = Long.parseLong(memberIdStr);
+
+                    // 이미 모든 문장 완료한 경우는 건너뛰기 (이미 분석 요청됨)
+                    if (roomSessionService.isMemberRecordingsComplete(roomId, round, memberId)) {
+                        continue;
+                    }
+
+                    // 1개 이상 녹음했으면 분석 요청
+                    Long recordedCount = roomSessionService.getRecordedCount(roomId, round, memberId);
+                    if (recordedCount != null && recordedCount > 0) {
+                        log.info("타임아웃: 부분 완료 멤버 분석 요청 - memberId={}, recordedCount={}",
+                                memberId, recordedCount);
+                        analysisProducer.requestMemberAnalysis(roomId, round, memberId);
+                    }
+                }
+            }
 
             // 완료 플래그 설정 (중복 처리 방지)
             roomSessionService.markRoundCompleted(roomId, round);

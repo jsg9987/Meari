@@ -2,6 +2,7 @@ package com.ssafy.meari.domain.room.dto.response;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import com.ssafy.meari.domain.room.entity.GamePhase;
 import com.ssafy.meari.domain.room.entity.Room;
 import com.ssafy.meari.domain.room.entity.RoomStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -47,7 +48,22 @@ public class RoomDetailResponse {
     @Schema(description = "참여자 목록")
     private List<RoomMemberResponse> members;
 
-    public static RoomDetailResponse from(Room room, List<RoomMemberResponse> members) {
+    @Schema(description = "선택된 컨텐츠 ID (null: 컨텐츠 미선택 상태)", example = "1")
+    private Long contentId;
+
+    @Schema(description = "현재 게임 진행 단계 (null: 게임 시작 전)", example = "WATCHING")
+    private GamePhase phase;
+
+    @Schema(description = "역할 확정 여부 (true: 확정됨, null/false: 미확정)", example = "true")
+    private Boolean rolesConfirmed;
+
+    public static RoomDetailResponse from(
+            Room room,
+            List<RoomMemberResponse> members,
+            Long contentId,
+            GamePhase phase,
+            Boolean rolesConfirmed
+    ) {
         return RoomDetailResponse.builder()
                 .roomId(room.getRoomId())
                 .ownerId(room.getOwner().getMemberId())
@@ -59,6 +75,9 @@ public class RoomDetailResponse {
                 .hasPassword(room.hasPassword())
                 .createdAt(room.getCreatedAt())
                 .members(members)
+                .contentId(contentId)
+                .phase(phase)
+                .rolesConfirmed(rolesConfirmed)
                 .build();
     }
 }

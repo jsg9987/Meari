@@ -13,7 +13,6 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-// Redis에 저장되는 채팅 메세지 객체
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor

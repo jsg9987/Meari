@@ -13,13 +13,20 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
+import com.ssafy.meari.domain.room.dto.websocket.ChatMessage;
 import com.ssafy.meari.domain.room.dto.websocket.ReadyMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoleReleaseMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoleSelectMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
+import com.ssafy.meari.domain.room.dto.websocket.WatchingCompleteMessage;
 import com.ssafy.meari.domain.room.entity.Chat;
 import com.ssafy.meari.domain.room.repository.ChatRepository;
+import com.ssafy.meari.domain.room.service.RoomService;
+import com.ssafy.meari.domain.room.service.RoomSessionService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Room WebSocket 메시지 핸들러
@@ -130,7 +137,7 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/chat")
     public void chat(
             @DestinationVariable Long roomId,
-            @Payload ChatMessageRequest message
+            @Payload ChatMessage message
     ) {
         log.info("채팅 메시지: roomId={}, memberId={}, message={}",
                 roomId, message.getSenderId(), message.getMessage());
@@ -162,6 +169,22 @@ public class RoomWebSocketController {
     }
 
     /**
+     * 영상 시청 완료 (참여자 개인)
+     * 클라이언트: /app/room/{roomId}/watching/complete
+     * 4명 모두 완료 시 서버가 PHASE_CHANGE(ROLE_PICK) 브로드캐스트
+     */
+    @MessageMapping("/room/{roomId}/watching/complete")
+    public void watchingComplete(
+            @DestinationVariable Long roomId,
+            @Payload WatchingCompleteMessage message
+    ) {
+        log.info("영상 시청 완료 메시지 수신: roomId={}, memberId={}", roomId, message.getMemberId());
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
+
+        roomService.watchingComplete(roomId, message.getMemberId());
+    }
+
+    /**
      * 문장별 녹음 완료
      * 클라이언트: /app/room/{roomId}/recording/complete
      */
@@ -175,6 +198,21 @@ public class RoomWebSocketController {
         clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
         roomService.recordingComplete(roomId, message);
+    }
+
+    /**
+     * 영상 시청 완료
+     * 클라이언트: /app/room/{roomId}/watching/complete
+     */
+    @MessageMapping("/room/{roomId}/watching/complete")
+    public void watchingComplete(
+            @DestinationVariable Long roomId,
+            @Payload WatchingCompleteMessage message
+    ) {
+        log.info("영상 시청 완료 메시지 수신: roomId={}, memberId={}", roomId, message.getMemberId());
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
+
+        roomService.watchingComplete(roomId, message);
     }
 
     /**

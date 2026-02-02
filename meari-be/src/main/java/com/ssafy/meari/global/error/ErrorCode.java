@@ -58,10 +58,14 @@ public enum ErrorCode {
     NOT_FOUND_THEME(HttpStatus.NOT_FOUND, "존재하지 않는 테마입니다."),
     NOT_FOUND_CONTENT(HttpStatus.NOT_FOUND, "존재하지 않는 콘텐츠입니다."),
     NOT_FOUND_ROLE(HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."),
+    NOT_FOUND_SENTENCE(HttpStatus.NOT_FOUND, "존재하지 않는 문장입니다."),
     NOT_FOUND_MEMBER_ROOM(HttpStatus.NOT_FOUND, "방에 참여하지 않은 사용자입니다."),
     NOT_FOUND_KOPIC_SENTENCE(HttpStatus.NOT_FOUND, "해당 테마에 코픽 문장이 존재하지 않습니다."),
+    NOT_FOUND_SHADOWING_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 쉐도잉 리포트입니다."),
     NOT_FOUND_KOPIC_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 코픽 리포트입니다."),
     NOT_FOUND_KOPIC_TOTAL_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 코픽 통합 리포트입니다."),
+    NOT_FOUND_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 리포트입니다."),
+    NOT_FOUND_AUDIO_URL(HttpStatus.NOT_FOUND, "녹음 파일 URL을 찾을 수 없습니다."),
     OPENVIDU_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "OpenVidu 세션을 찾을 수 없습니다."),
 
 	// Method Not Allowed Error: 405

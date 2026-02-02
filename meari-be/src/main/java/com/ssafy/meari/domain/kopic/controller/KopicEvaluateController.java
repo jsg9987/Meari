@@ -16,11 +16,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Kopic Evaluate", description = "코픽 발화 분석 API")
 @Slf4j
@@ -49,20 +47,14 @@ public class KopicEvaluateController {
             summary = "코픽 발화 분석 요청",
             description = "음성 파일을 Gemini AI로 분석합니다. 비동기로 처리되며 202 Accepted를 즉시 반환합니다."
     )
-    @PostMapping(value = "/evaluate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping("/evaluate")
     public ResponseEntity<ApiResponse<KopicEvaluateResponse>> evaluate(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @Valid @RequestPart("request") KopicEvaluateRequest request,
-            @RequestPart("audio") MultipartFile audioFile
+            @Valid @RequestBody KopicEvaluateRequest request
     ) {
         log.debug("코픽 발화 분석 요청: memberId={}, sentenceId={}", userDetails.getMember().getMemberId(), request.getKopicSentenceId());
-        try {
-            byte[] audioData = audioFile.getBytes();
-            KopicEvaluateResponse response = kopicEvaluateService.evaluate(userDetails.getMember(), request, audioData);
-            return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.success(response));
-        } catch (java.io.IOException e) {
-            throw new RuntimeException("음성 파일 읽기 실패", e);
-        }
+        KopicEvaluateResponse response = kopicEvaluateService.evaluate(userDetails.getMember(), request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.success(response));
     }
 
     @Operation(

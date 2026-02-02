@@ -40,8 +40,10 @@ public class RoomSessionService {
     private static final String KEY_ROUND_START_TIME = "room:%d:round_start_time";
     private static final String KEY_MEMBER_RECORDINGS = "room:%d:round:%d:member:%d:recordings";
     private static final String KEY_MEMBER_TOTAL_SENTENCES = "room:%d:round:%d:member:%d:total_sentences";
+    private static final String KEY_MEMBER_AUDIO_URLS = "room:%d:round:%d:member:%d:audio_urls";
     private static final String KEY_ROUND_TIMEOUT = "room:%d:round:%d:timeout";
     private static final String KEY_ROUND_COMPLETED = "room:%d:round:%d:completed";
+    private static final String KEY_WATCHING_COMPLETE = "room:%d:round:%d:watching_complete";
 
     // === 참여자 관리 ===
 
@@ -347,6 +349,44 @@ public class RoomSessionService {
         return com.ssafy.meari.domain.room.entity.GamePhase.valueOf(value);
     }
 
+    // === 영상 시청 완료 추적 ===
+
+    /**
+     * 영상 시청 완료 마킹
+     */
+    public void markWatchingComplete(Long roomId, Long memberId) {
+        String key = String.format(KEY_WATCHING_COMPLETE, roomId);
+        redisTemplate.opsForSet().add(key, memberId.toString());
+        setExpire(key);
+        log.debug("방 {} 영상 시청 완료 마킹: memberId={}", roomId, memberId);
+    }
+
+    /**
+     * 현재 방 참여자 모두 영상 시청을 완료했는지 확인
+     */
+    public boolean isAllWatchingComplete(Long roomId) {
+        Set<String> members = getMembers(roomId);
+        if (members == null || members.isEmpty()) {
+            return false;
+        }
+        String key = String.format(KEY_WATCHING_COMPLETE, roomId);
+        for (String memberIdStr : members) {
+            Boolean isMember = redisTemplate.opsForSet().isMember(key, memberIdStr);
+            if (!Boolean.TRUE.equals(isMember)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 영상 시청 완료 집합 초기화 (게임 시작 시 WATCHING 진입 시 호출)
+     */
+    public void clearWatchingComplete(Long roomId) {
+        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE, roomId));
+        log.debug("방 {} 영상 시청 완료 집합 초기화", roomId);
+    }
+
     // === 연결 끊김 관리 (Grace Period) ===
 
     /**
@@ -453,6 +493,56 @@ public class RoomSessionService {
     }
 
     /**
+     * 문장 오디오 URL 저장
+     */
+    public void saveAudioUrl(Long roomId, Integer round, Long memberId, Long sentenceId, String audioUrl) {
+        String key = String.format(KEY_MEMBER_AUDIO_URLS, roomId, round, memberId);
+        redisTemplate.opsForHash().put(key, sentenceId.toString(), audioUrl);
+        setExpire(key);
+        log.debug("방 {} Round {} 멤버 {} 문장 {} 오디오 URL 저장", roomId, round, memberId, sentenceId);
+    }
+
+    /**
+     * 문장 오디오 URL 조회
+     */
+    public String getAudioUrl(Long roomId, Integer round, Long memberId, Long sentenceId) {
+        String key = String.format(KEY_MEMBER_AUDIO_URLS, roomId, round, memberId);
+        Object audioUrl = redisTemplate.opsForHash().get(key, sentenceId.toString());
+        return audioUrl != null ? audioUrl.toString() : null;
+    }
+
+    /**
+     * 특정 멤버의 모든 문장 녹음이 완료되었는지 확인
+     */
+    public boolean isMemberRecordingsComplete(Long roomId, Integer round, Long memberId) {
+        // 예상 문장수 조회
+        String totalKey = String.format(KEY_MEMBER_TOTAL_SENTENCES, roomId, round, memberId);
+        String totalValue = redisTemplate.opsForValue().get(totalKey);
+        if (totalValue == null) {
+            return false;
+        }
+        int totalSentences = Integer.parseInt(totalValue);
+
+        // 완료된 문장수 조회
+        String recordingsKey = String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId);
+        Long completedCount = redisTemplate.opsForSet().size(recordingsKey);
+        if (completedCount == null || completedCount < totalSentences) {
+            return false;
+        }
+
+        log.debug("멤버 {} 모든 녹음 완료: {}/{}", memberId, completedCount, totalSentences);
+        return true;
+    }
+
+    /**
+     * 멤버가 녹음한 문장 개수 조회
+     */
+    public Long getRecordedCount(Long roomId, Integer round, Long memberId) {
+        String recordingsKey = String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId);
+        return redisTemplate.opsForSet().size(recordingsKey);
+    }
+
+    /**
      * 모든 멤버의 모든 문장 녹음이 완료되었는지 확인
      */
     public boolean isAllRecordingsComplete(Long roomId, Integer round) {
@@ -463,19 +553,39 @@ public class RoomSessionService {
 
         for (String memberIdStr : members) {
             Long memberId = Long.parseLong(memberIdStr);
-
-            // 예상 문장수 조회
-            String totalKey = String.format(KEY_MEMBER_TOTAL_SENTENCES, roomId, round, memberId);
-            String totalValue = redisTemplate.opsForValue().get(totalKey);
-            if (totalValue == null) {
+            if (!isMemberRecordingsComplete(roomId, round, memberId)) {
                 return false;
             }
-            int totalSentences = Integer.parseInt(totalValue);
+        }
+        return true;
+    }
 
-            // 완료된 문장수 조회
-            String recordingsKey = String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId);
-            Long completedCount = redisTemplate.opsForSet().size(recordingsKey);
-            if (completedCount == null || completedCount < totalSentences) {
+    /**
+     * 영상 시청 완료 마킹 (WATCHING_COMPLETE 수신 시)
+     */
+    public void addMemberWatchingComplete(Long roomId, Integer round, Long memberId) {
+        String key = String.format(KEY_WATCHING_COMPLETE, roomId, round);
+        redisTemplate.opsForSet().add(key, memberId.toString());
+        setExpire(key);
+        log.debug("방 {} Round {} 멤버 {} 영상 시청 완료 마킹", roomId, round, memberId);
+    }
+
+    /**
+     * 모든 멤버가 영상 시청 완료 메시지를 보냈는지 확인
+     */
+    public boolean isAllWatchingComplete(Long roomId, Integer round) {
+        Set<String> members = getMembers(roomId);
+        if (members == null || members.isEmpty()) {
+            return false;
+        }
+        String key = String.format(KEY_WATCHING_COMPLETE, roomId, round);
+        Long setSize = redisTemplate.opsForSet().size(key);
+        if (setSize == null || setSize < members.size()) {
+            return false;
+        }
+        for (String memberIdStr : members) {
+            Boolean inSet = redisTemplate.opsForSet().isMember(key, memberIdStr);
+            if (!Boolean.TRUE.equals(inSet)) {
                 return false;
             }
         }
@@ -495,6 +605,7 @@ public class RoomSessionService {
             }
         }
         redisTemplate.delete(String.format(KEY_ROUND_START_TIME, roomId));
+        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE, roomId, round));
         log.debug("방 {} Round {} 녹음 추적 데이터 초기화", roomId, round);
     }
 
@@ -511,6 +622,7 @@ public class RoomSessionService {
         redisTemplate.delete(String.format(KEY_CONTENT, roomId));
         redisTemplate.delete(String.format(KEY_PHASE, roomId));
         redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
+        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE, roomId));
         log.info("방 {} 세션 전체 삭제", roomId);
     }
 
@@ -526,6 +638,7 @@ public class RoomSessionService {
         redisTemplate.delete(String.format(KEY_CONTENT, roomId));
         redisTemplate.delete(String.format(KEY_PHASE, roomId));
         redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
+        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE, roomId));
         log.info("방 {} 게임 상태 초기화 (준비 단계로 복귀, phase 삭제)", roomId);
     }
 
