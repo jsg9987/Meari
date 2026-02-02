@@ -105,6 +105,7 @@ public class GeminiAnalysisService {
 
             String content = extractContentFromResponse(response.getBody());
             String jsonResponse = extractJson(content);
+            log.debug("Gemini raw json response: {}", jsonResponse);
             JsonNode jsonNode = objectMapper.readTree(jsonResponse);
 
             int accuracy = jsonNode.get("accuracy").asInt();
