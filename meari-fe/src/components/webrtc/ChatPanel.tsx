@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type JSX } from 'react';
 import type { ChatMessage } from '../../hooks/useRoomWebSocket';
 import LinkPreview from './LinkPreview';
 

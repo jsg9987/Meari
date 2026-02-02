@@ -339,6 +339,7 @@ export function useRoomWebSocket({
 
   // 준비 상태 토글
   const toggleReady = useCallback((ready: boolean) => {
+    console.log(ready)
     if (!clientRef.current?.connected) {
       console.warn('[WebSocket] Not connected, cannot toggle ready');
       return;
