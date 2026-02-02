@@ -36,17 +36,10 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
       };
 
       mediaRecorder.onstop = async () => {
-        console.log('[useAudioRecorder] onstop event fired');
-        console.log('[useAudioRecorder] Audio chunks count:', audioChunksRef.current.length);
-
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        console.log('[useAudioRecorder] Audio blob created, size:', audioBlob.size);
 
         // WAV로 변환 (필요한 경우) TODO: 이거 그대로 가나요?
         const wavBlob = await convertToWav(audioBlob);
-        console.log('[useAudioRecorder] WAV conversion complete, size:', wavBlob.size);
-
-        console.log('[useAudioRecorder] Calling onRecordingComplete callback');
         onRecordingComplete?.(wavBlob);
 
         // 스트림 정리
@@ -59,7 +52,6 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
       mediaRecorder.start();
       isRecordingRef.current = true;
       setIsRecording(true);
-      console.log('Recording started');
     } catch (error) {
       console.error('Failed to start recording:', error);
       onError?.(error as Error);
@@ -67,18 +59,10 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
   }, [onRecordingComplete, onError]);
 
   const stopRecording = useCallback(() => {
-    console.log('[useAudioRecorder] stopRecording called');
-    console.log('[useAudioRecorder] mediaRecorderRef.current:', !!mediaRecorderRef.current);
-    console.log('[useAudioRecorder] isRecordingRef.current:', isRecordingRef.current);
-
     if (mediaRecorderRef.current && isRecordingRef.current) {
-      console.log('[useAudioRecorder] Calling mediaRecorder.stop()');
       mediaRecorderRef.current.stop();
       isRecordingRef.current = false;
       setIsRecording(false);
-      console.log('[useAudioRecorder] Recording stopped, waiting for onstop event...');
-    } else {
-      console.log('[useAudioRecorder] stopRecording called but conditions not met');
     }
   }, []);
 

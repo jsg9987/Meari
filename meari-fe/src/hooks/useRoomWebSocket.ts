@@ -7,6 +7,7 @@ export type WebSocketMessageType =
   | 'MEMBER_JOIN'
   | 'MEMBER_LEAVE'
   | 'READY'
+  | 'CONTENT_SELECTED'
   | 'ROLE_PICK'
   | 'ROLE_ASSIGNED'
   | 'ROLE_RELEASED'
@@ -84,6 +85,7 @@ export interface ChatMessage {
   nickname: string;
   message: string;
   timestamp: string;
+  isSystem?: boolean; // 시스템 메시지 여부
 }
 
 interface UseRoomWebSocketOptions {
@@ -93,6 +95,7 @@ interface UseRoomWebSocketOptions {
   onMemberJoin?: (message: WebSocketMessage) => void;
   onMemberLeave?: (message: WebSocketMessage) => void;
   onReady?: (message: WebSocketMessage) => void;
+  onContentSelected?: (message: WebSocketMessage) => void;
   onRolePick?: (message: WebSocketMessage) => void;
   onRoleAssigned?: (message: WebSocketMessage) => void;
   onRoleReleased?: (message: WebSocketMessage) => void;
@@ -114,6 +117,7 @@ export function useRoomWebSocket({
   onMemberJoin,
   onMemberLeave,
   onReady,
+  onContentSelected,
   onRolePick,
   onRoleAssigned,
   onRoleReleased,
@@ -150,10 +154,8 @@ export function useRoomWebSocket({
         message: parsedMessage.message,
         timestamp: parsedMessage.timestamp,
       };
-      console.log('[WebSocket] Received chat message:', chatMessage);
       onChatMessage?.(chatMessage);
     } catch (error) {
-      console.error('[WebSocket] Failed to parse chat message:', error);
       console.error('[WebSocket] Raw message:', message.body);
     }
   }, [onChatMessage]);
@@ -162,8 +164,6 @@ export function useRoomWebSocket({
   const handleMessage = useCallback((message: IMessage) => {
     try {
       const payload: WebSocketMessage = JSON.parse(message.body);
-      console.log('[WebSocket] Received message:', payload);
-      console.log('[WebSocket] Message type:', payload.type);
 
       // 공통 핸들러 호출
       onMessage?.(payload);
@@ -171,65 +171,48 @@ export function useRoomWebSocket({
       // 타입별 핸들러 호출
       switch (payload.type) {
         case 'MEMBER_JOIN':
-          console.log('[WebSocket] Handling MEMBER_JOIN');
           onMemberJoin?.(payload);
           break;
         case 'MEMBER_LEAVE':
-          console.log('[WebSocket] Handling MEMBER_LEAVE');
           onMemberLeave?.(payload);
           break;
         case 'READY':
-          console.log('[WebSocket] Handling READY');
           onReady?.(payload);
           break;
+        case 'CONTENT_SELECTED':
+          onContentSelected?.(payload);
+          break;
         case 'ROLE_PICK':
-          console.log('[WebSocket] Handling ROLE_PICK');
-          console.log('[WebSocket] ROLE_PICK payload:', JSON.stringify(payload, null, 2));
           onRolePick?.(payload);
           break;
         case 'PHASE_CHANGE':
-          console.log('[WebSocket] Handling PHASE_CHANGE');
-          console.log('[WebSocket] Phase:', payload.phase);
           // PHASE_CHANGE 타입에서 phase가 ROLE_PICK일 때 역할 선택 처리
           if (payload.phase === 'ROLE_PICK') {
-            console.log('[WebSocket] ROLE_PICK phase detected');
-            console.log('[WebSocket] ROLE_PICK payload:', JSON.stringify(payload, null, 2));
             onRolePick?.(payload);
           } else if (payload.phase === 'WATCHING') {
             // 영상 시청 페이즈 (게임 시작)
-            console.log('[WebSocket] WATCHING phase - calling onGameStart');
             onGameStart?.(payload);
           } else if (payload.phase === 'WAITING') {
             // 대기 페이즈 (처음으로 돌아가기)
-            console.log('[WebSocket] WAITING phase - resetting to initial state');
             onPhaseWaiting?.(payload);
           }
           break;
         case 'ROLE_ASSIGNED':
-          console.log('[WebSocket] Handling ROLE_ASSIGNED');
           onRoleAssigned?.(payload);
           break;
         case 'ROLE_RELEASED':
-          console.log('[WebSocket] Handling ROLE_RELEASED');
           onRoleReleased?.(payload);
           break;
         case 'GAME_START':
-          console.log('[WebSocket] Handling GAME_START');
           onGameStart?.(payload);
           break;
         case 'ROLES_CONFIRMED':
-          console.log('[WebSocket] Handling ROLES_CONFIRMED');
-          console.log('[WebSocket] Segments:', payload.segments);
           onRolesConfirmed?.(payload);
           break;
         case 'ROUND_START':
-          console.log('[WebSocket] Handling ROUND_START');
-          console.log('[WebSocket] Round:', payload.round, 'Server time:', payload.server_time);
-          console.log('[WebSocket] Segments:', payload.segments);
           onRoundStart?.(payload);
           break;
         case 'GAME_FINISHED':
-          console.log('[WebSocket] Handling GAME_FINISHED');
           onGameFinished?.(payload);
           break;
         default:
@@ -239,12 +222,11 @@ export function useRoomWebSocket({
       console.error('[WebSocket] Failed to parse message:', error);
       console.error('[WebSocket] Raw message:', message.body);
     }
-  }, [onMessage, onMemberJoin, onMemberLeave, onReady, onRolePick, onRoleAssigned, onRoleReleased, onGameStart, onPhaseWaiting, onRolesConfirmed, onRoundStart, onGameFinished]);
+  }, [onMessage, onMemberJoin, onMemberLeave, onReady, onContentSelected, onRolePick, onRoleAssigned, onRoleReleased, onGameStart, onPhaseWaiting, onRolesConfirmed, onRoundStart, onGameFinished]);
 
   // 웹소켓 연결
   const connect = useCallback(() => {
     if (clientRef.current?.connected) {
-      console.log('[WebSocket] Already connected');
       return;
     }
 
@@ -271,7 +253,6 @@ export function useRoomWebSocket({
       },
 
       onConnect: () => {
-        console.log('[WebSocket] Connected');
         setIsConnected(true);
         setConnectionError(null);
         onConnect?.();
@@ -298,28 +279,21 @@ export function useRoomWebSocket({
             handleChatMessage
           );
           subscriptionsRef.current.push(chatSub);
-
-          console.log('[WebSocket] Subscribed to /topic/rooms/' + roomId);
-          console.log('[WebSocket] Subscribed to /topic/room/' + roomId + '/state');
-          console.log('[WebSocket] Subscribed to /topic/room/' + roomId + '/chat');
         } catch (error) {
           console.error('[WebSocket] Subscription failed:', error);
           onError?.(error as Error);
         }
       },
       onDisconnect: () => {
-        console.log('[WebSocket] Disconnected');
         setIsConnected(false);
         onDisconnect?.();
       },
       onStompError: (frame) => {
-        console.error('[WebSocket] STOMP error:', frame);
         const errorMessage = frame.headers['message'] || 'STOMP connection error';
         setConnectionError(errorMessage);
         onError?.(new Error(errorMessage));
       },
-      onWebSocketError: (event) => {
-        console.error('[WebSocket] WebSocket error:', event);
+      onWebSocketError: () => {
         const errorMessage = 'WebSocket connection error';
         setConnectionError(errorMessage);
         onError?.(new Error(errorMessage));
@@ -340,8 +314,6 @@ export function useRoomWebSocket({
   // 웹소켓 연결 해제
   const disconnect = useCallback(() => {
     if (!clientRef.current) return;
-
-    console.log('[WebSocket] Disconnecting...');
 
     // 구독 해제
     subscriptionsRef.current.forEach((sub) => {
@@ -367,6 +339,7 @@ export function useRoomWebSocket({
 
   // 준비 상태 토글
   const toggleReady = useCallback((ready: boolean) => {
+    console.log(ready)
     if (!clientRef.current?.connected) {
       console.warn('[WebSocket] Not connected, cannot toggle ready');
       return;
@@ -382,7 +355,6 @@ export function useRoomWebSocket({
         body: JSON.stringify(payload),
       });
 
-      console.log('[WebSocket] Sent ready toggle:', ready);
     } catch (error) {
       console.error('[WebSocket] Failed to toggle ready:', error);
       onError?.(error as Error);
@@ -407,7 +379,6 @@ export function useRoomWebSocket({
         body: JSON.stringify(payload),
       });
 
-      console.log('[WebSocket] Sent role assignment:', roleId);
     } catch (error) {
       console.error('[WebSocket] Failed to assign role:', error);
       onError?.(error as Error);
@@ -432,7 +403,6 @@ export function useRoomWebSocket({
         body: JSON.stringify(payload),
       });
 
-      console.log('[WebSocket] Sent role release:', roleId);
     } catch (error) {
       console.error('[WebSocket] Failed to release role:', error);
       onError?.(error as Error);
@@ -464,7 +434,6 @@ export function useRoomWebSocket({
         body: JSON.stringify(payload),
       });
 
-      console.log('[WebSocket] Sent chat message:', message);
     } catch (error) {
       console.error('[WebSocket] Failed to send chat message:', error);
       onError?.(error as Error);

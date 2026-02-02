@@ -1,14 +1,25 @@
 import { X, Check } from "lucide-react";
 import type { Role } from "../../hooks/useRoomWebSocket";
 
+interface RoomMember {
+  member_id: number;
+  nickname: string;
+  profile_url: string | null;
+  is_owner: boolean;
+  is_ready: boolean;
+  role_id: number | null;
+}
+
 interface RoleSelectModalProps {
   roles: Role[];
   onSelect: (role: Role) => void;
   onClose: () => void;
   onConfirm?: () => void;
-  selectedRoleId?: number;
   isHost?: boolean;
   isConfirming?: boolean;
+  roomMembers?: RoomMember[];
+  selectedRoles?: Record<number, number>; // member_id -> role_id
+  currentUserId?: number;
 }
 
 export default function RoleSelectModal({
@@ -16,10 +27,24 @@ export default function RoleSelectModal({
   onSelect,
   onClose,
   onConfirm,
-  selectedRoleId,
   isHost = false,
   isConfirming = false,
+  roomMembers = [],
+  selectedRoles = {},
+  currentUserId,
 }: RoleSelectModalProps) {
+
+  // 역할 ID로 선택한 멤버 찾기
+  const getMemberByRoleId = (roleId: number) => {
+    const memberId = Object.entries(selectedRoles).find(
+      ([_, selectedRoleId]) => selectedRoleId === roleId
+    )?.[0];
+
+    if (!memberId) return null;
+
+    const member = roomMembers.find(m => m.member_id === Number(memberId));
+    return member;
+  };
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
@@ -41,14 +66,19 @@ export default function RoleSelectModal({
         <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
           <div className="grid grid-cols-2 gap-4">
             {roles.map((role) => {
-              const isSelected = selectedRoleId === role.role_id;
+              const selectedMember = getMemberByRoleId(role.role_id);
+              const isSelectedByMe = selectedMember?.member_id === currentUserId;
+              const isSelectedByOther = selectedMember && !isSelectedByMe;
+
               return (
                 <button
                   key={role.id}
                   onClick={() => onSelect(role)}
                   className={`p-4 rounded-lg border-2 transition-all text-left ${
-                    isSelected
+                    isSelectedByMe
                       ? "border-blue-600 bg-blue-50"
+                      : isSelectedByOther
+                      ? "border-green-600 bg-green-50"
                       : "border-gray-200 hover:border-blue-400 hover:bg-gray-50"
                   }`}
                 >
@@ -57,9 +87,11 @@ export default function RoleSelectModal({
                       <span className="text-lg font-semibold text-gray-900">
                         {role.name}
                       </span>
-                      {isSelected && (
-                        <div className="px-2 py-1 bg-blue-600 text-white text-xs rounded-full">
-                          선택됨
+                      {selectedMember && (
+                        <div className={`px-2 py-1 text-white text-xs rounded-full ${
+                          isSelectedByMe ? "bg-blue-600" : "bg-green-600"
+                        }`}>
+                          {selectedMember.nickname}
                         </div>
                       )}
                     </div>
