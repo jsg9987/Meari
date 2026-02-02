@@ -79,7 +79,7 @@ export default function KopicEvaluation() {
 
     const currentSentence = sentences[currentIndex]
     const totalSentences = sentences.length
-    const safeSentenceImageUrl =
+    const safeSentenceAudioUrl =
         currentSentence?.kopic_sentence_url?.startsWith('http') ? currentSentence.kopic_sentence_url : ''
 
     // 뒤로가기/새로고침 시 세션 초기화
@@ -382,13 +382,16 @@ export default function KopicEvaluation() {
 
                 {/* 질문 컨텐츠 영역 */}
                 <div className="flex flex-col items-center justify-center max-w-5xl mx-auto w-full px-16">
-                    {/* 질문 이미지 */}
-                    <div className="w-full aspect-video bg-gray-200 rounded-xl overflow-hidden mb-6 shadow-lg p-1">
-                        <img
-                            src={safeSentenceImageUrl || undefined}
-                            alt={`문제 ${currentIndex + 1}`}
-                            className="w-full h-full object-cover rounded-lg"
-                        />
+                    {/* 문장 음성 */}
+                    <div className="w-full aspect-video bg-gray-100 rounded-xl overflow-hidden mb-6 shadow-lg p-6 flex items-center justify-center">
+                        {safeSentenceAudioUrl ? (
+                            <audio controls preload="none" className="w-full max-w-xl">
+                                <source src={safeSentenceAudioUrl} />
+                                브라우저가 오디오 재생을 지원하지 않습니다.
+                            </audio>
+                        ) : (
+                            <p className="text-gray-400">샘플 음성이 없습니다.</p>
+                        )}
                     </div>
 
                     {/* 질문 텍스트 */}

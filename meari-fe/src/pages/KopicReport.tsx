@@ -106,6 +106,11 @@ const ReportItem = ({
     isExpanded: boolean
     onToggle: () => void
 }) => {
+    const analysis = item.detailed_analysis
+    const feedback = analysis?.feedback
+    const originalSentence = analysis?.original_sentence
+    const targetSentence = analysis?.target_sentence
+
     return (
         <div className="border border-gray-200 rounded-lg overflow-hidden">
             {/* 헤더 (클릭하여 펼치기) */}
@@ -114,7 +119,7 @@ const ReportItem = ({
                 className="w-full px-4 py-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
             >
                 <span className="text-gray-700 font-medium">
-                    문제 {index + 1}: {item.text_ko}
+                    질문 {index + 1}: {item.text_ko}
                 </span>
                 {isExpanded ? (
                     <ChevronUp size={20} className="text-gray-400" />
@@ -135,23 +140,33 @@ const ReportItem = ({
                         </div>
                     )}
 
-                    {item.detailed_analysis ? (
+                    {analysis ? (
                         <div className="space-y-3">
                             <div className="bg-gray-50 p-3 rounded-lg">
-                                <p className="text-sm font-medium text-gray-900 mb-2">문장별 피드백</p>
+                                <p className="text-sm font-medium text-gray-900 mb-2">답변 피드백</p>
 
                                 <div className="space-y-2 text-sm text-gray-700">
                                     <div>
-                                        <span className="font-medium">발음 문제점:</span>{' '}
-                                        <span className="text-red-600">{item.detailed_analysis.missed_point}</span>
+                                        <span className="font-medium">내 답변(STT):</span>{' '}
+                                        <span className="text-gray-800">{originalSentence || '-'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">모범 답변:</span>{' '}
+                                        <span className="text-blue-600">"{targetSentence || '-'}"</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">아쉬운 점:</span>{' '}
+                                        <span className="text-red-600">{feedback?.missed_point ?? '-'}</span>
                                     </div>
                                     <div>
                                         <span className="font-medium">교정 표현:</span>{' '}
-                                        <span className="text-blue-600">"{item.detailed_analysis.correction}"</span>
+                                        <span className="text-blue-600">
+                                            "{feedback?.correction ?? '-'}"
+                                        </span>
                                     </div>
                                     <div>
                                         <span className="font-medium">팁:</span>{' '}
-                                        <span className="text-green-600">{item.detailed_analysis.tip}</span>
+                                        <span className="text-green-600">{feedback?.tip ?? '-'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -162,7 +177,7 @@ const ReportItem = ({
                                     정확도: <strong className="text-gray-900">{item.accuracy ?? '-'}</strong>
                                 </span>
                                 <span className="text-gray-600">
-                                    억양: <strong className="text-gray-900">{item.intonation ?? '-'}</strong>
+                                    총점: <strong className="text-gray-900">{item.total_score ?? '-'}</strong>
                                 </span>
                             </div>
                         </div>
@@ -253,7 +268,7 @@ export default function KopicReport() {
             user_answer: '',
             audio_url: '',
             accuracy: item.accuracy,
-            intonation: item.intonation,
+            total_score: item.total_score,
             detailed_analysis: item.detailed_analysis,
         })
 
@@ -289,13 +304,9 @@ export default function KopicReport() {
                     setAverageScore(Math.round(totalReport.total_score))
                 } else if (
                     totalReport.avg_accuracy !== null &&
-                    totalReport.avg_accuracy !== undefined &&
-                    totalReport.avg_intonation !== null &&
-                    totalReport.avg_intonation !== undefined
+                    totalReport.avg_accuracy !== undefined
                 ) {
-                    setAverageScore(
-                        Math.round((totalReport.avg_accuracy + totalReport.avg_intonation) / 2)
-                    )
+                    setAverageScore(Math.round(totalReport.avg_accuracy))
                 }
 
                 if (totalReport.status === 'PROCESSING') {

@@ -8,10 +8,16 @@ export interface KopicSentence {
     time_limit?: number;
 }
 
-export interface KopicDetailedAnalysis {
+export interface KopicDetailedAnalysisFeedback {
     missed_point: string;
     correction: string;
     tip: string;
+}
+
+export interface KopicDetailedAnalysis {
+    original_sentence: string;
+    target_sentence: string;
+    feedback: KopicDetailedAnalysisFeedback;
 }
 
 export interface KopicAnalyzeResponse {
@@ -26,7 +32,7 @@ export interface KopicReportItem {
     kopic_sentence_id: number;
     text_ko: string;
     accuracy?: number | null;
-    intonation?: number | null;
+    total_score?: number | null;
     detailed_analysis?: KopicDetailedAnalysis | null;
     user_answer?: string;
     audio_url?: string;
@@ -54,7 +60,6 @@ export interface KopicTotalReportItem {
     kopic_sentence_id: number;
     text_ko: string;
     accuracy: number;
-    intonation: number;
     total_score: number;
     detailed_analysis: KopicDetailedAnalysis | null;
 }
@@ -65,7 +70,6 @@ export interface KopicTotalReportResponse {
         kopic_total_report_id: number;
         status: 'PROCESSING' | 'COMPLETED';
         avg_accuracy?: number | null;
-        avg_intonation?: number | null;
         total_score?: number | null;
         sentence_count?: number | null;
         completed_count?: number | null;
@@ -87,31 +91,31 @@ const mockSentences: Record<number, KopicSentence[]> = {
         {
             kopic_sentence_id: 10,
             text_ko: '카페 주문 상황 - 안녕하세요. 아이스 아메리카노 한 잔이랑 치즈케이크 하나 주세요.',
-            kopic_sentence_url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600',
+            kopic_sentence_url: 'https://samplelib.com/lib/preview/mp3/sample-3s.mp3',
             time_limit: 60
         },
         {
             kopic_sentence_id: 11,
             text_ko: '영화관 예매 상황 - 오늘 저녁 7시 영화 두 장 예매하고 싶은데 가운데 자리로 가능할까요?',
-            kopic_sentence_url: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600',
+            kopic_sentence_url: 'https://samplelib.com/lib/preview/mp3/sample-6s.mp3',
             time_limit: 60
         },
         {
             kopic_sentence_id: 12,
             text_ko: '병원 접수 상황 - 감기 증상이 있어서 오늘 진료를 받고 싶은데 접수 가능한가요?',
-            kopic_sentence_url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600',
+            kopic_sentence_url: 'https://samplelib.com/lib/preview/mp3/sample-9s.mp3',
             time_limit: 60
         },
         {
             kopic_sentence_id: 13,
             text_ko: '식당 예약 상황 - 오늘 오후 6시에 두 명 예약 가능한지 확인 부탁드립니다.',
-            kopic_sentence_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600',
+            kopic_sentence_url: 'https://samplelib.com/lib/preview/mp3/sample-12s.mp3',
             time_limit: 60
         },
         {
             kopic_sentence_id: 14,
             text_ko: '길 안내 요청 상황 - 이 근처에 지하철역이 어디 있는지 알려주실 수 있나요?',
-            kopic_sentence_url: 'https://images.unsplash.com/photo-1601297183305-6df142704ea2?w=600',
+            kopic_sentence_url: 'https://samplelib.com/lib/preview/mp3/sample-15s.mp3',
             time_limit: 60
         }
     ]
@@ -127,11 +131,15 @@ const generateMockResult = (sentenceId: number, textKo: string): KopicReportItem
         user_answer: `${textKo} (모의 발화)`,
         audio_url: `https://example.com/audio_${sentenceId}.wav`,
         accuracy: 85 + Math.floor(Math.random() * 10),
-        intonation: 80 + Math.floor(Math.random() * 10),
+        total_score: 80 + Math.floor(Math.random() * 10),
         detailed_analysis: {
-            missed_point: '억양이 조금 부족합니다.',
-            correction: textKo,
-            tip: '문장 끝 억양을 살짝 올려서 연습해보세요.'
+            original_sentence: '모의 답변입니다.',
+            target_sentence: '더 자연스러운 모범 답변입니다.',
+            feedback: {
+                missed_point: '핵심 정보가 부족합니다.',
+                correction: '구체적인 정보를 포함해 답해보세요.',
+                tip: '상황에 맞는 인사나 부탁 표현을 추가하면 자연스럽습니다.'
+            }
         }
     };
 };
