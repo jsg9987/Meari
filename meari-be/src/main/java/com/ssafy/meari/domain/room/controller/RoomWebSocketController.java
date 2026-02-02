@@ -19,6 +19,7 @@ import com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoleReleaseMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoleSelectMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
+import com.ssafy.meari.domain.room.dto.websocket.WatchingCompleteMessage;
 import com.ssafy.meari.domain.room.entity.Chat;
 import com.ssafy.meari.domain.room.repository.ChatRepository;
 import com.ssafy.meari.domain.room.service.RoomService;
@@ -166,6 +167,22 @@ public class RoomWebSocketController {
 //            // 추후 채팅 전송 실패 시 에러 메시지를 발신자에게만 전송하는 기능 추가를 고려할 수 있다.
 //        }
 //    }
+
+    /**
+     * 영상 시청 완료 (참여자 개인)
+     * 클라이언트: /app/room/{roomId}/watching/complete
+     * 4명 모두 완료 시 서버가 PHASE_CHANGE(ROLE_PICK) 브로드캐스트
+     */
+    @MessageMapping("/room/{roomId}/watching/complete")
+    public void watchingComplete(
+            @DestinationVariable Long roomId,
+            @Payload WatchingCompleteMessage message
+    ) {
+        log.info("영상 시청 완료 메시지 수신: roomId={}, memberId={}", roomId, message.getMemberId());
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
+
+        roomService.watchingComplete(roomId, message.getMemberId());
+    }
 
     /**
      * 문장별 녹음 완료
