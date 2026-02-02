@@ -88,7 +88,6 @@ services:
   openvidu:
     image: openvidu/openvidu-server:2.29.0
     container_name: meari-openvidu
-    restart: on-failure
     network_mode: host
     environment:
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
