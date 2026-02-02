@@ -85,31 +85,31 @@ services:
   # ============================================================
   # 4. OpenVidu - WebRTC 미디어 서버 포트범위 수정
   # ============================================================
-  openvidu:
-    image: openvidu/openvidu-server:2.29.0
-    container_name: meari-openvidu
-    # restart, network 삭제
-    environment:
-      OPENVIDU_SECRET: ${OPENVIDU_SECRET}
-      DOMAIN_OR_PUBLIC_IP: ${DOMAIN}
-      HTTPS_PORT: 4443
-    ports:
-      - "4443:4443"
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-      - "40000-40100:40000-40100/tcp"
-      - "40000-40100:40000-40100/udp"
-    volumes:
-      - openvidu_recordings:/opt/openvidu/recordings
-      - openvidu_config:/opt/openvidu/config
-    networks:
-      - meari-network
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-
+  # openvidu:
+  #  image: openvidu/openvidu-server:2.29.0
+  #  container_name: meari-openvidu
+  #  environment:
+  #    OPENVIDU_SECRET: ${OPENVIDU_SECRET}
+  #    CERTIFICATE_TYPE: selfsigned
+  #    DOMAIN_OR_PUBLIC_IP: ${DOMAIN}
+  #    HTTPS_PORT: 4443
+  #  ports:
+  #    - "4443:4443"
+  #    - "3478:3478/tcp"
+  #    - "3478:3478/udp"
+  #    - "40000-40100:40000-40100/tcp"
+  #    - "40000-40100:40000-40100/udp"
+  #  volumes:
+  #    - openvidu_recordings:/opt/openvidu/recordings
+  #    - openvidu_config:/opt/openvidu/config
+  #  networks:
+  #    - meari-network
+  #  restart: unless-stopped
+  #  deploy:
+  #    resources:
+  #      limits:
+  #        memory: 2G
+  #
   # ============================================================
   # 5. Frontend (Nginx + React)
   # ============================================================
@@ -145,7 +145,7 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ssafy
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      OPENVIDU_URL: https://${DOMAIN}:4443
+      OPENVIDU_URL: https:${DOMAIN}:4443
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ACCESS_TOKEN_EXPIRE_PERIOD: ${JWT_ACCESS_TOKEN_EXPIRE_PERIOD}
@@ -169,7 +169,8 @@ services:
       - "8080:8080"
     networks:
       - meari-network
-#    depends_on:
+    #depends_on:
+    #   - openvidu
 #      postgres:
 #        condition: service_healthy
 #      redis:
@@ -222,5 +223,5 @@ volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
-  openvidu_recordings:
-  openvidu_config:
+#  openvidu_recordings:
+#  openvidu_config:
