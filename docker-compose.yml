@@ -86,10 +86,14 @@ services:
   # 4. OpenVidu - WebRTC 미디어 서버 포트범위 수정
   # ============================================================
   openvidu:
-    image: openvidu/openvidu-dev:2.29.0
+    image: openvidu/openvidu-server:2.29.0
     container_name: meari-openvidu
+    restart: on-failure
+    network_mode: host
     environment:
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
+      DOMAIN_OR_PUBLIC_IP: ${DOMAIN}
+      HTTPS_PORT: 4443
     ports:
       - "4443:4443"
       - "3478:3478/tcp"
@@ -142,7 +146,7 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ssafy
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      OPENVIDU_URL: https://openvidu:4443
+      OPENVIDU_URL: https://${DOMAIN}:4443
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ACCESS_TOKEN_EXPIRE_PERIOD: ${JWT_ACCESS_TOKEN_EXPIRE_PERIOD}
