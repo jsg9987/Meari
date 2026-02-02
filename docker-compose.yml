@@ -21,7 +21,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1.5G
+          memory: 2G
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ssafy"]
       interval: 10s
@@ -83,103 +83,32 @@ services:
       retries: 5
 
   # ============================================================
-  # 4. OpenVidu CE Platform 2.32.1 - WebRTC 미디어 서버
+  # 4. OpenVidu - WebRTC 미디어 서버
   # ============================================================
-
-  # 4-1. OpenVidu Server
-  openvidu-server:
-    image: openvidu/openvidu-server:2.32.1
-    container_name: meari-openvidu-server
-    restart: on-failure
-    networks:
-      - meari-network
-    entrypoint: ['/usr/local/bin/entrypoint.sh']
-    volumes:
-      - ./openvidu/coturn:/run/secrets/coturn
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${OPENVIDU_RECORDING_PATH}:${OPENVIDU_RECORDING_PATH}
-      - ${OPENVIDU_RECORDING_CUSTOM_LAYOUT}:${OPENVIDU_RECORDING_CUSTOM_LAYOUT}
-      - ${OPENVIDU_CDR_PATH}:${OPENVIDU_CDR_PATH}
-    environment:
-      - SERVER_SSL_ENABLED=false
-      - SERVER_PORT=5443
-      - KMS_URIS=["ws://kms:8888/kurento"]
-      - COTURN_IP=${COTURN_IP:-auto-ipv4}
-      - COTURN_PORT=${COTURN_PORT:-3478}
-      - OPENVIDU_SECRET=${OPENVIDU_SECRET}
-    ports:
-      - "5443:5443"
-    logging:
-      options:
-        max-size: "${DOCKER_LOGS_MAX_SIZE:-100M}"
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-
-  # 4-2. Kurento Media Server
-  kms:
-    image: ${KMS_IMAGE:-kurento/kurento-media-server:7.3.0}
-    container_name: meari-kms
-    restart: always
-    networks:
-      - meari-network
-    ulimits:
-      core: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    volumes:
-      - /opt/openvidu/kms-crashes:/opt/openvidu/kms-crashes
-      - ${OPENVIDU_RECORDING_PATH}:${OPENVIDU_RECORDING_PATH}
-      - /opt/openvidu/kurento-logs:/opt/openvidu/kurento-logs
-    environment:
-      - KMS_MIN_PORT=40000
-      - KMS_MAX_PORT=57000
-      - GST_DEBUG=${KMS_DOCKER_ENV_GST_DEBUG:-}
-      - KURENTO_LOG_FILE_SIZE=${KMS_DOCKER_ENV_KURENTO_LOG_FILE_SIZE:-100}
-      - KURENTO_LOGS_PATH=/opt/openvidu/kurento-logs
-    ports:
-      - "8888:8888"
-      - "40000-57000:40000-57000/udp"
-    logging:
-      options:
-        max-size: "${DOCKER_LOGS_MAX_SIZE:-100M}"
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-
-  # 4-3. COTURN (TURN/STUN Server)
-  coturn:
-    image: openvidu/openvidu-coturn:2.32.1
-    container_name: meari-coturn
-    restart: on-failure
-    networks:
-      - meari-network
-    ports:
-      - "${COTURN_PORT:-3478}:${COTURN_PORT:-3478}/tcp"
-      - "${COTURN_PORT:-3478}:${COTURN_PORT:-3478}/udp"
-      - "${COTURN_MIN_PORT:-57001}-${COTURN_MAX_PORT:-65535}:${COTURN_MIN_PORT:-57001}-${COTURN_MAX_PORT:-65535}/udp"
-    volumes:
-      - ./openvidu/coturn:/run/secrets/coturn
-    command:
-      - --log-file=stdout
-      - --listening-port=${COTURN_PORT:-3478}
-      - --fingerprint
-      - --min-port=${COTURN_MIN_PORT:-57001}
-      - --max-port=${COTURN_MAX_PORT:-65535}
-      - --realm=openvidu
-      - --verbose
-      - --use-auth-secret
-      - --static-auth-secret=${COTURN_SHARED_SECRET_KEY}
-    logging:
-      options:
-        max-size: "${DOCKER_LOGS_MAX_SIZE:-100M}"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+  # openvidu:
+  #  image: openvidu/openvidu-dev:2.29.0
+  #  container_name: meari-openvidu
+  #  environment:
+  #    OPENVIDU_SECRET: ${OPENVIDU_SECRET}
+  #    DOMAIN_OR_PUBLIC_IP: ${OPENVIDU_DOMAIN}
+  #    HTTPS_PORT: 4443
+  #    HTTP_PORT: 4442
+  #  ports:
+  #    - "4443:4443"
+  #    - "4442:4442"
+  #    - "3478:3478"
+  #    - "40000-57000:40000-57000/tcp"
+  #    - "40000-57000:40000-57000/udp"
+  #  volumes:
+  #    - openvidu_recordings:/opt/openvidu/recordings
+  #    - openvidu_config:/opt/openvidu/config
+  #  networks:
+  #    - meari-network
+  #  restart: unless-stopped
+  #  deploy:
+  #    resources:
+  #      limits:
+  #        memory: 4G
 
   # ============================================================
   # 5. Frontend (Nginx + React)
@@ -199,7 +128,7 @@ services:
       - spring-api
 
   # ============================================================
-  # 6. Spring Boot API - 메인 백엔드 서버.
+  # 6. Spring Boot API - 메인 백엔드 서버
   # ============================================================
   spring-api:
     image: backend-image:latest
@@ -209,45 +138,26 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meari_db
       SPRING_DATASOURCE_USERNAME: ssafy
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ssafy
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      OPENVIDU_URL: http://openvidu-server:5443
+      OPENVIDU_URL: https://openvidu-openvidu-server-1:5443
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      JWT_ACCESS_TOKEN_EXPIRE_PERIOD: ${JWT_ACCESS_TOKEN_EXPIRE_PERIOD}
-      JWT_REFRESH_TOKEN_EXPIRE_PERIOD: ${JWT_REFRESH_TOKEN_EXPIRE_PERIOD}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL}
-      GEMINI_BASE_URL: ${GEMINI_BASE_URL}
-      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
-      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
-      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
-      AWS_REGION: ${AWS_REGION}
-      CLOUD_AWS_S3_BUCKET: ${AWS_S3_BUCKET}
-      CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
-      CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ${AWS_ACCESS_KEY}
-      CLOUD_AWS_CREDENTIALS_SECRET_KEY: ${AWS_SECRET_KEY}
-      CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION: 3600
-      CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION: 900
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
     ports:
       - "8080:8080"
     networks:
       - meari-network
-    #depends_on:
-    #   - openvidu
-    #      postgres:
-    #        condition: service_healthy
-    #      redis:
-    #        condition: service_healthy
-    #      rabbitmq:
-    #        condition: service_healthy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
@@ -268,13 +178,13 @@ services:
       - "8000:8000"
     networks:
       - meari-network
-    #    depends_on:
-    #      postgres:
-    #        condition: service_healthy
-    #      redis:
-    #        condition: service_healthy
-    #      rabbitmq:
-    #        condition: service_healthy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
@@ -286,7 +196,6 @@ services:
 # ============================================================
 networks:
   meari-network:
-    name: meari-network
     driver: bridge
 
 volumes:
@@ -294,5 +203,5 @@ volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
-  openvidu_recordings:
-  openvidu_config:
+#  openvidu_recordings:
+#  openvidu_config:

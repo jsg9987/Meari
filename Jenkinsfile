@@ -1,245 +1,174 @@
-  pipeline {
-      agent any
+pipeline {
+    agent any
 
-      triggers {
-          pollSCM('* * * * *')
-      }
+    triggers {
+        pollSCM('* * * * *')
+    }
 
-      stages {
-          stage('Checkout') {
-              steps {
-                  checkout scm
-              }
-          }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
 
-          stage('Build & Docker Image') {
-              parallel {
-                  stage('Backend Build') {
-                      steps {
-                          dir('meari-be') {
-                              script {
-                                  def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
-                                  if (isReleaseBranch) {
-                                      withCredentials([
-                                          string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
-                                          string(credentialsId: 'JWT_SECRET_KEY', variable: 'JWT_KEY'),
-                                          string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PW'),
-                                          string(credentialsId: 'FRONTEND_URL', variable: 'FE_URL'),
-                                          string(credentialsId: 'OPENVIDU_URL', variable: 'OV_URL'),
-                                          string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET'),
-                                          string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
-                                          string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
-                                          string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
-                                          string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY')
-                                      ]) {
-                                          sh '''
-                                          docker build \
-                                            --build-arg DB_PASSWORD="${DB_PW}" \
-                                            --build-arg JWT_SECRET_KEY="${JWT_KEY}" \
-                                            --build-arg REDIS_PASSWORD="${REDIS_PW}" \
-                                            --build-arg FRONTEND_URL="${FE_URL}" \
-                                            --build-arg OPENVIDU_URL="${OV_URL}" \
-                                            --build-arg OPENVIDU_SECRET="${OV_SECRET}" \
-                                            --build-arg AWS_ACCESS_KEY="${AWS_KEY}" \
-                                            --build-arg AWS_SECRET_KEY="${AWS_SECRET}" \
-                                            --build-arg AWS_S3_BUCKET="${S3_BUCKET}" \
-                                            --build-arg GEMINI_API_KEY="${GEMINI_KEY}" \
-                                            -t backend-image:latest .
-                                          '''
-                                      }
-                                  } else {
-                                      sh 'docker build -t backend-image:latest .'
-                                  }
-                              }
-                          }
-                      }
-                  }
+        stage('Build & Docker Image') {
+            parallel {
+                stage('Backend Build') {
+                    steps {
+                        dir('meari-be') {
+                            script {
+                                def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
+                                if (isReleaseBranch) {
+                                    withCredentials([
+                                        string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
+                                        string(credentialsId: 'JWT_SECRET_KEY', variable: 'JWT_KEY'),
+                                        string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PW'),
+                                        string(credentialsId: 'FRONTEND_URL', variable: 'FE_URL'),
+                                        string(credentialsId: 'OPENVIDU_URL', variable: 'OV_URL'),
+                                        string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET')
+                                    ]) {
+                                        sh '''
+                                        docker build \
+                                          --build-arg DB_PASSWORD="${DB_PW}" \
+                                          --build-arg JWT_SECRET_KEY="${JWT_KEY}" \
+                                          --build-arg REDIS_PASSWORD="${REDIS_PW}" \
+                                          --build-arg FRONTEND_URL="${FE_URL}" \
+                                          --build-arg OPENVIDU_URL="${OV_URL}" \
+                                          --build-arg OPENVIDU_SECRET="${OV_SECRET}" \
+                                          -t backend-image:latest .
+                                        '''
+                                    }
+                                } else {
+                                    sh 'docker build -t backend-image:latest .'
+                                }
+                            }
+                        }
+                    }
+                }
 
-                  stage('Frontend Build') {
-                      steps {
-                          dir('meari-fe') {
-                              script {
-                                  def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
-                                  if (isReleaseBranch) {
-                                      withCredentials([
-                                          string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
-                                      ]) {
-                                          sh '''
-                                          docker build \
-                                            --build-arg VITE_BASE_SERVER_URL="${BE_URL}" \
-                                            --build-arg VITE_USE_MOCK_API=false \
-                                            --build-arg VITE_USE_MOCK_AUTH=false \
-                                            --build-arg VITE_USE_MOCK_ROOMS=false \
-                                            --build-arg VITE_USE_MOCK_WEBRTC=false \
-                                            --build-arg VITE_USE_MOCK_CONTENTS=false \
-                                            -t frontend-image:latest .
-                                          '''
-                                      }
-                                  } else {
-                                      sh 'docker build -t frontend-image:latest .'
-                                  }
-                              }
-                          }
-                      }
-                  }
+                stage('Frontend Build') {
+                    steps {
+                        dir('meari-fe') {
+                            script {
+                                def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
+                                if (isReleaseBranch) {
+                                    withCredentials([
+                                        string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
+                                    ]) {
+                                        sh '''
+                                        docker build \
+                                          --build-arg VITE_BASE_SERVER_URL="${BE_URL}" \
+                                          --build-arg VITE_USE_MOCK_API=false \
+                                          --build-arg VITE_USE_MOCK_AUTH=false \
+                                          --build-arg VITE_USE_MOCK_ROOMS=false \
+                                          --build-arg VITE_USE_MOCK_WEBRTC=false \
+                                          --build-arg VITE_USE_MOCK_CONTENTS=true \
+                                          -t frontend-image:latest .
+                                        '''
+                                    }
+                                } else {
+                                    sh 'docker build -t frontend-image:latest .'
+                                }
+                            }
+                        }
+                    }
+                }
 
-                  // --- 임시 FastAPI 빌드 (프로젝트 폴더가 없을 때 사용) ---
-                  stage('FastAPI Build') {
-                      steps {
-                          script {
-                              // meari-ai 폴더가 없으므로 현재 경로에서 임시 Dockerfile 생성 후 빌드
-                              // 8000번 포트로 단순히 응답만 해주는 초경량 Python 이미지입니다.
-                              sh '''
-                                  echo "FROM python:3.9-slim" > Dockerfile.dummy
-                                  echo "CMD [\\"python\\", \\"-m\\", \\"http.server\\", \\"8000\\"]" >> Dockerfile.dummy
-                                  docker build -t meari-fastapi:latest -f Dockerfile.dummy .
-                                  rm Dockerfile.dummy
-                              '''
-                          }
-                      }
-                  }
-              }
-          }
-                  // --- 개발 된다면 FastAPI 빌드 스테이지 추가!! ---
-  //                 stage('FastAPI Build') {
-  //                     steps {
-  //                         dir('meari-ai') { // FastAPI 소스 코드가 있는 디렉토리 이름으로 수정하세요
-  //                             script {
-  //                                 // FastAPI는 별도의 build-arg가 없다면 간단히 빌드합니다.
-  //                                 sh 'docker build -t meari-fastapi:latest .'
-  //                             }
-  //                         }
-  //                     }
-  //                 }
-  //             }
-  //         }
-          stage('Deploy') {
-              when {
-                  expression {
-                      return env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
-                  }
-              }
-              steps {
-                  withCredentials([
-                      string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
-                      string(credentialsId: 'JWT_SECRET_KEY', variable: 'JWT_KEY'),
-                      string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PW'),
-                      string(credentialsId: 'RABBITMQ_PASSWORD', variable: 'RABBITMQ_PW'),
-                      string(credentialsId: 'FRONTEND_URL', variable: 'FE_URL'),
-                      string(credentialsId: 'OPENVIDU_URL', variable: 'OV_URL'),
-                      string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET'),
-                      string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL'),
-                      string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
-                      string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
-                      string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
-                      string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
-                      string(credentialsId: 'DOMAIN', variable: 'DOMAIN_NAME'),
-                      string(credentialsId: 'COTURN_SHARED_SECRET_KEY', variable: 'COTURN_SECRET'),
-                      string(credentialsId: 'GEMINI_MODEL', variable: 'GEMINI_MDL'),
-                      string(credentialsId: 'GEMINI_BASE_URL', variable: 'GEMINI_URL'),
-                      string(credentialsId: 'AWS_REGION', variable: 'AWS_RGN')
-                  ]) {
-                      script {
-                          sh '''
-                              cd /home/ubuntu
+                // --- 임시 FastAPI 빌드 (프로젝트 폴더가 없을 때 사용) ---
+                stage('FastAPI Build') {
+                    steps {
+                        script {
+                            // meari-ai 폴더가 없으므로 현재 경로에서 임시 Dockerfile 생성 후 빌드
+                            // 8000번 포트로 단순히 응답만 해주는 초경량 Python 이미지입니다.
+                            sh '''
+                                echo "FROM python:3.9-slim" > Dockerfile.dummy
+                                echo "CMD [\\"python\\", \\"-m\\", \\"http.server\\", \\"8000\\"]" >> Dockerfile.dummy
+                                docker build -t meari-fastapi:latest -f Dockerfile.dummy .
+                                rm Dockerfile.dummy
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+                // --- 개발 된다면 FastAPI 빌드 스테이지 추가!! ---
+//                 stage('FastAPI Build') {
+//                     steps {
+//                         dir('meari-ai') { // FastAPI 소스 코드가 있는 디렉토리 이름으로 수정하세요
+//                             script {
+//                                 // FastAPI는 별도의 build-arg가 없다면 간단히 빌드합니다.
+//                                 sh 'docker build -t meari-fastapi:latest .'
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+        stage('Deploy') {
+            when {
+                expression {
+                    return env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
+                }
+            }
+            steps {
+                withCredentials([
+                    string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
+                    string(credentialsId: 'JWT_SECRET_KEY', variable: 'JWT_KEY'),
+                    string(credentialsId: 'REDIS_PASSWORD', variable: 'REDIS_PW'),
+                    string(credentialsId: 'RABBITMQ_PASSWORD', variable: 'RABBITMQ_PW'),
+                    string(credentialsId: 'FRONTEND_URL', variable: 'FE_URL'),
+                    string(credentialsId: 'OPENVIDU_URL', variable: 'OV_URL'),
+                    string(credentialsId: 'OPENVIDU_SECRET', variable: 'OV_SECRET'),
+                    string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
+                ]) {
+                    script {
+                        sh '''
+                            cd /home/ubuntu
+                            echo "DB_PASSWORD=${DB_PW}" > .env
+                            echo "JWT_SECRET_KEY=${JWT_KEY}" >> .env
+                            echo "REDIS_PASSWORD=${REDIS_PW}" >> .env
+                            echo "RABBITMQ_PASSWORD=${RABBITMQ_PW}" >> .env
+                            echo "FRONTEND_URL=${FE_URL}" >> .env
+                            echo "OPENVIDU_URL=${OV_URL}" >> .env
+                            echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
+                            echo "OPENVIDU_DOMAIN=localhost" >> .env
+                            echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
 
-                              # 기본 환경 변수
-                              echo "DB_PASSWORD=${DB_PW}" > .env
-                              echo "JWT_SECRET_KEY=${JWT_KEY}" >> .env
-                              echo "REDIS_PASSWORD=${REDIS_PW}" >> .env
-                              echo "RABBITMQ_PASSWORD=${RABBITMQ_PW}" >> .env
-                              echo "FRONTEND_URL=${FE_URL}" >> .env
-                              echo "OPENVIDU_URL=${OV_URL}" >> .env
-                              echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
-                              echo "OPENVIDU_DOMAIN=${DOMAIN_NAME}" >> .env
-                              echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
+                            # 이제 meari-fastapi 이미지가 생성되었으므로 정상적으로 실행됩니다.
+                            docker-compose up -d --force-recreate frontend spring-api fastapi
+                        '''
+                        sh 'docker image prune -f'
+                    }
+                }
+            }
+        }
+    }
 
-                              # JWT 설정
-                              echo "JWT_ACCESS_TOKEN_EXPIRE_PERIOD=43200000" >> .env
-                              echo "JWT_REFRESH_TOKEN_EXPIRE_PERIOD=1209600000" >> .env
-
-                              # Gemini AI 설정
-                              echo "GEMINI_API_KEY=${GEMINI_KEY}" >> .env
-                              echo "GEMINI_MODEL=${GEMINI_MDL}" >> .env
-                              echo "GEMINI_BASE_URL=${GEMINI_URL}" >> .env
-
-                              # AWS 설정
-                              echo "AWS_ACCESS_KEY=${AWS_KEY}" >> .env
-                              echo "AWS_SECRET_KEY=${AWS_SECRET}" >> .env
-                              echo "AWS_S3_BUCKET=${S3_BUCKET}" >> .env
-                              echo "AWS_REGION=${AWS_RGN}" >> .env
-                              echo "CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION=3600" >> .env
-                              echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
-
-                              # OpenVidu CE 2.32.1 설정
-                              echo "OPENVIDU_RECORDING_PATH=/opt/openvidu/recordings" >> .env
-                              echo "OPENVIDU_RECORDING_CUSTOM_LAYOUT=/opt/openvidu/custom-layout" >> .env
-                              echo "OPENVIDU_CDR_PATH=/opt/openvidu/cdr" >> .env
-                              echo "KMS_IMAGE=kurento/kurento-media-server:7.3.0" >> .env
-                              echo "COTURN_IP=auto-ipv4" >> .env
-                              echo "COTURN_PORT=3478" >> .env
-                              echo "COTURN_MIN_PORT=57001" >> .env
-                              echo "COTURN_MAX_PORT=65535" >> .env
-                              echo "COTURN_SHARED_SECRET_KEY=${COTURN_SECRET}" >> .env
-                              echo "DOCKER_LOGS_MAX_SIZE=100M" >> .env
-                              echo "KMS_DOCKER_ENV_GST_DEBUG=" >> .env
-                              echo "KMS_DOCKER_ENV_KURENTO_LOG_FILE_SIZE=100" >> .env
-
-                              # PostgreSQL 설정
-                              echo "POSTGRES_USER=ssafy" >> .env
-                              echo "POSTGRES_DB=meari_db" >> .env
-
-                              # 기타
-                              echo "DOMAIN=${DOMAIN_NAME}" >> .env
-
-                              # OpenVidu 필수 디렉토리 생성
-                              mkdir -p /opt/openvidu/recordings
-                              mkdir -p /opt/openvidu/custom-layout
-                              mkdir -p /opt/openvidu/cdr
-                              mkdir -p /opt/openvidu/kms-crashes
-                              mkdir -p /opt/openvidu/kurento-logs
-                              mkdir -p ./openvidu/coturn
-
-                              # COTURN 시크릿 파일 생성
-                              echo "${COTURN_SECRET}" > ./openvidu/coturn/shared_secret.txt
-
-                               # 기존 컨테이너 정리 (orphan 포함)
-                               docker-compose down --remove-orphans
-
-                              # Docker Compose 실행 (OpenVidu 포함)
-                              docker-compose up -d --force-recreate
-                          '''
-                          sh 'docker image prune -f'
-                      }
-                  }
-              }
-          }
-      }
-
-      post {
-          success {
-              script {
-                  def message = "✅ 빌드 성공! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
-                  if (env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release') {
-                      message = "✅ 배포 성공!: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
-                  }
-                  try {
-                      mattermostSend(color: 'good', message: message + " (<${env.BUILD_URL}|상세보기>)")
-                  } catch (e) { echo "Mattermost 알림 실패" }
-                  echo message
-              }
-          }
-          failure {
-              script {
-                  def message = "🚨 빌드 실패! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
-                  if (env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release') {
-                      message = "🚨 배포 실패(확인요망): ${env.JOB_NAME} #${env.BUILD_NUMBER}"
-                  }
-                  try {
-                      mattermostSend(color: 'danger', message: message + " (<${env.BUILD_URL}|상세보기>)")
-                  } catch (e) { echo "Mattermost 알림 실패" }
-                  echo message
-              }
-          }
-      }
-  }
+    post {
+        success {
+            script {
+                def message = "✅ 빌드 성공! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
+                if (env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release') {
+                    message = "✅ 배포 성공!: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                }
+                try {
+                    mattermostSend(color: 'good', message: message + " (<${env.BUILD_URL}|상세보기>)")
+                } catch (e) { echo "Mattermost 알림 실패" }
+                echo message
+            }
+        }
+        failure {
+            script {
+                def message = "🚨 빌드 실패! - Branch: ${env.GIT_BRANCH} #${env.BUILD_NUMBER}"
+                if (env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release') {
+                    message = "🚨 배포 실패(확인요망): ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                }
+                try {
+                    mattermostSend(color: 'danger', message: message + " (<${env.BUILD_URL}|상세보기>)")
+                } catch (e) { echo "Mattermost 알림 실패" }
+                echo message
+            }
+        }
+    }
+}
