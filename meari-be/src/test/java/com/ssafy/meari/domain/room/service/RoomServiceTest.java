@@ -272,8 +272,8 @@ class RoomServiceTest {
     class GetRoomDetail {
 
         @Test
-        @DisplayName("성공 - 방 상세 조회")
-        void getRoomDetail_Success() {
+        @DisplayName("성공 - 게임 시작 전 (게임 상태 정보 모두 null)")
+        void getRoomDetail_Success_BeforeGameStart() {
             // Given
             MemberRoom memberRoom = MemberRoom.builder()
                     .room(testRoom)
@@ -284,6 +284,10 @@ class RoomServiceTest {
             given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
             given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
             given(roomSessionService.getAllRoles(1L)).willReturn(Collections.emptyMap());
+            // 게임 상태 정보 모두 null
+            given(roomSessionService.getContentId(1L)).willReturn(null);
+            given(roomSessionService.getPhase(1L)).willReturn(null);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
 
             // When
             RoomDetailResponse response = roomService.getRoomDetail(1L);
@@ -294,6 +298,149 @@ class RoomServiceTest {
             assertThat(response.getTitle()).isEqualTo("테스트 방");
             assertThat(response.getMembers()).hasSize(1);
             assertThat(response.getMembers().get(0).getIsOwner()).isTrue();
+            // 게임 상태 검증
+            assertThat(response.getContentId()).isNull();
+            assertThat(response.getPhase()).isNull();
+            assertThat(response.getRolesConfirmed()).isNull();
+        }
+
+        @Test
+        @DisplayName("성공 - 컨텐츠 선택 완료 상태")
+        void getRoomDetail_Success_ContentSelected() {
+            // Given
+            MemberRoom memberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(testMember)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, true));
+            given(roomSessionService.getAllRoles(1L)).willReturn(Collections.emptyMap());
+            // 컨텐츠 선택됨, 게임은 아직 시작 전
+            given(roomSessionService.getContentId(1L)).willReturn(5L);
+            given(roomSessionService.getPhase(1L)).willReturn(null);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+
+            // When
+            RoomDetailResponse response = roomService.getRoomDetail(1L);
+
+            // Then
+            assertThat(response.getContentId()).isEqualTo(5L);
+            assertThat(response.getPhase()).isNull();
+            assertThat(response.getRolesConfirmed()).isNull();
+        }
+
+        @Test
+        @DisplayName("성공 - 영상 시청 중 (WATCHING phase)")
+        void getRoomDetail_Success_Watching() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            MemberRoom memberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(testMember)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
+            given(roomSessionService.getAllRoles(1L)).willReturn(Collections.emptyMap());
+            // 게임 시작됨, 영상 시청 중
+            given(roomSessionService.getContentId(1L)).willReturn(3L);
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.WATCHING);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+
+            // When
+            RoomDetailResponse response = roomService.getRoomDetail(1L);
+
+            // Then
+            assertThat(response.getContentId()).isEqualTo(3L);
+            assertThat(response.getPhase()).isEqualTo(GamePhase.WATCHING);
+            assertThat(response.getRolesConfirmed()).isNull();
+        }
+
+        @Test
+        @DisplayName("성공 - 역할 선택 중 (ROLE_PICK phase, 미확정)")
+        void getRoomDetail_Success_RolePickNotConfirmed() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            MemberRoom memberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(testMember)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
+            given(roomSessionService.getAllRoles(1L)).willReturn(Map.of(1L, "1"));
+            // 역할 선택 중, 아직 미확정
+            given(roomSessionService.getContentId(1L)).willReturn(3L);
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+
+            // When
+            RoomDetailResponse response = roomService.getRoomDetail(1L);
+
+            // Then
+            assertThat(response.getContentId()).isEqualTo(3L);
+            assertThat(response.getPhase()).isEqualTo(GamePhase.ROLE_PICK);
+            assertThat(response.getRolesConfirmed()).isNull();
+        }
+
+        @Test
+        @DisplayName("성공 - 역할 확정 완료 (ROLE_PICK phase, 확정됨)")
+        void getRoomDetail_Success_RoleConfirmed() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            MemberRoom memberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(testMember)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
+            given(roomSessionService.getAllRoles(1L)).willReturn(Map.of(1L, "1"));
+            // 역할 확정됨
+            given(roomSessionService.getContentId(1L)).willReturn(3L);
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
+
+            // When
+            RoomDetailResponse response = roomService.getRoomDetail(1L);
+
+            // Then
+            assertThat(response.getContentId()).isEqualTo(3L);
+            assertThat(response.getPhase()).isEqualTo(GamePhase.ROLE_PICK);
+            assertThat(response.getRolesConfirmed()).isTrue();
+        }
+
+        @Test
+        @DisplayName("성공 - 라운드 진행 중 (ROUND_1 phase)")
+        void getRoomDetail_Success_Round1() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            MemberRoom memberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(testMember)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
+            given(roomSessionService.getAllRoles(1L)).willReturn(Map.of(1L, "1"));
+            // 라운드 1 진행 중
+            given(roomSessionService.getContentId(1L)).willReturn(3L);
+            given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROUND_1);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
+
+            // When
+            RoomDetailResponse response = roomService.getRoomDetail(1L);
+
+            // Then
+            assertThat(response.getContentId()).isEqualTo(3L);
+            assertThat(response.getPhase()).isEqualTo(GamePhase.ROUND_1);
+            assertThat(response.getRolesConfirmed()).isTrue();
         }
 
         @Test
