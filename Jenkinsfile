@@ -133,8 +133,7 @@ pipeline {
                     string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
                     string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
                     string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
-                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
-                    string(credentialsId: 'DOMAIN', variable: 'DOMAIN')
+                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET')
                 ]) {
                     script {
                         sh '''
@@ -163,9 +162,8 @@ pipeline {
                             echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
                             echo "DOMAIN=${DOMAIN}" >> .env
                             # 이제 meari-fastapi 붙이면 포함시켜서 docker compose up에 포함
-                            docker compose up -d --force-recreate frontend spring-api
+                            docker compose up -d --force-recreate frontend spring-api openvidu
                         '''
-                            // docker compose up -d --force-recreate frontend spring-api openvidu
                         sh 'docker image prune -f'
                     }
                 }
