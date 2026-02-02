@@ -39,7 +39,7 @@ pipeline {
                                           --build-arg REDIS_PASSWORD="${REDIS_PW}" \
                                           --build-arg FRONTEND_URL="${FE_URL}" \
                                           --build-arg OPENVIDU_URL="${OV_URL}" \
-                                          --build-arg OPENVIDU_SECRET="${OV_SECRET}" \                                          
+                                          --build-arg OPENVIDU_SECRET="${OV_SECRET}" \
                                           --build-arg AWS_ACCESS_KEY="${AWS_KEY}" \
                                           --build-arg AWS_SECRET_KEY="${AWS_SECRET}" \
                                           --build-arg AWS_S3_BUCKET="${S3_BUCKET}" \
