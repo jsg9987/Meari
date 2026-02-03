@@ -379,11 +379,9 @@ const MyPage = () => {
 
   return (
     <div className='flex min-h-screen w-full'>
-      <aside>
-        <SideBar activeMenu={activeMenu} onMenuChange={setActiveMenu} userInitial='U' />
-      </aside>
+      <SideBar activeMenu={activeMenu} onMenuChange={setActiveMenu} userInitial='U' />
 
-      <main className='flex-1 bg-white'>
+      <main className='flex-1 bg-white ml-64'>
         {renderContent()}
       </main>
     </div>
