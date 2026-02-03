@@ -30,7 +30,7 @@ const WordPill = ({
   id,
   text,
   onClick,
-  isGhost = false
+  isGhost = false 
 }: {
   id: string
   text: string
