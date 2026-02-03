@@ -22,7 +22,7 @@ public class DashboardMapper {
     public DailyRecordsResponse toResponse(LocalDate startDate, LocalDate endDate,
                                            List<DailyRecord> records) {
         List<ActivityResponse> activities = records.stream()
-            .filter(DailyRecord::hasAnyCompletion) // level > 0인 것만
+            .filter(DailyRecord::hasAnyCompletion) // completedCount > 0인 것만
             .map(this::toActivityResponse)
             .collect(Collectors.toList());
 
@@ -41,9 +41,7 @@ public class DashboardMapper {
     private ActivityResponse toActivityResponse(DailyRecord record) {
         return ActivityResponse.builder()
             .date(record.getRecordDate().toString())
-            .level(record.getLevel())
-            .wordStudy(record.getIsWordStudyFinished())
-            .sentenceQuiz(record.getIsSentenceQuizFinished())
+            .completed_count(record.getLevel())
             .build();
     }
 }

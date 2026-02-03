@@ -49,6 +49,10 @@ public class DashboardServiceImpl implements DashboardService {
             // 1일~마지막날
             startDate = referenceDate.withDayOfMonth(1);
             endDate = referenceDate.with(TemporalAdjusters.lastDayOfMonth());
+        } else if ("yearly".equalsIgnoreCase(period)) {
+            // 1월 1일~12월 31일
+            startDate = referenceDate.withDayOfYear(1);
+            endDate = referenceDate.withDayOfYear(referenceDate.lengthOfYear());
         } else {
             throw new BusinessException(ErrorCode.INVALID_PERIOD);
         }
@@ -67,9 +71,8 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     @Transactional
-    public void recordLearningCompletion(Long memberId, String learningType, LocalDate completionDate) {
-        log.debug("학습 완료 기록 시작 - memberId: {}, type: {}, date: {}",
-            memberId, learningType, completionDate);
+    public void recordLearningCompletion(Long memberId, LocalDate completionDate) {
+        log.debug("학습 완료 기록 시작 - memberId: {}, date: {}", memberId, completionDate);
 
         // 1. 회원 조회
         Member member = memberRepository.findById(memberId)
@@ -83,23 +86,14 @@ public class DashboardServiceImpl implements DashboardService {
                 .recordDate(completionDate)
                 .build());
 
-        // 3. 학습 타입별 완료 처리 (Dirty Checking)
-        switch (learningType.toUpperCase()) {
-            case "WORD_STUDY":
-                record.completeWordStudy();
-                break;
-            case "SENTENCE_QUIZ":
-                record.completeSentenceQuiz();
-                break;
-            default:
-                throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
-        }
+        // 3. 완료 개수 증가 (Dirty Checking)
+        record.incrementCompletedCount();
 
         // 4. 저장 (새로 생성된 경우만)
         if (record.getDailyRecordId() == null) {
             dailyRecordRepository.save(record);
         }
 
-        log.debug("학습 완료 기록 완료 - level: {}", record.getLevel());
+        log.debug("학습 완료 기록 완료 - completedCount: {}", record.getCompletedCount());
     }
 }

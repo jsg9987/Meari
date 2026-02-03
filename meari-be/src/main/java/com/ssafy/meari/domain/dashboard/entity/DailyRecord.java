@@ -35,40 +35,28 @@ public class DailyRecord extends BaseEntity {
     @Column(name = "record_date", nullable = false)
     private LocalDate recordDate;
 
-    @Column(name = "is_word_study_finished", nullable = false)
-    private Boolean isWordStudyFinished = false;
-
-    @Column(name = "is_sentence_quiz_finished", nullable = false)
-    private Boolean isSentenceQuizFinished = false;
+    @Column(name = "completed_count", nullable = false)
+    private Integer completedCount = 0;
 
     @Builder
     public DailyRecord(Member member, LocalDate recordDate) {
         this.member = member;
         this.recordDate = recordDate;
-        this.isWordStudyFinished = false;
-        this.isSentenceQuizFinished = false;
+        this.completedCount = 0;
     }
 
-    // 도메인 메서드: 단어 학습 완료
-    public void completeWordStudy() {
-        this.isWordStudyFinished = true;
+    // 도메인 메서드: 학습 완료 추가 (Dirty Checking 활용)
+    public void incrementCompletedCount() {
+        this.completedCount++;
     }
 
-    // 도메인 메서드: 문장 퀴즈 완료
-    public void completeSentenceQuiz() {
-        this.isSentenceQuizFinished = true;
-    }
-
-    // 도메인 메서드: level 계산 (0~2)
+    // 도메인 메서드: level 계산 (completedCount 그대로 사용)
     public int getLevel() {
-        int count = 0;
-        if (isWordStudyFinished) count++;
-        if (isSentenceQuizFinished) count++;
-        return count;
+        return this.completedCount;
     }
 
     // 도메인 메서드: 학습 완료 여부 확인
     public boolean hasAnyCompletion() {
-        return getLevel() > 0;
+        return this.completedCount > 0;
     }
 }

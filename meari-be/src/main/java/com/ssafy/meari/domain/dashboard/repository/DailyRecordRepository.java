@@ -39,7 +39,7 @@ public interface DailyRecordRepository extends JpaRepository<DailyRecord, Long> 
 
     /**
      * 학습 완료한 날짜만 조회 (성능 최적화)
-     * level > 0인 레코드만 반환 (단어 학습 또는 문장 퀴즈 중 하나라도 완료한 날짜)
+     * completedCount > 0인 레코드만 반환
      * @param member 회원 엔티티
      * @param startDate 시작 날짜
      * @param endDate 종료 날짜
@@ -48,7 +48,7 @@ public interface DailyRecordRepository extends JpaRepository<DailyRecord, Long> 
     @Query("SELECT d FROM DailyRecord d " +
            "WHERE d.member = :member " +
            "AND d.recordDate BETWEEN :startDate AND :endDate " +
-           "AND (d.isWordStudyFinished = true OR d.isSentenceQuizFinished = true) " +
+           "AND d.completedCount > 0 " +
            "ORDER BY d.recordDate ASC")
     List<DailyRecord> findCompletedRecordsByMemberAndDateRange(
         @Param("member") Member member,
@@ -63,6 +63,6 @@ public interface DailyRecordRepository extends JpaRepository<DailyRecord, Long> 
      */
     @Query("SELECT COUNT(d) FROM DailyRecord d " +
            "WHERE d.member = :member " +
-           "AND (d.isWordStudyFinished = true OR d.isSentenceQuizFinished = true)")
+           "AND d.completedCount > 0")
     Long countCompletedDaysByMember(@Param("member") Member member);
 }
