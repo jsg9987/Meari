@@ -11,6 +11,6 @@ public interface SentenceRepository extends JpaRepository<Sentence, Long> {
 
     List<Sentence> findByContent_ContentId(Long contentId);
 
-    @Query(value = "SELECT * FROM sentence ORDER BY RAND() LIMIT :count", nativeQuery = true)
+    @Query(value = "SELECT * FROM sentence ORDER BY RANDOM() LIMIT :count", nativeQuery = true)
     List<Sentence> findRandomSentences(@Param("count") int count);
 }
