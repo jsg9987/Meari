@@ -116,6 +116,8 @@ services:
   frontend:
     container_name: meari-frontend
     image: frontend-image:latest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "80:80"
       - "443:443"
@@ -133,20 +135,41 @@ services:
   spring-api:
     image: backend-image:latest
     container_name: meari-spring
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meari_db
       SPRING_DATASOURCE_USERNAME: ssafy
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ssafy
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      OPENVIDU_URL: https://openvidu-openvidu-server-1:5443
+      OPENVIDU_URL: https://host.docker.internal:5443/
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
+      OPENVIDU_PUBLIC_URL: ${OPENVIDU_PUBLIC_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ACCESS_TOKEN_EXPIRE_PERIOD: ${JWT_ACCESS_TOKEN_EXPIRE_PERIOD}
+      JWT_REFRESH_TOKEN_EXPIRE_PERIOD: ${JWT_REFRESH_TOKEN_EXPIRE_PERIOD}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL}
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_REGION: ${AWS_REGION}
+      CLOUD_AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      CLOUD_AWS_CREDENTIALS_SECRET_KEY: ${AWS_SECRET_KEY}
+      CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION: 3600
+      CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION: 900
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
     ports:
       - "8080:8080"
     networks:
