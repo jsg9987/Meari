@@ -7,6 +7,7 @@ import MyPage from "../pages/MyPage";
 import KopicEvaluation from "../pages/KopicEvaluation";
 import KopicReport from "../pages/KopicReport";
 import WordStudy from "../pages/daily/WordStudy";
+import SentenceOrder from "../pages/daily/SentenceOrder";
 import { PublicRoute } from './guards'
 import { ProtectedRoute } from './guards'
 
@@ -50,6 +51,7 @@ export default function AppRoutes() {
       <Route path="/kopic/evaluation/:themeId" element={<KopicEvaluation />} />
       <Route path="/kopic/report" element={<KopicReport />} />
       <Route path="/daily/word-study" element={<WordStudy />} />
+      <Route path="/daily/sentence-order" element={<SentenceOrder />} />
     </Routes>
   );
 }
