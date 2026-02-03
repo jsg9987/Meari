@@ -26,6 +26,10 @@ body {
   min-height: 100vh;
 }
 
+body button{
+  cursor: pointer;
+}
+
 #root {
   width: 100%;
 }
