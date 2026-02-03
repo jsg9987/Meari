@@ -80,9 +80,11 @@ const ShadowingProgressChart = () => {
   if (isLoading) {
     return (
       <div className='rounded-2xl border border-gray-200 bg-white p-5'>
-        <div className='flex justify-center items-center h-80'>
-          <div className='w-8 h-8 border-4 border-gray-300 border-t-gray-900 rounded-full animate-spin' />
+        <div className='mb-4'>
+          <div className='h-7 w-40 bg-gray-200 rounded animate-pulse mb-2' />
+          <div className='h-5 w-32 bg-gray-200 rounded animate-pulse' />
         </div>
+        <div className='h-[400px] bg-gray-200 rounded-lg animate-pulse' />
       </div>
     )
   }
@@ -108,7 +110,7 @@ const ShadowingProgressChart = () => {
       <ResponsiveContainer width='100%' height={400}>
         <ComposedChart
           data={data}
-          margin={{ top: 30, right: 30, left: 10, bottom: 20 }}
+          margin={{ top: 30, right: 80, left: 80, bottom: 20 }}
         >
           <CartesianGrid strokeDasharray='3 3' stroke='#f0f0f0' />
 
@@ -118,6 +120,7 @@ const ShadowingProgressChart = () => {
             tickFormatter={formatDate}
             tick={{ fontSize: 12, fill: '#6b7280' }}
             stroke='#d1d5db'
+            label={{ value: '날짜', position: 'insideBottom', offset: -10, style: { fontSize: 12, fill: '#6b7280', fontWeight: 600 } }}
           />
 
           {/* 왼쪽 Y축 - Accuracy, Intonation (0-100) */}
@@ -126,7 +129,7 @@ const ShadowingProgressChart = () => {
             domain={[0, 100]}
             tick={{ fontSize: 12, fill: '#6b7280' }}
             stroke='#d1d5db'
-            label={{ value: '점수', angle: 0, position: 'insideTopLeft', offset: -10, style: { fontSize: 12, fill: '#6b7280', fontWeight: 600 } }}
+            label={{ value: '점수 (%)', angle: 0, position: 'insideLeft', style: { fontSize: 12, fill: '#6b7280', fontWeight: 600, textAnchor: 'middle' } }}
           />
 
           {/* 오른쪽 Y축 - Errors (0-10) */}
@@ -136,7 +139,7 @@ const ShadowingProgressChart = () => {
             domain={[0, 10]}
             tick={{ fontSize: 12, fill: '#6b7280' }}
             stroke='#d1d5db'
-            label={{ value: '오류 (개)', angle: 0, position: 'insideTopRight', offset: -10, style: { fontSize: 12, fill: '#6b7280', fontWeight: 600 } }}
+            label={{ value: '오류 (개)', angle: 0, position: 'insideRight', style: { fontSize: 12, fill: '#6b7280', fontWeight: 600, textAnchor: 'middle' } }}
           />
 
           <Tooltip content={<CustomTooltip />} />
@@ -151,7 +154,7 @@ const ShadowingProgressChart = () => {
             yAxisId='left'
             type='monotone'
             dataKey='accuracy'
-            name='Accuracy'
+            name='정확도'
             stroke='#3b82f6'
             strokeWidth={3}
             dot={{ fill: '#3b82f6', strokeWidth: 2, r: 5 }}
@@ -165,7 +168,7 @@ const ShadowingProgressChart = () => {
             yAxisId='left'
             type='monotone'
             dataKey='intonation'
-            name='Intonation'
+            name='억양'
             stroke='#10b981'
             strokeWidth={3}
             dot={{ fill: '#10b981', strokeWidth: 2, r: 5 }}
@@ -178,7 +181,7 @@ const ShadowingProgressChart = () => {
           <Bar
             yAxisId='right'
             dataKey='errorsCount'
-            name='Errors'
+            name='오류'
             fill='#ef4444'
             fillOpacity={0.6}
             barSize={30}
