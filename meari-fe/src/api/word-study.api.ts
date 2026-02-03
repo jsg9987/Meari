@@ -2,121 +2,86 @@ import axiosInstance from './axiosInstance'
 import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from './auth.api'
 
-export type WordStudySentence = {
-  sentence_id: number
-  sequence: number
-  speaker_role: string
-  text_ko: string
-  text_vi: string
+export type WordStudyWord = {
+  wordId: number
+  wordKr: string
+  definitionKr: string
+  wordVn: string
+  definitionVn: string
 }
 
-export type GetWordStudyResponse = AxiosResponse<ApiResponse<WordStudySentence[]>>
+export type GetWordStudyResponse = AxiosResponse<ApiResponse<WordStudyWord[]>>
 
-const SENTENCE_POOL: WordStudySentence[] = [
+const WORD_POOL: WordStudyWord[] = [
   {
-    sentence_id: 1,
-    sequence: 1,
-    speaker_role: 'USER',
-    text_ko: '예약',
-    text_vi: 'Đặt chỗ hoặc thời gian trước.'
+    wordId: 1,
+    wordKr: 'Order',
+    definitionKr: 'A request to buy something',
+    wordVn: 'dat hang',
+    definitionVn: 'yeu cau mua hang'
   },
   {
-    sentence_id: 2,
-    sequence: 2,
-    speaker_role: 'USER',
-    text_ko: '환불',
-    text_vi: 'Nhận lại tiền đã thanh toán.'
+    wordId: 2,
+    wordKr: 'Warm',
+    definitionKr: 'Having a moderately high temperature',
+    wordVn: 'am',
+    definitionVn: 'co nhiet do cao vua phai'
   },
   {
-    sentence_id: 3,
-    sequence: 3,
-    speaker_role: 'USER',
-    text_ko: '영수증',
-    text_vi: 'Giấy tờ chứng minh việc thanh toán.'
+    wordId: 3,
+    wordKr: 'Receipt',
+    definitionKr: 'A paper that proves payment',
+    wordVn: 'hoa don',
+    definitionVn: 'giay chung nhan thanh toan'
   },
   {
-    sentence_id: 4,
-    sequence: 4,
-    speaker_role: 'USER',
-    text_ko: '분실물',
-    text_vi: 'Đồ vật bị mất.'
+    wordId: 4,
+    wordKr: 'Takeout',
+    definitionKr: 'Food packaged to go',
+    wordVn: 'mang di',
+    definitionVn: 'dong goi mang di'
   },
   {
-    sentence_id: 5,
-    sequence: 5,
-    speaker_role: 'USER',
-    text_ko: '포장',
-    text_vi: 'Đóng gói món ăn để mang đi.'
+    wordId: 5,
+    wordKr: 'Refund',
+    definitionKr: 'Getting paid money back',
+    wordVn: 'hoan tien',
+    definitionVn: 'tra lai tien da thanh toan'
   },
   {
-    sentence_id: 6,
-    sequence: 6,
-    speaker_role: 'USER',
-    text_ko: '현금',
-    text_vi: 'Tiền mặt, không phải thẻ.'
+    wordId: 6,
+    wordKr: 'Add',
+    definitionKr: 'To include one more',
+    wordVn: 'them',
+    definitionVn: 'them vao'
   },
   {
-    sentence_id: 7,
-    sequence: 7,
-    speaker_role: 'USER',
-    text_ko: '할인',
-    text_vi: 'Giảm giá.'
+    wordId: 7,
+    wordKr: 'Recommend',
+    definitionKr: 'Suggest something good',
+    wordVn: 'goi y',
+    definitionVn: 'de xuat dieu tot'
   },
   {
-    sentence_id: 8,
-    sequence: 8,
-    speaker_role: 'USER',
-    text_ko: '교환',
-    text_vi: 'Đổi sản phẩm đã mua sang sản phẩm khác.'
+    wordId: 8,
+    wordKr: 'Discount',
+    definitionKr: 'A price reduction',
+    wordVn: 'giam gia',
+    definitionVn: 'ha gia'
   },
   {
-    sentence_id: 9,
-    sequence: 9,
-    speaker_role: 'USER',
-    text_ko: '영업시간',
-    text_vi: 'Thời gian cửa hàng mở cửa.'
+    wordId: 9,
+    wordKr: 'Exchange',
+    definitionKr: 'Swap for something else',
+    wordVn: 'doi',
+    definitionVn: 'doi sang cai khac'
   },
   {
-    sentence_id: 10,
-    sequence: 10,
-    speaker_role: 'USER',
-    text_ko: '좌석',
-    text_vi: 'Chỗ ngồi.'
-  },
-  {
-    sentence_id: 11,
-    sequence: 11,
-    speaker_role: 'USER',
-    text_ko: '결제',
-    text_vi: 'Thanh toán.'
-  },
-  {
-    sentence_id: 12,
-    sequence: 12,
-    speaker_role: 'USER',
-    text_ko: '추천',
-    text_vi: 'Giới thiệu điều tốt/đáng dùng.'
-  },
-  {
-    sentence_id: 13,
-    sequence: 13,
-    speaker_role: 'USER',
-    text_ko: '알레르기',
-    text_vi: 'Phản ứng dị ứng với một chất.'
-  },
-  {
-    sentence_id: 14,
-    sequence: 14,
-    speaker_role: 'USER',
-    text_ko: '반찬',
-    text_vi: 'Món ăn kèm với cơm.'
-  },
-  {
-    sentence_id: 15,
-    sequence: 15,
-    speaker_role: 'USER',
-    text_ko: '면세',
-    text_vi: 'Miễn thuế.'
+    wordId: 10,
+    wordKr: 'Seat',
+    definitionKr: 'A place to sit',
+    wordVn: 'cho ngoi',
+    definitionVn: 'noi ngoi'
   }
 ]
 
@@ -126,7 +91,7 @@ export const getWordStudyMock = async (): Promise<GetWordStudyResponse> => {
       resolve({
         data: {
           success: true,
-          data: SENTENCE_POOL,
+          data: WORD_POOL,
           error: null
         },
         status: 200,
@@ -139,9 +104,7 @@ export const getWordStudyMock = async (): Promise<GetWordStudyResponse> => {
 }
 
 const getWordStudyReal = async (): Promise<GetWordStudyResponse> => {
-  const response = await axiosInstance.post<ApiResponse<WordStudySentence[]>>(
-    '/contents/1/words'
-  )
+  const response = await axiosInstance.get<ApiResponse<WordStudyWord[]>>('/contents/words/random')
   return response
 }
 

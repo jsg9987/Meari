@@ -171,6 +171,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
             type='button'
             className='flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors cursor-pointer'
             title='설정'
+            onClick={() => navigate('/mypage', { state: { menu: 'settings' } })}
           >
             <Settings size={21} />
           </button>
