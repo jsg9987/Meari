@@ -175,7 +175,6 @@ export type DailyActivityResponse = AxiosResponse<ApiResponse<DailyActivityData>
 const generateMockDailyActivities = (): DailyActivity[] => {
   const activities: DailyActivity[] = []
   const today = new Date()
-  const statuses: DailyActivityStatus[] = ['NONE', 'WORD', 'SENTENCE', 'BOTH']
 
   // 최근 365일 데이터 생성
   for (let i = 364; i >= 0; i--) {

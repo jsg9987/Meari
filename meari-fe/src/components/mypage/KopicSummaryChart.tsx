@@ -146,7 +146,7 @@ const KopicSummaryChart = () => {
                   fill: '#fff',
                   fontSize: 14,
                   fontWeight: 600,
-                  formatter: (value: number) => `${value}점`
+                  formatter: (value: any) => (typeof value === 'number' ? `${value}점` : '')
                 }}
               />
               <Legend
@@ -157,7 +157,7 @@ const KopicSummaryChart = () => {
                 wrapperStyle={{ paddingTop: '20px' }}
               />
               <Tooltip
-                formatter={(value: number) => [`${value}점`, '']}
+                formatter={(value: any) => [typeof value === 'number' ? `${value}점` : '', '']}
                 contentStyle={{
                   backgroundColor: 'white',
                   border: '1px solid #e5e7eb',
@@ -201,7 +201,7 @@ const KopicSummaryChart = () => {
                   borderRadius: '8px',
                   padding: '8px 12px'
                 }}
-                formatter={(value: number) => `${value}점`}
+                formatter={(value: any) => (typeof value === 'number' ? `${value}점` : '')}
               />
               <Legend wrapperStyle={{ paddingTop: '10px' }} />
               <Bar dataKey='평균' fill='#3b82f6' radius={[4, 4, 0, 0]} />
