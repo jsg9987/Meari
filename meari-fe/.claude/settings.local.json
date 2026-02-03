@@ -7,12 +7,11 @@
       "Bash(npm:*)",
       "Bash(node --version)",
       "Bash(pnpm install:*)",
-      "Bash(pnpm build:*)",
-      "Bash(pnpm exec tsc:*)"
+      "Bash(pnpm build:*)"
     ]
   },
-  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "sequential-thinking"
-  ]
+  ],
+  "enableAllProjectMcpServers": true
 }

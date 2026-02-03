@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Clock } from 'lucide-react'
 import {
   getActivityFeedMock,
   type ActivityItem,
@@ -14,9 +13,9 @@ const typeBadgeClass: Record<ActivityType, string> = {
 
 const getTypeLabel = (type: ActivityType) => {
   const labels = {
-    DAILY_LEARNING: '일일 학습',
+    DAILY_LEARNING: 'Daily Learning',
     COPIC: 'KOPIC',
-    SHADOWING: '쉐도잉'
+    SHADOWING: 'Shadowing'
   }
   return labels[type]
 }
@@ -32,19 +31,12 @@ const getDateTimeLabel = (item: ActivityItem) => {
 
 const getPayloadSummary = (item: ActivityItem) => {
   switch (item.type) {
-    case 'DAILY_LEARNING': {
-      const categoryLabel = item.payload.category === 'WORD' ? '단어' : '문장'
-      const statusLabel = item.payload.status === 'COMPLETED' ? '완료' : '진행 중'
-      return `카테고리: ${categoryLabel} · 상태: ${statusLabel}`
-    }
-    case 'COPIC': {
-      const eventLabel = item.payload.event === 'EXAM_COMPLETED' ? '시험 완료' : '채점 완료'
-      return `테마: ${item.payload.theme} · ${eventLabel}`
-    }
-    case 'SHADOWING': {
-      const statusLabel = item.payload.status === 'STARTED' ? '시작' : '완료'
-      return `테마: ${item.payload.theme} · 콘텐츠: ${item.payload.contentName} · 상태: ${statusLabel}`
-    }
+    case 'DAILY_LEARNING':
+      return `Category: ${item.payload.category} · Status: ${item.payload.status}`
+    case 'COPIC':
+      return `Theme: ${item.payload.theme} · Event: ${item.payload.event}`
+    case 'SHADOWING':
+      return `Theme: ${item.payload.theme} · Content: ${item.payload.contentName}`
     default:
       return ''
   }
@@ -73,31 +65,22 @@ const MyActivityFeed = () => {
   }, [])
 
   return (
-    <div className='rounded-2xl border border-gray-200 bg-white p-5 flex flex-col lg:h-full lg:max-h-225'>
-      <div className='mb-4 shrink-0'>
+    <div className='rounded-2xl border-gray-200 bg-white p-5'>
+      <div className='mb-4'>
         <h2 className='text-xl font-semibold text-gray-900'>활동</h2>
-        <p className='text-sm text-gray-500'>최근 학습 활동 내역입니다.</p>
+        <p className='text-sm text-gray-500'>Latest actions from your account.</p>
       </div>
 
-      <div className='space-y-3 overflow-y-auto flex-1 min-h-0'>
+      <div className='space-y-3'>
         {isLoading && (
-          <div className='space-y-3'>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className='border-l-4 border-gray-200 p-4 flex flex-col gap-3'>
-                <div className='h-6 w-24 bg-gray-200 rounded-full animate-pulse' />
-                <div className='space-y-2'>
-                  <div className='h-4 w-full bg-gray-200 rounded animate-pulse' />
-                  <div className='h-4 w-3/4 bg-gray-200 rounded animate-pulse' />
-                  <div className='h-3 w-20 bg-gray-200 rounded animate-pulse mt-2' />
-                </div>
-              </div>
-            ))}
+          <div className='flex justify-center py-8'>
+            <div className='w-8 h-8 border-4 border-gray-300 border-t-gray-900 rounded-full animate-spin' />
           </div>
         )}
 
         {!isLoading && activities.length === 0 && (
           <div className='border border-gray-200 rounded-xl p-6 text-center text-gray-500'>
-            아직 활동 내역이 없습니다. 학습을 시작해보세요!
+            No activity yet. Start a session to see updates here.
           </div>
         )}
 
@@ -122,10 +105,7 @@ const MyActivityFeed = () => {
                     {item.title}
                   </h3>
                   <p className='text-sm text-gray-600 mt-1'>{getPayloadSummary(item)}</p>
-                  <div className='flex items-center gap-1 mt-2'>
-                    <Clock size={12} className='text-gray-400' />
-                    <span className='text-xs text-gray-400'>{getDateTimeLabel(item)}</span>
-                  </div>
+                  <span className='text-xs text-gray-400 mt-2 block'>{getDateTimeLabel(item)}</span>
                 </div>
               </div>
             ))}

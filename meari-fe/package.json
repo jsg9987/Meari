@@ -20,7 +20,6 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.1.1",
-    "recharts": "^3.7.0",
     "sockjs-client": "^1.6.1",
     "tailwindcss": "^4.1.18",
     "zustand": "^5.0.10"
@@ -30,7 +29,6 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
-    "@types/recharts": "^2.0.1",
     "@vitejs/plugin-react-swc": "^4.2.2",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import illustratorCard from '../../assets/images/daily/Illustrator-card.svg'
 import illustratorCard1 from '../../assets/images/daily/Illustrator-card-1.svg'
-import { useAuthStore } from '../../store/auth.store'
 
 // 카드 데이터
 const CARDS = [
@@ -43,7 +42,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 const DailyStudyPanel = () => {
   const navigate = useNavigate()
-  const { userInfo } = useAuthStore()
+  // const { userInfo } = useAuthStore()
   const [activeCard, setActiveCard] = useState<number>(0)
 
   const handleCardClick = (index: number) => {

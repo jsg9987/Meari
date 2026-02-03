@@ -37,7 +37,7 @@ export function useVideoRoom({
   roleId = null
 }: UseVideoRoomOptions) {
   const { userInfo } = useAuthStore();
-  const memberId = userInfo?.member_id;
+  const memberId = userInfo?.memberId;
   const [session, setSession] = useState<Session | null>(null);
   const [publisher, setPublisher] = useState<Publisher | null>(null);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -152,28 +152,6 @@ export function useVideoRoom({
     try {
       let token: string;
 
-      // 백엔드 URL에서 토큰을 추출하는 헬퍼 함수
-      // 백엔드가 "ws://localhost:4443?sessionId=room_444&token=tok_xxx" 형식으로 보내면
-      // 토큰 부분만 추출해서 사용
-      const extractToken = (tokenOrUrl: string): string => {
-        try {
-          // URL 형식인지 확인 (ws:// 또는 wss://로 시작)
-          if (tokenOrUrl.startsWith('ws://') || tokenOrUrl.startsWith('wss://')) {
-            const url = new URL(tokenOrUrl);
-            const tokenParam = url.searchParams.get('token');
-
-            if (tokenParam) {
-              return tokenParam;
-            }
-          }
-          // URL이 아니거나 token 파라미터가 없으면 원본 그대로 반환
-          return tokenOrUrl;
-        } catch {
-          // URL 파싱 실패 시 원본 그대로 반환
-          return tokenOrUrl;
-        }
-      };
-
       if (isOwner) {
         // 방장: 세션 생성 -> 연결 토큰 생성
         const sessionResponse = await createSession({
@@ -199,7 +177,7 @@ export function useVideoRoom({
 
         // 백엔드에서 받은 session_id 저장
         setBackendSessionId(session_id);
-        token = extractToken(connectionResponse.data.data.token);
+        token = connectionResponse.data.data.token;
       } else {
         // 일반 사용자: enterWebRTC 사용
         const webrtcResponse = await enterWebRTC(roomId, { password });
@@ -210,7 +188,7 @@ export function useVideoRoom({
 
         // 백엔드에서 받은 session_id 저장
         setBackendSessionId(webrtcResponse.data.data.sessionId);
-        token = extractToken(webrtcResponse.data.data.token);
+        token = webrtcResponse.data.data.token;
       }
 
       await mySession.connect(token, { clientData: nickname });

@@ -51,8 +51,7 @@ const Signup = () => {
         try {
             setEmailCheckStatus('checking');
             setEmailCheckMessage('확인 중...');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const response = await checkEmail(formData.email) as any;
+            const response = await checkEmail(formData.email);
             const hasEmail = response.data.data?.has_email ?? false;
             if (hasEmail) {
                 setEmailCheckStatus('duplicate');
@@ -61,7 +60,6 @@ const Signup = () => {
                 setEmailCheckStatus('available');
                 setEmailCheckMessage('사용 가능한 이메일입니다.');
             }
-        // eslint-disable-next-line
         } catch (err: any) {
             setEmailCheckStatus('error');
             setEmailCheckMessage('중복 확인에 실패했습니다.');
@@ -78,8 +76,7 @@ const Signup = () => {
         try {
             setNicknameCheckStatus('checking');
             setNicknameCheckMessage('확인 중...');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const response = await checkNickname(formData.nickname) as any;
+            const response = await checkNickname(formData.nickname);
             const hasNickname = response.data.data?.has_nickname ?? false;
             if (hasNickname) {
                 setNicknameCheckStatus('duplicate');
