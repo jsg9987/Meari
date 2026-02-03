@@ -145,7 +145,7 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ssafy
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      OPENVIDU_URL: https://openvidu-openvidu-server-1:5443
+      OPENVIDU_URL: http://openvidu:4443
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
     ports:
       - "8080:8080"

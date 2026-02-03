@@ -17,14 +17,12 @@ export interface LoginCredentials {
     password: string;
 }
 
-export interface LoginData {
+export interface LoginResponse {
     access_token: string;
 }
 
-export type LoginResponse = AxiosResponse<ApiResponse<LoginData>>;
-
 // Mock API
-const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginResponse> => {
+const loginMock = async ({ email, password }: LoginCredentials) => {
     console.log('[API] Mock Login Requested:', { email, password });
     return new Promise((resolve, reject) => {
         setTimeout(() => {
@@ -37,7 +35,7 @@ const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginRe
                         },
                         error: null
                     }
-                } as LoginResponse);
+                });
                 return;
             }
 
@@ -59,8 +57,8 @@ const loginMock = async ({ email, password }: LoginCredentials): Promise<LoginRe
 };
 
 // Real API
-const loginReal = async ({ email, password }: LoginCredentials): Promise<LoginResponse> => {
-    const response = await axiosInstance.post<ApiResponse<LoginData>>('/auth/login', {
+const loginReal = async ({ email, password }: LoginCredentials) => {
+    const response = await axiosInstance.post<LoginResponse>('/auth/login', {
         email,
         password
     });
@@ -76,8 +74,13 @@ export interface SignupCredentials {
     native_language: string; // 'TOPIC_KR' ... (DB Schema: VARCHAR(10))
 }
 
-export interface SignupData {
-    message: string;
+export interface SignupResponse {
+    success: boolean;
+    data: any | null;
+    error: {
+        code: string;
+        message: string;
+    } | null;
 }
 
 export type SignupResponse = AxiosResponse<ApiResponse<SignupData>>;
@@ -138,13 +141,13 @@ const signupMock = async (credentials: SignupCredentials): Promise<SignupRespons
                     data: { message: '???? ??' },
                     error: null
                 }
-            } as SignupResponse);
+            });
         }, 700);
     });
 };
 
-const signupReal = async (credentials: SignupCredentials): Promise<SignupResponse> => {
-    const response = await axiosInstance.post<ApiResponse<SignupData>>('/auth/signup', credentials);
+const signupReal = async (credentials: SignupCredentials) => {
+    const response = await axiosInstance.post<SignupResponse>('/auth/signup', credentials);
     return response;
 };
 
@@ -178,15 +181,22 @@ const checkNicknameMock = async (nickname: string) => {
 
 // --- Get User Info ---
 export interface UserInfo {
-    memberId: number;
+    member_id: number;
     email: string;
     profile_url: string;
     nickname: string;
 }
 
-export type UserInfoResponse = AxiosResponse<ApiResponse<UserInfo>>;
+export interface UserInfoResponse {
+    success: boolean;
+    data: UserInfo | null;
+    error: {
+        code: string;
+        message: string;
+    } | null;
+}
 
-const getUserInfoMock = async (): Promise<UserInfoResponse> => {
+const getUserInfoMock = async () => {
     console.log('[API] Mock Get User Info Requested');
     return new Promise((resolve) => {
         setTimeout(() => {
@@ -200,17 +210,18 @@ const getUserInfoMock = async (): Promise<UserInfoResponse> => {
                     },
                     error: null
                 }
-            } as UserInfoResponse);
+            });
         }, 300);
     });
 };
 
-const getUserInfoReal = async (): Promise<UserInfoResponse> => {
-    const response = await axiosInstance.get<ApiResponse<UserInfo>>('/members/me');
+const getUserInfoReal = async () => {
+    const response = await axiosInstance.get<UserInfoResponse>('/members/me');
     return response;
 };
 
 const useMock = apiConfig.shouldMock('AUTH');
+
 
 export const login = useMock ? loginMock : loginReal;
 export const signup = useMock ? signupMock : signupReal;
