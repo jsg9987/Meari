@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import SideBar, { type SideBarMenu } from '../components/common/SideBar'
 import Dashboard from '../components/mypage/Dashboard'
+import ReportTab from '../components/mypage/ReportTab'
 
 const MyPage = () => {
   const location = useLocation()
@@ -73,12 +74,7 @@ const MyPage = () => {
           </div>
         )
       case 'report':
-        return (
-          <div className='p-8'>
-            <h1 className='text-3xl font-bold text-gray-900 mb-6'>Reports</h1>
-            <p className='text-gray-600'>Check your learning reports here.</p>
-          </div>
-        )
+        return <ReportTab />
       case 'settings':
         return (
           <div className='p-8'>

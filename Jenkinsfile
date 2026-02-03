@@ -113,7 +113,6 @@ pipeline {
 //                 }
 //             }
 //         }
-// 
         stage('Deploy') {
             when {
                 expression {
@@ -145,7 +144,7 @@ pipeline {
                             echo "FRONTEND_URL=${FE_URL}" >> .env
                             echo "OPENVIDU_URL=${OV_URL}" >> .env
                             echo "OPENVIDU_SECRET=${OV_SECRET}" >> .env
-                            echo "OPENVIDU_DOMAIN=i14c207.p.ssafy.io" >> .env
+                            echo "OPENVIDU_DOMAIN=localhost" >> .env
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
                             # --- JWT 설정 (기본값 주입) ---
                             # 만약 application.yml의 변수명이 다르면 아래 이름을 수정하세요
@@ -160,8 +159,9 @@ pipeline {
                             echo "AWS_REGION=ap-northeast-2" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION=3600" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
-                            # 이제 meari-fastapi 붙이면 포함시켜서 docker compose up에 포함
-                            docker compose up -d --force-recreate frontend spring-api openvidu
+                            echo "DOMAIN=${DOMAIN}" >> .env
+
+                            docker-compose up -d --force-recreate frontend spring-api fastapi
                         '''
                         sh 'docker image prune -f'
                     }

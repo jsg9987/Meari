@@ -13,7 +13,8 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "shadowing_report", indexes = {
     @Index(name = "idx_shadowing_report_member_id", columnList = "member_id"),
-    @Index(name = "idx_shadowing_report_room_id", columnList = "room_id")
+    @Index(name = "idx_shadowing_report_room_id", columnList = "room_id"),
+    @Index(name = "idx_member_isread", columnList = "member_id, is_read")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -57,6 +58,9 @@ public class ShadowingReport extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private ReportStatus status;
 
+    @Column(name = "is_read", nullable = false)
+    private Boolean isRead = false;
+
     @Builder
     public ShadowingReport(Member member, Room room, Role role, Content content, Integer round) {
         this.member = member;
@@ -83,5 +87,10 @@ public class ShadowingReport extends BaseEntity {
     // 도메인 메서드: 분석 완료 여부
     public boolean isCompleted() {
         return this.status == ReportStatus.COMPLETED;
+    }
+
+    // 도메인 메서드: 리포트 읽음 처리
+    public void markAsRead() {
+        this.isRead = true;
     }
 }

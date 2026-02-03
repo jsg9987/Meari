@@ -28,7 +28,6 @@ const WordStudy = () => {
   const isMountedRef = useRef(true)
 
   const total = questions.length
-  const activeQuestion = questions[currentIndex]
   const progressPercent = useMemo(() => {
     if (!total) return 0
     const progressIndex = Math.min(currentIndex, total)
