@@ -55,7 +55,7 @@ public class KopicEvaluateService {
     }
 
     @Transactional
-    public KopicEvaluateResponse evaluate(Member member, KopicEvaluateRequest request, byte[] audioData) {
+    public KopicEvaluateResponse evaluate(Member member, KopicEvaluateRequest request) {
         KopicTotalReport totalReport = kopicTotalReportRepository.findById(request.getKopicTotalReportId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_KOPIC_TOTAL_REPORT));
 
@@ -77,12 +77,13 @@ public class KopicEvaluateService {
 
         Long reportId = report.getKopicReportId();
         String textKo = sentence.getTextKo();
+        String audioUrl = request.getAudioUrl();
         Long totalReportId = totalReport.getKopicTotalReportId();
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                geminiAnalysisService.analyze(reportId, textKo, audioData, totalReportId);
+                geminiAnalysisService.analyze(reportId, textKo, audioUrl, totalReportId);
             }
         });
 
