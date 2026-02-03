@@ -72,6 +72,9 @@ class RoomServiceWebSocketTest {
     @Mock
     private RoomSessionService roomSessionService;
 
+    @Mock
+    private com.ssafy.meari.domain.analysis.service.AnalysisProducer analysisProducer;
+
     private Member testMember;
     private Theme testTheme;
     private Room testRoom;
@@ -305,12 +308,45 @@ class RoomServiceWebSocketTest {
     }
 
     @Nested
+    @DisplayName("영상 시청 완료(참여자 개인) WebSocket 브로드캐스트")
+    class WatchingCompleteBroadcast {
+
+        @Test
+        @DisplayName("성공 - 4명 모두 완료 시 PHASE_CHANGE(ROLE_PICK) 메시지 브로드캐스트")
+        void watchingComplete_Success_AllComplete_BroadcastPhaseChange() {
+            // Given
+            Long roomId = 1L;
+            Long memberId = 1L;
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+
+            given(roomRepository.findById(roomId)).willReturn(Optional.of(testRoom));
+            given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.WATCHING);
+            given(roomSessionService.isMember(roomId, memberId)).willReturn(true);
+            given(roomSessionService.isAllWatchingComplete(roomId)).willReturn(true);
+
+            // When
+            roomService.watchingComplete(roomId, memberId);
+
+            // Then
+            ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/room/" + roomId + "/state"),
+                    messageCaptor.capture()
+            );
+
+            RoomStateMessage sentMessage = messageCaptor.getValue();
+            assertThat(sentMessage.getType()).isEqualTo("PHASE_CHANGE");
+            assertThat(sentMessage.getPhase()).isEqualTo(GamePhase.ROLE_PICK);
+        }
+    }
+
+    @Nested
     @DisplayName("게임 종료 WebSocket 브로드캐스트")
     class FinishGameBroadcast {
 
         @Test
-        @DisplayName("성공 - PHASE_CHANGE(null) 메시지 브로드캐스트 (WAITING 복귀)")
-        void finishGame_Success_BroadcastPhaseChange() {
+        @DisplayName("성공 - GAME_FINISHED 메시지 브로드캐스트 (WAITING 복귀)")
+        void finishGame_Success_BroadcastGameFinished() {
             // Given
             Long roomId = 1L;
             testRoom.updateStatus(RoomStatus.IN_PROGRESS);
@@ -329,7 +365,7 @@ class RoomServiceWebSocketTest {
             );
 
             RoomStateMessage sentMessage = messageCaptor.getValue();
-            assertThat(sentMessage.getType()).isEqualTo("PHASE_CHANGE");
+            assertThat(sentMessage.getType()).isEqualTo("GAME_FINISHED");
             assertThat(sentMessage.getPhase()).isNull();
         }
     }
@@ -458,6 +494,10 @@ class RoomServiceWebSocketTest {
 
             given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_1);
             given(roomSessionService.isMember(roomId, 2L)).willReturn(true);
+            given(roomSessionService.isMemberRecordingsComplete(roomId, 1, 2L)).willReturn(false);
+            given(roomSessionService.isRoundCompleted(roomId, 1)).willReturn(false);
+            given(roomSessionService.getRoundTimeout(roomId, 1)).willReturn(null);
+            given(roomSessionService.isAllWatchingComplete(roomId, 1)).willReturn(true);
             given(roomSessionService.isAllRecordingsComplete(roomId, 1)).willReturn(true);
 
             // When
@@ -488,7 +528,10 @@ class RoomServiceWebSocketTest {
 
             given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_2);
             given(roomSessionService.isMember(roomId, 1L)).willReturn(true);
-            given(roomSessionService.isAllRecordingsComplete(roomId, 2)).willReturn(false);
+            given(roomSessionService.isMemberRecordingsComplete(roomId, 2, 1L)).willReturn(false);
+            given(roomSessionService.isRoundCompleted(roomId, 2)).willReturn(false);
+            given(roomSessionService.getRoundTimeout(roomId, 2)).willReturn(null);
+            given(roomSessionService.isAllWatchingComplete(roomId, 2)).willReturn(false);
 
             // When
             roomService.recordingComplete(roomId, message);

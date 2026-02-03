@@ -2,6 +2,7 @@ package com.ssafy.meari.global.common;
 
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.ConstraintViolationException;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -19,23 +20,25 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 @Getter
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class ApiResponse<T> {
-	
-	private Boolean success;
-	private T data;
-	private ExceptionDto error;
-	
-	// ---- 성공 응답 ---- 
-	// successWithData
-	public static <T> ApiResponse<T> success(final T data) {
+
+    private Boolean success;
+    private T data;
+
+    @Schema(description = "에러 정보 (성공 시 null)", nullable = true, example = "null")
+    private ExceptionDto error;
+
+    // ---- 성공 응답 ----
+    // successWithData
+    public static <T> ApiResponse<T> success(final T data) {
         return new ApiResponse<>(true, data, null);
     }
-	
-	public static <T> ApiResponse<T> successWithoutData() {
-		return new ApiResponse<>(true, null, null);
-	}
-	
-	// ---- 실패 응답 ----
-	public static ApiResponse<Object> fail(final HttpMessageNotReadableException e) {
+
+    public static <T> ApiResponse<T> successWithoutData() {
+        return new ApiResponse<>(true, null, null);
+    }
+
+    // ---- 실패 응답 ----
+    public static ApiResponse<Object> fail(final HttpMessageNotReadableException e) {
         return new ApiResponse<>(false, null, ExceptionDto.of(ErrorCode.BAD_REQUEST_JSON));
     }
 
@@ -56,7 +59,7 @@ public class ApiResponse<T> {
     }
 
     public static ApiResponse<Object> fail(final ConstraintViolationException e) {
-    	
+
         return new ApiResponse<>(false, null, new ArgumentNotValidExceptionDto(e));
     }
 
@@ -75,8 +78,8 @@ public class ApiResponse<T> {
     public static ApiResponse<Object> fail(final MethodArgumentTypeMismatchException e) {
         return new ApiResponse<>(false, null, ExceptionDto.of(ErrorCode.INVALID_PARAMETER_FORMAT));
     }
-    
-	public static ApiResponse<Object> fail(final BusinessException e) {
+
+    public static ApiResponse<Object> fail(final BusinessException e) {
         return new ApiResponse<>(false, null, ExceptionDto.of(e.getErrorCode()));
     }
 }

@@ -1,0 +1,36 @@
+content_id,sequence,role_id,start_time,end_time,text_ko,text_vn
+1,1,1,00:00.60,00:01.30,넌 꿈이 뭐니?,Ước mơ của em là gì?
+1,2,2,00:01.40,00:01.80,뭐?,Gì cơ?
+1,3,1,00:03.20,00:03.50,뭐?,Gì?
+1,4,1,00:03.60,00:05.10,앞으로 어떻게 살 작정이야?,Sau này em định sống thế nào?
+1,5,1,00:06.10,00:08.30,작정이란 게 계획이란 게 너한테 있긴 하니?,Em có cái gọi là dự định hay kế hoạch không vậy?
+1,6,2,00:10.80,00:13.20,있으면... 그게 궁금하기는 해?,Nếu có... thì chị có tò mò không?
+1,7,2,00:14.20,00:16.50,궁금해서 물어보는 거야? 아니지?,Chị hỏi vì tò mò sao? Không phải đâu nhỉ?
+1,8,2,00:17.10,00:20.90,또 잘난 척하면서 나 밟으려고 그냥 앞에 하는 말이지? 서론처럼?,Lại định ra vẻ ta đây để chà đạp em nên mới nói thế chứ gì? Như lời mở đầu ấy?
+1,9,1,00:21.60,00:23.50,네 서론은 들을 땐 잘 모르겠는데,"Lời mở đầu của em nghe thì không hiểu lắm,"
+1,10,1,00:25.10,00:28.20,나중에 생각해 보면 기분이 참 더럽다.,nhưng nghĩ lại thì thấy tâm trạng thật dơ bẩn.
+1,11,2,00:29.60,00:30.50,그거 알아?,Chị biết không?
+1,12,2,00:32.20,00:33.20,"아, 알겠지.","À, chắc chị biết."
+1,13,2,00:34.30,00:37.60,일부러 기분 나쁘게 하려고 하는 말인데 모를 리가 있겠어?,Cố tình nói để làm người khác khó chịu mà sao không biết được?
+1,14,1,00:39.20,00:40.60,발레가 계속 하고 싶긴 해?,Em có thực sự muốn tiếp tục múa ballet không?
+1,15,2,00:41.30,00:41.80,그럼.,Đương nhiên.
+1,16,2,00:42.10,00:44.90,하기 싫은데 내가 미쳤다고 맨날 오디션 보러 다니냐?,Không thích mà em lại điên đến mức ngày nào cũng đi thử vai sao?
+1,17,1,00:45.60,00:46.60,근데 왜 떨어져?,Thế sao lại trượt?
+1,18,1,00:47.10,00:48.60,왜 한 번도 안 붙어?,Sao không đậu lần nào vậy?
+1,19,1,00:49.60,00:51.90,어지간하면 한 군데라도 붙어야 되는 거 아니야?,Lẽ ra ít nhất cũng phải đậu một chỗ chứ?
+1,20,2,00:52.20,00:55.60,"야, 우리나라 발레단이 수백 수천 개는 되는 줄 알아?","Này, chị tưởng đoàn ballet ở nước mình có hàng trăm hàng nghìn cái chắc?"
+1,21,1,00:56.60,00:57.50,연습은 하니?,Em có tập luyện không?
+1,22,1,00:57.90,00:59.00,죽도록 하는 거야?,Có tập điên cuồng không?
+1,23,2,00:59.60,01:00.30,당연하지!,Đương nhiên rồi!
+1,24,1,01:00.90,01:03.60,근데 네 발은 왜 그렇게 깨끗하고 예뻐?,Thế sao chân em lại sạch sẽ và đẹp thế kia?
+1,25,2,01:05.30,01:05.90,뭐라고?,Gì cơ?
+1,26,1,01:06.60,01:11.60,발레 하는 사람들 발은 발톱이 수십 번이나 빠지고 뼈가 이리저리 튀어나와 사람 발로도 짐승 발로도 안 보이던데.,"Chân người múa ballet thì móng chân rụng cả chục lần, xương lồi ra chỗ này chỗ kia, nhìn chẳng giống chân người hay chân thú gì cả."
+1,27,1,01:13.60,01:16.60,네 발은 왜 평생 한 번도 물집 안 잡혀본 발 같아?,Sao chân em trông như cả đời chưa từng bị phồng rộp lần nào vậy?
+1,28,1,01:17.90,01:18.90,연습 안 하지?,Em không tập luyện đúng không?
+1,29,1,01:19.60,01:21.90,썩 그렇게 발레가 하고 싶은 것도 아니지?,Em cũng đâu có thiết tha múa ballet đến thế phải không?
+1,30,1,01:22.30,01:23.60,꿈같은 거 없는 거지?,Em không có ước mơ gì đúng không?
+1,31,1,01:24.30,01:25.90,작정도 계획도 없지. 아무 생각 없지?,"Không dự định, không kế hoạch. Không suy nghĩ gì đúng không?"
+1,32,1,01:26.60,01:27.90,아무 생각 없다고 말해.,Nói là em không có suy nghĩ gì đi.
+1,33,1,01:28.30,01:35.60,"그럼 네 재미없는 인생, 카드나 긁고 다니면서 푸는 불쌍한 애다 이해하고 회초리 부러뜨리던지 감춰버리던지 도와줄 테니까.","Thì chị sẽ hiểu cho đứa trẻ đáng thương giải tỏa cuộc đời vô vị bằng cách quẹt thẻ, rồi bẻ gãy roi hay giấu nó đi giúp cho."
+1,34,2,01:37.30,01:38.30,"말, 다 했어?",Nói xong chưa?
+1,35,1,01:39.60,01:43.10,내 앞에서 울지 마. 짜증 나.,Đừng có khóc trước mặt chị. Phiền phức lắm.
