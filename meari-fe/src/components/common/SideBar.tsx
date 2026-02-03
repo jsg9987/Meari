@@ -26,21 +26,23 @@ const SideBar = ({ activeMenu = 'dashboard', onMenuChange, userInitial = 'U' }: 
 
   return (
     <div
-      className='h-full w-32 flex flex-col items-center py-6'
+      className='h-full w-34 flex flex-col items-center py-10'
       style={{ backgroundColor: 'var(--color-bg-root)' }}
     >
       {/* 로고 */}
-      <button
-        type='button'
-        onClick={handleLogoClick}
-        className='pt-8 pb-12 cursor-pointer hover:opacity-80 transition-opacity'
-        aria-label='홈으로 이동'
-      >
-        <img src={logoWhite} alt='Meari' className='h-4' />
-      </button>
+      <div className='pt-2 pb-14'>
+        <button
+          type='button'
+          onClick={handleLogoClick}
+          className='cursor-pointer hover:opacity-80 transition-opacity'
+          aria-label='메인으로 이동'
+        >
+          <img src={logoWhite} alt='Meari' className='h-4' />
+        </button>
+      </div>
 
       {/* 대시보드 */}
-      <div className='mb-10'>
+      <div className=''>
         <button
           type='button'
           onClick={() => handleMenuClick('dashboard')}
@@ -57,56 +59,60 @@ const SideBar = ({ activeMenu = 'dashboard', onMenuChange, userInitial = 'U' }: 
         </button>
       </div>
 
-      {/* 메뉴 그룹 */}
-      <div className='flex flex-col gap-3 mb-auto'>
-        <button
-          type='button'
-          onClick={() => handleMenuClick('profile')}
-          className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
-            selectedMenu === 'profile'
-              ? 'text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/10'
-          }`}
-          style={selectedMenu === 'profile' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
-          title='프로필'
-          aria-label='프로필'
-        >
-          <User size={26} />
-        </button>
+      {/* 메뉴 */}
+      <div className='pt-14'>
+        <div className='flex flex-col items-center gap-8'>
+          <button
+            type='button'
+            onClick={() => handleMenuClick('profile')}
+            className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
+              selectedMenu === 'profile'
+                ? 'text-white'
+                : 'text-white/60 hover:text-white hover:bg-white/10'
+            }`}
+            style={selectedMenu === 'profile' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
+            title='프로필'
+            aria-label='프로필'
+          >
+            <User size={26} />
+          </button>
 
-        <button
-          type='button'
-          onClick={() => handleMenuClick('report')}
-          className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
-            selectedMenu === 'report'
-              ? 'text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/10'
-          }`}
-          style={selectedMenu === 'report' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
-          title='리포트'
-          aria-label='리포트'
-        >
-          <FileText size={26} />
-        </button>
+          <button
+            type='button'
+            onClick={() => handleMenuClick('report')}
+            className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
+              selectedMenu === 'report'
+                ? 'text-white'
+                : 'text-white/60 hover:text-white hover:bg-white/10'
+            }`}
+            style={selectedMenu === 'report' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
+            title='리포트'
+            aria-label='리포트'
+          >
+            <FileText size={26} />
+          </button>
 
-        <button
-          type='button'
-          onClick={() => handleMenuClick('settings')}
-          className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
-            selectedMenu === 'settings'
-              ? 'text-white'
-              : 'text-white/60 hover:text-white hover:bg-white/10'
-          }`}
-          style={selectedMenu === 'settings' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
-          title='설정'
-          aria-label='설정'
-        >
-          <Settings size={26} />
-        </button>
+          <button
+            type='button'
+            onClick={() => handleMenuClick('settings')}
+            className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${
+              selectedMenu === 'settings'
+                ? 'text-white'
+                : 'text-white/60 hover:text-white hover:bg-white/10'
+            }`}
+            style={selectedMenu === 'settings' ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
+            title='설정'
+            aria-label='설정'
+          >
+            <Settings size={26} />
+          </button>
+        </div>
       </div>
 
-      {/* 프로필 이미지 */}
-      <div className='mt-auto'>
+      <div className='flex-1' />
+
+      {/* 프로필 */}
+      <div className='flex flex-col items-center'>
         <div className='flex items-center justify-center w-16 h-16 rounded-full bg-blue-500 text-white font-semibold text-xl'>
           {userInitial.charAt(0).toUpperCase()}
         </div>
