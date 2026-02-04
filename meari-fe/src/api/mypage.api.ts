@@ -1,5 +1,9 @@
 import type { AxiosResponse } from 'axios'
 import type { ApiResponse } from './auth.api'
+import axiosInstance from './axiosInstance'
+
+// 환경 변수에 따라 목업 또는 실제 API 사용
+const USE_MOCK_MYPAGE = import.meta.env.VITE_USE_MOCK_MYPAGE === 'true'
 
 // 쉐도잉 연습 기록 타입
 export interface ShadowingPracticeRecord {
@@ -231,34 +235,34 @@ export const getDailyActivity = getDailyActivityMock
 
 // 쉐도잉 리포트 타입
 export interface ShadowingReport {
-  id: number
-  thumbnail: string
-  themeName: string
-  contentName: string
-  roomName: string
-  totalScore: number
-  date: string // YYYY-MM-DD 형식
+  shadowing_report_id: number
+  thumbnail_url: string
+  room_title: string
+  content_title: string
+  total_score: number
+  is_read: boolean
+  created_at: string // ISO 8601 형식
 }
 
 export interface ShadowingReportListData {
-  reports: ShadowingReport[]
-  hasMore: boolean
-  nextCursor: number | null
+  contents: ShadowingReport[]
+  next_cursor: number | null
+  has_next: boolean
+  size: number
 }
 
 export type ShadowingReportListResponse = AxiosResponse<ApiResponse<ShadowingReportListData>>
 
 // 목업 데이터 - 쉐도잉 리포트 목록
 const generateMockShadowingReports = (page: number, limit: number): ShadowingReport[] => {
-  const themes = ['여행', '비즈니스', '일상', '음식', '쇼핑']
-  const contents = [
-    '공항에서 체크인하기',
-    '회의 일정 조율하기',
-    '친구와 대화하기',
-    '레스토랑 예약하기',
-    '쇼핑몰에서 쇼핑하기'
+  const contentTitles = [
+    'Grocery inflation',
+    'Business meeting etiquette',
+    'Daily conversation',
+    'Restaurant reservation',
+    'Shopping at the mall'
   ]
-  const rooms = ['영어 스터디룸 A', '비즈니스 영어반', 'Level 3 그룹', '프리토킹 룸', '초급반']
+  const roomTitles = ['초보만', '비즈니스반', 'Level 3 그룹', '프리토킹 룸', '초급반']
 
   const reports: ShadowingReport[] = []
   const startIdx = page * limit
@@ -269,17 +273,17 @@ const generateMockShadowingReports = (page: number, limit: number): ShadowingRep
 
     const date = new Date()
     date.setDate(date.getDate() - idx)
-    const dateString = date.toISOString().split('T')[0]
+    const dateString = date.toISOString()
 
-    const themeIdx = idx % themes.length
+    const titleIdx = idx % contentTitles.length
     reports.push({
-      id: idx + 1,
-      thumbnail: `https://picsum.photos/seed/${idx}/400/300`,
-      themeName: themes[themeIdx],
-      contentName: contents[themeIdx],
-      roomName: `${rooms[themeIdx]} - ${Math.floor(idx / 5) + 1}차`,
-      totalScore: Math.floor(Math.random() * 30) + 70,
-      date: dateString
+      shadowing_report_id: 1000 + idx + 1,
+      thumbnail_url: `https://picsum.photos/seed/${idx}/400/300`,
+      content_title: contentTitles[titleIdx],
+      room_title: `${roomTitles[titleIdx]} - ${Math.floor(idx / 5) + 1}차`,
+      total_score: Math.floor(Math.random() * 30) + 70,
+      is_read: Math.random() > 0.5,
+      created_at: dateString
     })
   }
 
@@ -289,28 +293,23 @@ const generateMockShadowingReports = (page: number, limit: number): ShadowingRep
 // 목업 API - 쉐도잉 리포트 목록 조회 (무한 스크롤)
 export const getShadowingReportsMock = async (
   page: number = 0,
-  limit: number = 10,
-  theme?: string
+  limit: number = 10
 ): Promise<ShadowingReportListResponse> => {
   return new Promise((resolve) => {
     setTimeout(() => {
-      let reports = generateMockShadowingReports(page, limit)
+      const contents = generateMockShadowingReports(page, limit)
 
-      // 테마 필터링
-      if (theme && theme !== 'all') {
-        reports = reports.filter((report) => report.themeName === theme)
-      }
-
-      const hasMore = (page + 1) * limit < 50
-      const nextCursor = hasMore ? page + 1 : null
+      const hasNext = (page + 1) * limit < 50
+      const nextCursor = hasNext ? page + 1 : null
 
       resolve({
         data: {
           success: true,
           data: {
-            reports,
-            hasMore,
-            nextCursor
+            contents,
+            next_cursor: nextCursor,
+            has_next: hasNext,
+            size: contents.length
           },
           error: null
         }
@@ -319,72 +318,94 @@ export const getShadowingReportsMock = async (
   })
 }
 
-// 현재는 목업 사용
-export const getShadowingReports = getShadowingReportsMock
+// 실제 API - 쉐도잉 리포트 목록 조회
+export const getShadowingReportsAPI = async (
+  cursor?: number,
+  size: number = 10
+): Promise<ShadowingReportListResponse> => {
+  const params = new URLSearchParams()
+  if (cursor !== undefined) {
+    params.append('cursor', cursor.toString())
+  }
+  params.append('size', size.toString())
+
+  const response = await axiosInstance.get<ApiResponse<ShadowingReportListData>>(
+    `/api/v1/shadowing/reports?${params.toString()}`
+  )
+  return response
+}
+
+// 환경 변수에 따라 목업 또는 실제 API 사용
+export const getShadowingReports = USE_MOCK_MYPAGE
+  ? getShadowingReportsMock
+  : getShadowingReportsAPI
 
 // 코픽(OPIc) 리포트 타입
 export interface KopicReport {
-  id: number
-  thumbnail: string
-  themeName: string
-  averageScore: number
-  date: string // YYYY-MM-DD 형식
+  kopic_report_id: number
+  thumbnail_url: string
+  theme: string
+  total_score: number
+  is_read: boolean
+  created_at: string // ISO 8601 형식
 }
 
 export interface KopicReportListData {
-  reports: KopicReport[]
+  contents: KopicReport[]
+  next_cursor: number | null
+  has_next: boolean
+  size: number
 }
 
 export type KopicReportListResponse = AxiosResponse<ApiResponse<KopicReportListData>>
 
 // 목업 데이터 - 코픽 리포트 목록
-const mockKopicReports: KopicReport[] = [
-  {
-    id: 1,
-    thumbnail: 'https://picsum.photos/seed/kopic1/400/300',
-    themeName: '비즈니스 미팅',
-    averageScore: 82,
-    date: '2026-02-02'
-  },
-  {
-    id: 2,
-    thumbnail: 'https://picsum.photos/seed/kopic2/400/300',
-    themeName: '여행 계획',
-    averageScore: 78,
-    date: '2026-02-01'
-  },
-  {
-    id: 3,
-    thumbnail: 'https://picsum.photos/seed/kopic3/400/300',
-    themeName: '일상 대화',
-    averageScore: 85,
-    date: '2026-01-31'
-  },
-  {
-    id: 4,
-    thumbnail: 'https://picsum.photos/seed/kopic4/400/300',
-    themeName: '음식 주문',
-    averageScore: 80,
-    date: '2026-01-30'
-  },
-  {
-    id: 5,
-    thumbnail: 'https://picsum.photos/seed/kopic5/400/300',
-    themeName: '쇼핑',
-    averageScore: 76,
-    date: '2026-01-29'
+const generateMockKopicReports = (page: number, limit: number): KopicReport[] => {
+  const themes = ['news', 'business', 'daily', 'travel', 'shopping']
+  const reports: KopicReport[] = []
+  const startIdx = page * limit
+
+  for (let i = 0; i < limit; i++) {
+    const idx = startIdx + i
+    if (idx >= 30) break // 총 30개의 데이터만 생성
+
+    const date = new Date()
+    date.setDate(date.getDate() - idx)
+    const dateString = date.toISOString()
+
+    const themeIdx = idx % themes.length
+    reports.push({
+      kopic_report_id: 2000 + idx + 1,
+      thumbnail_url: `https://picsum.photos/seed/kopic${idx}/400/300`,
+      theme: themes[themeIdx],
+      total_score: Math.floor(Math.random() * 30) + 70,
+      is_read: Math.random() > 0.5,
+      created_at: dateString
+    })
   }
-]
+
+  return reports
+}
 
 // 목업 API - 코픽 리포트 목록 조회
-export const getKopicReportsMock = async (): Promise<KopicReportListResponse> => {
+export const getKopicReportsMock = async (
+  page: number = 0,
+  limit: number = 10
+): Promise<KopicReportListResponse> => {
   return new Promise((resolve) => {
     setTimeout(() => {
+      const contents = generateMockKopicReports(page, limit)
+      const hasNext = (page + 1) * limit < 30
+      const nextCursor = hasNext ? page + 1 : null
+
       resolve({
         data: {
           success: true,
           data: {
-            reports: mockKopicReports
+            contents,
+            next_cursor: nextCursor,
+            has_next: hasNext,
+            size: contents.length
           },
           error: null
         }
@@ -393,8 +414,24 @@ export const getKopicReportsMock = async (): Promise<KopicReportListResponse> =>
   })
 }
 
-// 현재는 목업 사용
-export const getKopicReports = getKopicReportsMock
+// 실제 API - 코픽 리포트 목록 조회
+export const getKopicReportsAPI = async (
+  cursor?: number,
+  size: number = 10
+): Promise<KopicReportListResponse> => {
+  const params = new URLSearchParams()
+  if (cursor !== undefined) {
+    params.append('cursor', cursor.toString())
+  }
+  params.append('size', size.toString())
+
+  const response = await axiosInstance.get<ApiResponse<KopicReportListData>>(
+    `/api/v1/kopic/reports?${params.toString()}`
+  )
+  return response
+}
+
+export const getKopicReports = USE_MOCK_MYPAGE ? getKopicReportsMock : getKopicReportsAPI
 
 // 사전 학습 타입
 export interface PreStudyItem {
@@ -461,3 +498,4 @@ export const getPreStudyItemsMock = async (): Promise<PreStudyResponse> => {
 
 // 현재는 목업 사용
 export const getPreStudyItems = getPreStudyItemsMock
+// export const getShadowingReports = getShadowingReportsAPI
