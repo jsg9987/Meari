@@ -1,15 +1,22 @@
 package com.ssafy.meari.domain.dashboard.service;
 
 import com.ssafy.meari.domain.dashboard.dto.response.DailyRecordsResponse;
+import com.ssafy.meari.domain.dashboard.dto.response.UserActivityResponse;
 import com.ssafy.meari.domain.dashboard.entity.DailyRecord;
 import com.ssafy.meari.domain.dashboard.mapper.DashboardMapper;
 import com.ssafy.meari.domain.dashboard.repository.DailyRecordRepository;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
+import com.ssafy.meari.domain.report.entity.KopicTotalReport;
+import com.ssafy.meari.domain.report.entity.ReportStatus;
+import com.ssafy.meari.domain.report.entity.ShadowingReport;
+import com.ssafy.meari.domain.report.repository.KopicTotalReportRepository;
+import com.ssafy.meari.domain.report.repository.ShadowingReportRepository;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +32,8 @@ import java.util.List;
 public class DashboardServiceImpl implements DashboardService {
 
     private final DailyRecordRepository dailyRecordRepository;
+    private final ShadowingReportRepository shadowingReportRepository;
+    private final KopicTotalReportRepository kopicTotalReportRepository;
     private final MemberRepository memberRepository;
     private final DashboardMapper dashboardMapper;
 
@@ -95,5 +104,34 @@ public class DashboardServiceImpl implements DashboardService {
         }
 
         log.debug("학습 완료 기록 완료 - completedCount: {}", record.getCompletedCount());
+    }
+
+    @Override
+    public List<UserActivityResponse> getUserActivities(Long memberId) {
+        log.debug("사용자 활동 내역 조회 시작 - memberId: {}", memberId);
+
+        // 1. 회원 조회
+        Member member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+
+        // 2. 각 타입별로 최신 5개씩 조회
+        List<DailyRecord> dailyRecords = dailyRecordRepository
+            .findRecentCompletedRecords(memberId, PageRequest.of(0, 5));
+
+        List<ShadowingReport> shadowingReports = shadowingReportRepository
+            .findRecentCompletedReports(memberId, ReportStatus.COMPLETED,
+                PageRequest.of(0, 5));
+
+        List<KopicTotalReport> kopicReports = kopicTotalReportRepository
+            .findRecentCompletedReports(memberId, ReportStatus.COMPLETED,
+                PageRequest.of(0, 5));
+
+        // 3. 통합 및 정렬 후 최신 5개만 반환
+        List<UserActivityResponse> activities = dashboardMapper
+            .mergeAndSortActivities(dailyRecords, shadowingReports, kopicReports, 5);
+
+        log.debug("활동 내역 조회 완료 - 총 {}건", activities.size());
+
+        return activities;
     }
 }
