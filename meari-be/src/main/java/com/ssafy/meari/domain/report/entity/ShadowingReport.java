@@ -59,7 +59,7 @@ public class ShadowingReport extends BaseEntity {
     private ReportStatus status;
 
     @Column(name = "is_read", nullable = false)
-    private Boolean isRead = false;
+    private Boolean isRead;
 
     @Builder
     public ShadowingReport(Member member, Room room, Role role, Content content, Integer round) {
@@ -69,6 +69,7 @@ public class ShadowingReport extends BaseEntity {
         this.content = content;
         this.round = round;
         this.status = ReportStatus.PROCESSING;
+        this.isRead = false;
     }
 
     // 도메인 메서드: 분석 결과 업데이트
