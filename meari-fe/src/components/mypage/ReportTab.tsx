@@ -641,15 +641,15 @@ const ReportTab = () => {
                         <div className='bg-blue-50 rounded p-3 border border-blue-100 space-y-2'>
                           <div>
                             <p className='text-xs font-semibold text-blue-900 mb-1'>놓친 부분</p>
-                            <p className='text-xs text-blue-800'>{item.detailed_analysis.missed_point}</p>
+                            <p className='text-xs text-blue-800'>{item.detailed_analysis.feedback.missed_point}</p>
                           </div>
                           <div>
                             <p className='text-xs font-semibold text-blue-900 mb-1'>교정</p>
-                            <p className='text-xs text-blue-800'>{item.detailed_analysis.correction}</p>
+                            <p className='text-xs text-blue-800'>{item.detailed_analysis.feedback.correction}</p>
                           </div>
                           <div>
                             <p className='text-xs font-semibold text-blue-900 mb-1'>팁</p>
-                            <p className='text-xs text-blue-800'>{item.detailed_analysis.tip}</p>
+                            <p className='text-xs text-blue-800'>{item.detailed_analysis.feedback.tip}</p>
                           </div>
                         </div>
                       )}

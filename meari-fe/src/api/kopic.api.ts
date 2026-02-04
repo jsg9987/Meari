@@ -9,9 +9,13 @@ export interface KopicSentence {
 }
 
 export interface KopicDetailedAnalysis {
-    missed_point: string;
-    correction: string;
-    tip: string;
+    feedback: {
+        missed_point: string;
+        correction: string;
+        tip: string;
+    };
+    original_sentence: string;
+    target_sentence: string;
 }
 
 export interface KopicAnalyzeResponse {
@@ -128,9 +132,13 @@ const generateMockResult = (sentenceId: number, textKo: string): KopicReportItem
         accuracy: 85 + Math.floor(Math.random() * 10),
         total_score: 80 + Math.floor(Math.random() * 10),
         detailed_analysis: {
-            missed_point: '핵심 정보가 부족합니다.',
-            correction: '구체적인 정보를 포함해 답해보세요.',
-            tip: '상황에 맞는 인사나 부탁 표현을 추가하면 자연스럽습니다.'
+            feedback: {
+                missed_point: '핵심 정보가 부족합니다.',
+                correction: '구체적인 정보를 포함해 답해보세요.',
+                tip: '상황에 맞는 인사나 부탁 표현을 추가하면 자연스럽습니다.'
+            },
+            original_sentence: `${textKo} (모의 발화)`,
+            target_sentence: textKo
         }
     };
 };
