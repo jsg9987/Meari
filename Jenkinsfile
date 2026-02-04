@@ -136,7 +136,6 @@ pipeline {
                 ]) {
                     script {
                         sh '''
-                            cd /home/ubuntu
                             echo "DB_PASSWORD=${DB_PW}" > .env
                             echo "JWT_SECRET_KEY=${JWT_KEY}" >> .env
                             echo "REDIS_PASSWORD=${REDIS_PW}" >> .env
