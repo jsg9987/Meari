@@ -433,6 +433,25 @@ export const getKopicReportsAPI = async (
 
 export const getKopicReports = USE_MOCK_MYPAGE ? getKopicReportsMock : getKopicReportsAPI
 
+// 쉐도잉 리포트 상세 타입 (타입 미정 - 백엔드 확정 후 수정 필요)
+export interface ShadowingReportDetail {
+  shadowing_report_id: number
+  // TODO: 백엔드에서 타입 확정 후 필드 추가
+  data?: unknown
+}
+
+export type ShadowingReportDetailResponse = AxiosResponse<ApiResponse<ShadowingReportDetail>>
+
+// 쉐도잉 리포트 상세 조회
+export const getShadowingReportDetail = async (
+  reportId: number
+): Promise<ShadowingReportDetailResponse> => {
+  const response = await axiosInstance.get<ApiResponse<ShadowingReportDetail>>(
+    `/api/v1/reports/shadowing/${reportId}`
+  )
+  return response
+}
+
 // 사전 학습 타입
 export interface PreStudyItem {
   id: number

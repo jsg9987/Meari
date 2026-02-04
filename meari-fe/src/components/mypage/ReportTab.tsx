@@ -4,10 +4,13 @@ import {
   getShadowingReports,
   getKopicReports,
   getPreStudyItems,
+  getShadowingReportDetail,
   type ShadowingReport,
+  type ShadowingReportDetail,
   type KopicReport,
   type PreStudyItem
 } from '../../api/mypage.api'
+import { getKopicTotalReport, type KopicTotalReportResponse } from '../../api/kopic.api'
 
 type ReportTabType = 'shadowing' | 'kopic' | 'prestudy'
 
@@ -60,6 +63,9 @@ const ReportTab = () => {
   const [hasMoreKopic, setHasMoreKopic] = useState(true)
   const [isLoadingKopic, setIsLoadingKopic] = useState(false)
   const kopicObserverTarget = useRef<HTMLDivElement>(null)
+  const kopicCursorRef = useRef<number | undefined>(undefined)
+  const hasMoreKopicRef = useRef(true)
+  const isLoadingKopicRef = useRef(false)
 
   // 사전 학습 상태
   const [preStudyItems, setPreStudyItems] = useState<PreStudyItem[]>([])
@@ -68,6 +74,8 @@ const ReportTab = () => {
   // 상세 패널 상태
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null)
   const [selectedReportType, setSelectedReportType] = useState<'shadowing' | 'kopic' | null>(null)
+  const [selectedReportDetail, setSelectedReportDetail] = useState<ShadowingReportDetail | KopicTotalReportResponse['data'] | null>(null)
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
 
   // ref 업데이트
   useEffect(() => {
@@ -75,6 +83,13 @@ const ReportTab = () => {
     hasMoreRef.current = hasMore
     isLoadingRef.current = isLoadingShadowing
   }, [cursor, hasMore, isLoadingShadowing])
+
+  // 코픽 ref 업데이트
+  useEffect(() => {
+    kopicCursorRef.current = kopicCursor
+    hasMoreKopicRef.current = hasMoreKopic
+    isLoadingKopicRef.current = isLoadingKopic
+  }, [kopicCursor, hasMoreKopic, isLoadingKopic])
 
   // 쉐도잉 리포트 로드
   const loadShadowingReports = useCallback(async (reset: boolean = false) => {
@@ -132,29 +147,31 @@ const ReportTab = () => {
   }, [loadShadowingReports])
 
   // 코픽 리포트 로드
-  const loadKopicReports = useCallback(
-    async (reset: boolean = false) => {
-      if (isLoadingKopic || (!hasMoreKopic && !reset)) return
+  const loadKopicReports = useCallback(async (reset: boolean = false) => {
+    if (isLoadingKopicRef.current || (!hasMoreKopicRef.current && !reset)) return
 
-      setIsLoadingKopic(true)
-      try {
-        const currentCursor = reset ? undefined : kopicCursor
-        const response = await getKopicReports(currentCursor, 10)
+    isLoadingKopicRef.current = true
+    setIsLoadingKopic(true)
 
-        if (response.data.success && response.data.data) {
-          const newReports = response.data.data.contents
-          setKopicReports((prev) => (reset ? newReports : [...prev, ...newReports]))
-          setHasMoreKopic(response.data.data.has_next)
-          setKopicCursor(response.data.data.next_cursor ?? undefined)
-        }
-      } catch (error) {
-        console.error('Failed to load kopic reports:', error)
-      } finally {
-        setIsLoadingKopic(false)
+    try {
+      const response = await getKopicReports(
+        reset ? undefined : kopicCursorRef.current,
+        10
+      )
+
+      if (response.data.success && response.data.data) {
+        const newReports = response.data.data.contents
+        setKopicReports((prev) => (reset ? newReports : [...prev, ...newReports]))
+        setHasMoreKopic(response.data.data.has_next)
+        setKopicCursor(response.data.data.next_cursor ?? undefined)
       }
-    },
-    [kopicCursor, hasMoreKopic, isLoadingKopic]
-  )
+    } catch (error) {
+      console.error('Failed to load kopic reports:', error)
+    } finally {
+      isLoadingKopicRef.current = false
+      setIsLoadingKopic(false)
+    }
+  }, [])
 
   // 코픽 탭 활성화 시 초기 로드
   useEffect(() => {
@@ -169,7 +186,7 @@ const ReportTab = () => {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMoreKopic && !isLoadingKopic) {
+        if (entries[0].isIntersecting) {
           loadKopicReports()
         }
       },
@@ -186,7 +203,7 @@ const ReportTab = () => {
         observer.unobserve(currentTarget)
       }
     }
-  }, [activeTab, hasMoreKopic, isLoadingKopic, loadKopicReports])
+  }, [activeTab, loadKopicReports])
 
   // 사전 학습 로드
   useEffect(() => {
@@ -208,21 +225,48 @@ const ReportTab = () => {
   }, [activeTab, preStudyItems.length])
 
   // 쉐도잉 리포트 클릭 핸들러
-  const handleShadowingReportClick = (reportId: number) => {
+  const handleShadowingReportClick = async (reportId: number) => {
     setSelectedReportId(reportId)
     setSelectedReportType('shadowing')
+    setIsLoadingDetail(true)
+    setSelectedReportDetail(null)
+
+    try {
+      const response = await getShadowingReportDetail(reportId)
+      if (response.data.success && response.data.data) {
+        setSelectedReportDetail(response.data.data)
+      }
+    } catch (error) {
+      console.error('Failed to load shadowing report detail:', error)
+    } finally {
+      setIsLoadingDetail(false)
+    }
   }
 
   // 코픽 리포트 클릭 핸들러
-  const handleKopicReportClick = (reportId: number) => {
+  const handleKopicReportClick = async (reportId: number) => {
     setSelectedReportId(reportId)
     setSelectedReportType('kopic')
+    setIsLoadingDetail(true)
+    setSelectedReportDetail(null)
+
+    try {
+      const response = await getKopicTotalReport(reportId)
+      if (response.data.success && response.data.data) {
+        setSelectedReportDetail(response.data.data)
+      }
+    } catch (error) {
+      console.error('Failed to load kopic report detail:', error)
+    } finally {
+      setIsLoadingDetail(false)
+    }
   }
 
   // 상세 패널 닫기
   const closeDetailPanel = () => {
     setSelectedReportId(null)
     setSelectedReportType(null)
+    setSelectedReportDetail(null)
   }
 
   // 방 생성하기
@@ -498,62 +542,139 @@ const ReportTab = () => {
               </button>
             </div>
 
-            <div className='space-y-6'>
-              <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
-                <p className='text-sm font-semibold text-blue-900'>
-                  {selectedReportType === 'shadowing' ? '쉐도잉' : '코픽'} 리포트 #{selectedReportId}
-                </p>
+            {/* 로딩 중 */}
+            {isLoadingDetail && (
+              <div className='flex justify-center items-center py-20'>
+                <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600' />
               </div>
+            )}
 
-              {/* 임시 상세 내용 */}
-              <div className='bg-gray-50 rounded-lg p-5 border border-gray-200'>
-                <h3 className='font-semibold text-gray-900 mb-3 text-lg'>상세 정보</h3>
-                <div className='grid grid-cols-2 gap-4'>
-                  <div className='bg-white rounded-lg p-3 border border-gray-200'>
-                    <p className='text-xs text-gray-500 mb-1'>정확도</p>
-                    <p className='text-2xl font-bold text-gray-900'>85%</p>
-                  </div>
-                  <div className='bg-white rounded-lg p-3 border border-gray-200'>
-                    <p className='text-xs text-gray-500 mb-1'>유창성</p>
-                    <p className='text-2xl font-bold text-gray-900'>78%</p>
-                  </div>
-                  <div className='bg-white rounded-lg p-3 border border-gray-200'>
-                    <p className='text-xs text-gray-500 mb-1'>발음</p>
-                    <p className='text-2xl font-bold text-gray-900'>82%</p>
-                  </div>
-                  <div className='bg-white rounded-lg p-3 border border-gray-200'>
-                    <p className='text-xs text-gray-500 mb-1'>억양</p>
-                    <p className='text-2xl font-bold text-gray-900'>90%</p>
+            {/* 코픽 리포트 - PROCESSING 상태 */}
+            {!isLoadingDetail && selectedReportType === 'kopic' && selectedReportDetail && 'status' in selectedReportDetail && selectedReportDetail.status === 'PROCESSING' && (
+              <div className='space-y-6'>
+                <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-4'>
+                  <p className='text-sm font-semibold text-yellow-900'>
+                    코픽 리포트 #{selectedReportId} - 분석 중
+                  </p>
+                </div>
+
+                <div className='bg-white rounded-lg p-6 border border-gray-200'>
+                  <h3 className='font-semibold text-gray-900 mb-4 text-lg'>진행 상황</h3>
+                  <div className='space-y-3'>
+                    <div className='flex justify-between text-sm'>
+                      <span className='text-gray-600'>완료된 문장</span>
+                      <span className='font-bold text-gray-900'>
+                        {selectedReportDetail.completed_count || 0} / {selectedReportDetail.total_count || 0}
+                      </span>
+                    </div>
+                    <div className='w-full bg-gray-200 rounded-full h-2.5'>
+                      <div
+                        className='bg-blue-600 h-2.5 rounded-full transition-all duration-300'
+                        style={{
+                          width: `${((selectedReportDetail.completed_count || 0) / (selectedReportDetail.total_count || 1)) * 100}%`
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className='bg-blue-50 rounded-lg p-5 border border-blue-200'>
-                <h3 className='font-semibold mb-3 text-blue-900 text-lg'>AI 피드백</h3>
-                <p className='text-sm text-blue-800 leading-relaxed'>
-                  전반적으로 좋은 발음을 보여주셨습니다. 특히 억양이 매우 자연스러웠습니다.
-                  정확도와 발음 부분에서 조금 더 연습하시면 더 좋은 결과를 얻으실 수 있을 것 같습니다.
-                </p>
+                <div className='bg-blue-50 rounded-lg p-5 border border-blue-200'>
+                  <p className='text-sm text-blue-800 text-center'>
+                    AI가 발화를 분석 중입니다. 잠시만 기다려주세요.
+                  </p>
+                </div>
               </div>
+            )}
 
-              <div className='bg-gray-50 rounded-lg p-5 border border-gray-200'>
-                <h3 className='font-semibold text-gray-900 mb-3 text-lg'>개선 제안</h3>
-                <ul className='space-y-2'>
-                  <li className='flex items-start gap-2 text-sm text-gray-700'>
-                    <span className='text-green-600 font-bold'>•</span>
-                    <span>모음 발음을 좀 더 정확하게 해보세요</span>
-                  </li>
-                  <li className='flex items-start gap-2 text-sm text-gray-700'>
-                    <span className='text-green-600 font-bold'>•</span>
-                    <span>문장 끝의 억양 처리를 연습해보세요</span>
-                  </li>
-                  <li className='flex items-start gap-2 text-sm text-gray-700'>
-                    <span className='text-green-600 font-bold'>•</span>
-                    <span>연음 처리에 주의를 기울여보세요</span>
-                  </li>
-                </ul>
+            {/* 코픽 리포트 - COMPLETED 상태 */}
+            {!isLoadingDetail && selectedReportType === 'kopic' && selectedReportDetail && 'status' in selectedReportDetail && selectedReportDetail.status === 'COMPLETED' && (
+              <div className='space-y-6'>
+                <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
+                  <p className='text-sm font-semibold text-blue-900'>
+                    코픽 리포트 #{selectedReportId}
+                  </p>
+                </div>
+
+                {/* 전체 점수 요약 */}
+                <div className='bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200'>
+                  <h3 className='font-semibold text-gray-900 mb-4 text-lg'>전체 요약</h3>
+                  <div className='grid grid-cols-3 gap-4'>
+                    <div className='bg-white rounded-lg p-4 border border-blue-100 text-center'>
+                      <p className='text-xs text-gray-500 mb-1'>평균 정확도</p>
+                      <p className='text-2xl font-bold text-blue-600'>{selectedReportDetail.avg_accuracy}%</p>
+                    </div>
+                    <div className='bg-white rounded-lg p-4 border border-blue-100 text-center'>
+                      <p className='text-xs text-gray-500 mb-1'>총점</p>
+                      <p className='text-2xl font-bold text-indigo-600'>{selectedReportDetail.total_score}점</p>
+                    </div>
+                    <div className='bg-white rounded-lg p-4 border border-blue-100 text-center'>
+                      <p className='text-xs text-gray-500 mb-1'>문장 수</p>
+                      <p className='text-2xl font-bold text-gray-900'>{selectedReportDetail.sentence_count}개</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 문장별 상세 분석 */}
+                <div className='space-y-4'>
+                  <h3 className='font-semibold text-gray-900 text-lg'>문장별 분석</h3>
+                  {selectedReportDetail.report_data?.map((item, index) => (
+                    <div key={item.kopic_report_id} className='bg-gray-50 rounded-lg p-4 border border-gray-200'>
+                      <div className='flex justify-between items-start mb-3'>
+                        <h4 className='font-semibold text-gray-900 text-sm'>문장 {index + 1}</h4>
+                        <span className='text-lg font-bold text-blue-600'>{item.total_score}점</span>
+                      </div>
+
+                      <p className='text-sm text-gray-700 mb-3 leading-relaxed'>{item.text_ko}</p>
+
+                      <div className='grid grid-cols-2 gap-2 mb-3'>
+                        <div className='bg-white rounded p-2 border border-gray-200'>
+                          <p className='text-xs text-gray-500'>정확도</p>
+                          <p className='text-lg font-bold text-gray-900'>{item.accuracy}%</p>
+                        </div>
+                        <div className='bg-white rounded p-2 border border-gray-200'>
+                          <p className='text-xs text-gray-500'>억양</p>
+                          <p className='text-lg font-bold text-gray-900'>{item.intonation}%</p>
+                        </div>
+                      </div>
+
+                      {item.detailed_analysis && (
+                        <div className='bg-blue-50 rounded p-3 border border-blue-100 space-y-2'>
+                          <div>
+                            <p className='text-xs font-semibold text-blue-900 mb-1'>놓친 부분</p>
+                            <p className='text-xs text-blue-800'>{item.detailed_analysis.missed_point}</p>
+                          </div>
+                          <div>
+                            <p className='text-xs font-semibold text-blue-900 mb-1'>교정</p>
+                            <p className='text-xs text-blue-800'>{item.detailed_analysis.correction}</p>
+                          </div>
+                          <div>
+                            <p className='text-xs font-semibold text-blue-900 mb-1'>팁</p>
+                            <p className='text-xs text-blue-800'>{item.detailed_analysis.tip}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* 쉐도잉 리포트 (임시 - 타입 미정) */}
+            {!isLoadingDetail && selectedReportType === 'shadowing' && selectedReportDetail && (
+              <div className='space-y-6'>
+                <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
+                  <p className='text-sm font-semibold text-blue-900'>
+                    쉐도잉 리포트 #{selectedReportId}
+                  </p>
+                </div>
+
+                <div className='bg-yellow-50 rounded-lg p-5 border border-yellow-200'>
+                  <p className='text-sm text-yellow-800 text-center'>
+                    쉐도잉 리포트 상세 화면은 백엔드 API 타입 확정 후 구현됩니다.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
