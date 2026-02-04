@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getThemes, type Theme } from '../../api/contents.api'
 import ThemeConfirmModal from './ThemeConfirmModal'
@@ -51,19 +51,33 @@ const KopicPanel = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTheme, setSelectedTheme] = useState<number | null>(null)
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+  const minLoadingTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
     const loadThemes = async () => {
       try {
         setIsLoading(true)
+        // 스켈레톤 최소 노출 시간 시작
+        minLoadingTimeRef.current = Date.now()
+
         const response = await getThemes()
+
         if (response.data.success && response.data.data) {
+          // 최소 300ms 보장
+          const elapsedTime = Date.now() - minLoadingTimeRef.current
+          const remainingTime = Math.max(0, 300 - elapsedTime)
+
+          if (remainingTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, remainingTime))
+          }
+
           setThemes(response.data.data)
         }
       } catch (error) {
         console.error('Failed to load themes:', error)
       } finally {
         setIsLoading(false)
+        minLoadingTimeRef.current = null
       }
     }
     loadThemes()
@@ -156,7 +170,23 @@ const KopicPanel = () => {
       <div>
         <h2 className='text-xl font-bold text-gray-900 mb-[18px]'>테마 선택</h2>
         {isLoading ? (
-          <div className='text-center py-20 text-gray-500'>로딩 중...</div>
+          <div className='grid grid-cols-4 gap-[18px]'>
+            {[1, 2, 3, 4].map((index) => (
+              <div key={index} className='bg-white rounded-lg overflow-hidden shadow-md'>
+                {/* 썸네일 스켈레톤 */}
+                <div className='aspect-4/3 animate-shimmer' />
+                {/* 정보 스켈레톤 */}
+                <div className='px-3 py-4 space-y-3'>
+                  <div className='h-[18px] animate-shimmer rounded' />
+                  <div className='space-y-2'>
+                    <div className='h-[13px] animate-shimmer rounded' />
+                    <div className='h-[13px] animate-shimmer rounded w-4/5' />
+                  </div>
+                  <div className='h-[13px] animate-shimmer rounded w-3/5' />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : themes.length === 0 ? (
           <div className='text-center py-20 text-gray-500'>테마 정보를 불러올 수 없습니다.</div>
         ) : (
