@@ -44,7 +44,25 @@ public class RoomWebSocketController {
     private static final String TOPIC_CHAT = "/topic/room/%d/chat";
     private static final int MAX_CHAT_COUNT = 100;
 
+    /**
+     * 준비 상태 토글
+     * 클라이언트: /app/room/{roomId}/ready
+     */
+    @MessageMapping("/room/{roomId}/ready")
+    public void toggleReady(
+            @DestinationVariable Long roomId,
+            @Payload ReadyMessage message
+    ) {
+        log.info("준비 상태 변경 요청: roomId={}, memberId={}", roomId, message.getMemberId());
 
+        boolean currentReady = roomSessionService.isReady(roomId, message.getMemberId());
+        boolean newReady = !currentReady;
+        roomSessionService.setReady(roomId, message.getMemberId(), newReady);
+
+        // 전체 참여자에게 브로드캐스트
+        RoomStateMessage stateMessage = RoomStateMessage.ready(message.getMemberId(), newReady);
+        broadcast(roomId, TOPIC_STATE, stateMessage);
+    }
 
     /**
      * 역할 선점

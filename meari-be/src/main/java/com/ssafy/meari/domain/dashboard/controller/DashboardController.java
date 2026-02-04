@@ -1,7 +1,10 @@
 package com.ssafy.meari.domain.dashboard.controller;
 
 import com.ssafy.meari.domain.dashboard.dto.response.DailyRecordsResponse;
+import com.ssafy.meari.domain.dashboard.dto.response.UserActivityResponse;
 import com.ssafy.meari.domain.dashboard.service.DashboardService;
+import com.ssafy.meari.domain.report.dto.response.ShadowingPracticeHistoryResponse;
+import com.ssafy.meari.domain.report.service.ShadowingReportService;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
 import com.ssafy.meari.global.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/dashboard")
@@ -26,6 +30,7 @@ import java.time.LocalDate;
 public class DashboardController {
 
     private final DashboardService dashboardService;
+    private final ShadowingReportService shadowingReportService;
 
     @GetMapping("/me/daily-records")
     @Operation(summary = "일일학습 기록 조회", description = "GitHub 잔디 형식의 일일학습 기록을 조회합니다. weekly는 월요일~일요일, monthly는 1일~마지막날, yearly는 1월 1일~12월 31일 기준입니다.")
@@ -68,5 +73,57 @@ public class DashboardController {
                 LocalDate.now());
 
         return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.success(null));
+    }
+
+    @GetMapping("/me/activities")
+    @Operation(summary = "최근 활동 내역 조회",
+        description = "사용자의 최근 활동 내역(일일학습, 쉐도잉, KOPIC)을 통합 조회합니다. 각 타입별로 최신 5개씩 조회 후 통합 정렬하여 최신순 5개만 반환합니다.")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "인증되지 않은 사용자"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "회원을 찾을 수 없음")
+    })
+    public ResponseEntity<ApiResponse<List<UserActivityResponse>>> getUserActivities(
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        log.debug("활동 내역 조회 요청 - memberId: {}",
+            userDetails.getMember().getMemberId());
+
+        List<UserActivityResponse> activities = dashboardService
+            .getUserActivities(userDetails.getMember().getMemberId());
+
+        return ResponseEntity.ok(ApiResponse.success(activities));
+    }
+
+    @GetMapping("/me/shadowing")
+    @Operation(summary = "최근 5회 쉐도잉 연습 이력 조회",
+        description = "현재 사용자의 최근 5회 쉐도잉 연습 결과를 조회합니다.")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "인증되지 않은 사용자"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "회원을 찾을 수 없음")
+    })
+    public ResponseEntity<ApiResponse<List<ShadowingPracticeHistoryResponse>>> getShadowingHistory(
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        Long memberId = userDetails.getMember().getMemberId();
+        log.info("최근 5회 쉐도잉 연습 이력 조회 요청: memberId={}", memberId);
+
+        List<ShadowingPracticeHistoryResponse> response = shadowingReportService.getRecentPracticeHistory(memberId);
+
+        log.info("최근 5회 쉐도잉 연습 이력 조회 완료: 반환 개수={}", response.size());
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

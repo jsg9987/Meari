@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -112,6 +113,8 @@ class DashboardServiceTest {
                 .member(testMember)
                 .recordDate(completionDate)
                 .build();
+        // 기존 레코드의 ID 설정 (save() 호출 조건: getDailyRecordId() == null)
+        ReflectionTestUtils.setField(existingRecord, "dailyRecordId", 1L);
 
         given(memberRepository.findById(memberId)).willReturn(Optional.of(testMember));
         given(dailyRecordRepository.findByMemberAndRecordDate(testMember, completionDate))
@@ -121,7 +124,7 @@ class DashboardServiceTest {
         dashboardService.recordLearningCompletion(memberId, completionDate);
 
         // Then
-        verify(dailyRecordRepository, never()).save(any());  // Dirty Checking
+        verify(dailyRecordRepository, never()).save(any());  // Dirty Checking을 통한 업데이트
     }
 
     @Test

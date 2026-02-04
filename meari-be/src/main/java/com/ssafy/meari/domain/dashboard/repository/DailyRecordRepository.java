@@ -2,6 +2,7 @@ package com.ssafy.meari.domain.dashboard.repository;
 
 import com.ssafy.meari.domain.dashboard.entity.DailyRecord;
 import com.ssafy.meari.domain.member.entity.Member;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -65,4 +66,20 @@ public interface DailyRecordRepository extends JpaRepository<DailyRecord, Long> 
            "WHERE d.member = :member " +
            "AND d.completedCount > 0")
     Long countCompletedDaysByMember(@Param("member") Member member);
+
+    /**
+     * 사전 학습 완료한 최근 기록 조회 (활동 내역용)
+     * completedCount >= 2인 레코드만 반환 (단어+문장 모두 완료)
+     * @param memberId 회원 ID
+     * @param pageable 페이징 정보
+     * @return 최근 완료 기록 리스트 (createdAt 내림차순)
+     */
+    @Query("SELECT dr FROM DailyRecord dr " +
+           "WHERE dr.member.memberId = :memberId " +
+           "AND dr.completedCount >= 2 " +
+           "ORDER BY dr.createdAt DESC")
+    List<DailyRecord> findRecentCompletedRecords(
+        @Param("memberId") Long memberId,
+        Pageable pageable
+    );
 }

@@ -22,7 +22,4 @@ public class KopicEvaluateRequest {
     @Schema(description = "코픽 문장 ID", example = "501")
     private Long kopicSentenceId;
 
-    @NotBlank(message = "음성 파일 URL은 필수입니다.")
-    @Schema(description = "S3 음성 파일 URL", example = "https://s3.../shadowing_501.wav")
-    private String audioUrl;
 }

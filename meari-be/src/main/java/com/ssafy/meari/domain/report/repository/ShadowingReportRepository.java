@@ -51,4 +51,35 @@ public interface ShadowingReportRepository extends JpaRepository<ShadowingReport
             @Param("status") ReportStatus status,
             Pageable pageable
     );
+
+    // 최근 5개 쉐도잉 리포트 조회 (완료 상태만)
+    @Query(value = "SELECT sr FROM ShadowingReport sr " +
+           "WHERE sr.member.memberId = :memberId " +
+           "AND sr.status = :status " +
+           "ORDER BY sr.createdAt DESC")
+    List<ShadowingReport> findTop5CompletedByMemberId(
+            @Param("memberId") Long memberId,
+            @Param("status") ReportStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * 최근 완료된 쉐도잉 리포트 조회 (활동 내역용, N+1 방지)
+     * @param memberId 회원 ID
+     * @param status 리포트 상태
+     * @param pageable 페이징 정보
+     * @return 최근 완료 리포트 리스트 (theme, content JOIN FETCH)
+     */
+    @Query("SELECT sr FROM ShadowingReport sr " +
+           "JOIN FETCH sr.room r " +
+           "JOIN FETCH r.theme " +
+           "JOIN FETCH sr.content " +
+           "WHERE sr.member.memberId = :memberId " +
+           "AND sr.status = :status " +
+           "ORDER BY sr.createdAt DESC")
+    List<ShadowingReport> findRecentCompletedReports(
+        @Param("memberId") Long memberId,
+        @Param("status") ReportStatus status,
+        Pageable pageable
+    );
 }

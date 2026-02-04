@@ -1,8 +1,10 @@
 package com.ssafy.meari.domain.dashboard.service;
 
 import com.ssafy.meari.domain.dashboard.dto.response.DailyRecordsResponse;
+import com.ssafy.meari.domain.dashboard.dto.response.UserActivityResponse;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public interface DashboardService {
 
@@ -23,4 +25,13 @@ public interface DashboardService {
      * @param completionDate 완료 날짜
      */
     void recordLearningCompletion(Long memberId, LocalDate completionDate);
+
+    /**
+     * 사용자 최근 활동 내역 조회 (일일학습, 쉐도잉, KOPIC 통합)
+     * - 각 타입별로 최신 5개씩 조회 후 통합 정렬
+     * - 최종적으로 최신순 5개만 반환
+     * @param memberId 회원 ID
+     * @return 최근 활동 내역 리스트 (최대 5개)
+     */
+    List<UserActivityResponse> getUserActivities(Long memberId);
 }
