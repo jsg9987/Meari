@@ -117,6 +117,32 @@ public class ShadowingReportService {
     }
 
     /**
+     * 최근 5회 쉐도잉 연습 이력 조회
+     */
+    public List<ShadowingPracticeHistoryResponse> getRecentPracticeHistory(Long memberId) {
+        log.debug("최근 5회 쉐도잉 연습 이력 조회: memberId={}", memberId);
+
+        // Repository에서 최근 5개 조회 (COMPLETED 상태만)
+        List<ShadowingReport> reports = shadowingReportRepository.findTop5CompletedByMemberId(
+                memberId,
+                ReportStatus.COMPLETED,
+                PageRequest.of(0, 5)
+        );
+
+        log.debug("조회된 리포트 개수: {}", reports.size());
+
+        // DTO로 변환하면서 idx 부여 (1부터 시작)
+        List<ShadowingPracticeHistoryResponse> responses = new java.util.ArrayList<>();
+        for (int i = 0; i < reports.size(); i++) {
+            responses.add(ShadowingPracticeHistoryResponse.from(reports.get(i), i + 1));
+        }
+
+        log.debug("최근 5회 쉐도잉 연습 이력 조회 완료");
+        return responses;
+    }
+
+
+    /**
      * JSONB 문자열을 DetailedAnalysis 객체로 파싱
      */
     private DetailedAnalysis parseDetailedAnalysis(String jsonString) {
