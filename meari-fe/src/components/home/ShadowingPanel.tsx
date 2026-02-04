@@ -249,8 +249,11 @@ const ShadowingPanel = () => {
               key={`${room.room_id}-${index}`}
               roomId={room.room_id}
               title={room.title}
+              themeName={room.theme_name}
               contentTitle={room.content_title}
               currentPeople={room.current_people}
+              maxPeople={room.max_people}
+              status={room.status}
               hasPassword={room.has_password}
               onClick={() => handleRoomClick(room)}
             />

@@ -26,7 +26,7 @@ type LayoutMode = "narrow" | "grid" | "wide";
 // WebRTC 비활성화 플래그
 // true로 설정하면 WebRTC 없이 쉐도잉 기능만 테스트
 // ========================================
-const DISABLE_WEBRTC = false;
+const DISABLE_WEBRTC = true;
 
 // TODO: 헤더 변경, 비디오 타일 변경
 export default function ShadowingRoom() {
@@ -985,6 +985,13 @@ export default function ShadowingRoom() {
   const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
+
+  // 쉐도잉 영상 볼륨 적용
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = volume / 100;
+    }
+  }, [volume]);
 
   const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
 
