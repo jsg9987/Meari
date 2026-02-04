@@ -170,7 +170,7 @@ const DailyStudyPanel = () => {
                 </div>
               ) : (
                 <div className="p-6 h-full flex flex-col">
-                  <div className="flex justify-between items-start mb-12">
+                  <div className="flex justify-between items-start mb-8">
                     <div
                       className={`w-10 h-10 ${
                         card.themeColor === 'dark' ? 'bg-white/20' : 'bg-white/30'
@@ -189,7 +189,7 @@ const DailyStudyPanel = () => {
                     <span className="text-sm font-medium opacity-90">{card.badge}</span>
                   </div>
 
-                  <p className="text-sm opacity-80 mb-4">{card.subtitle}</p>
+                  <p className="text-sm opacity-80 mb-2">{card.subtitle}</p>
 
                   <h3 className="text-2xl font-bold mb-auto">{card.title}</h3>
 

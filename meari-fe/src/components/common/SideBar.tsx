@@ -58,7 +58,7 @@ const SideBar = ({
         className='pt-8 pb-12 cursor-pointer hover:opacity-80 transition-opacity'
         aria-label='메인으로 이동'
       >
-        <img src={logoWhite} alt='Meari' className='h-5' />
+        <img src={logoWhite} alt='Meari' className='h-5 pl-4' />
       </button>
 
       {/* 대시보드 메뉴 */}
@@ -72,7 +72,7 @@ const SideBar = ({
               key={topMenuItem.id}
               type='button'
               onClick={() => handleMenuClick(topMenuItem.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
                 isActive ? 'text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
               }`}
               style={isActive ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
@@ -80,14 +80,14 @@ const SideBar = ({
               aria-label={topMenuItem.label}
             >
               <Icon size={22} />
-              <span className='text-sm font-medium'>{topMenuItem.label}</span>
+              <span className='text-md font-medium'>{topMenuItem.label}</span>
             </button>
           )
         })()}
       </div>
 
       {/* 바뀌 메뉴 */}
-      <div className='flex flex-col gap-2'>
+      <div className='flex flex-col gap-3'>
         {menuItems.map((item) => {
           const Icon = item.icon
           const isActive = selectedMenu === item.id
@@ -97,7 +97,7 @@ const SideBar = ({
               key={item.id}
               type='button'
               onClick={() => handleMenuClick(item.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
                 isActive ? 'text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
               }`}
               style={isActive ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
@@ -105,7 +105,7 @@ const SideBar = ({
               aria-label={item.label}
             >
               <Icon size={22} />
-              <span className='text-sm font-medium'>{item.label}</span>
+              <span className='text-md font-medium'>{item.label}</span>
             </button>
           )
         })}
