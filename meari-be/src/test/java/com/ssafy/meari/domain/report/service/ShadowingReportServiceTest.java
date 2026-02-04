@@ -183,8 +183,8 @@ class ShadowingReportServiceTest {
         System.out.println("\n========== 두 번째 페이지 조회 ==========");
         LocalDateTime secondPageCursor = firstPage.getNextCursor() != null
                 ? LocalDateTime.ofInstant(
-                        java.time.Instant.ofEpochMilli(firstPage.getNextCursor()),
-                        ZoneId.systemDefault())
+                java.time.Instant.ofEpochMilli(firstPage.getNextCursor()),
+                ZoneId.systemDefault())
                 : null;
 
         System.out.printf("전달된 커서 (timestamp): %s%n", firstPage.getNextCursor());
@@ -217,7 +217,7 @@ class ShadowingReportServiceTest {
         boolean firstPageSorted = true;
         for (int i = 1; i < firstPageTimes.size(); i++) {
             if (!firstPageTimes.get(i).isBefore(firstPageTimes.get(i - 1)) &&
-                !firstPageTimes.get(i).isEqual(firstPageTimes.get(i - 1))) {
+                    !firstPageTimes.get(i).isEqual(firstPageTimes.get(i - 1))) {
                 firstPageSorted = false;
                 break;
             }
@@ -228,7 +228,7 @@ class ShadowingReportServiceTest {
         boolean secondPageSorted = true;
         for (int i = 1; i < secondPageTimes.size(); i++) {
             if (!secondPageTimes.get(i).isBefore(secondPageTimes.get(i - 1)) &&
-                !secondPageTimes.get(i).isEqual(secondPageTimes.get(i - 1))) {
+                    !secondPageTimes.get(i).isEqual(secondPageTimes.get(i - 1))) {
                 secondPageSorted = false;
                 break;
             }
