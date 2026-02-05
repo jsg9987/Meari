@@ -202,6 +202,16 @@ export function useVideoRoom({
 
       await mySession.connect(token, { clientData: nickname });
 
+      // 이미 세션에 있는 connections를 수동으로 추가 (늦게 들어온 경우 대비)
+      const existingConnections = mySession.remoteConnections;
+      if (existingConnections) {
+        Object.values(existingConnections).forEach((conn) => {
+          if (conn.connectionId !== mySession.connection?.connectionId) {
+            setConnections((prev) => [...prev, conn]);
+          }
+        });
+      }
+
       const pub = await OV.initPublisherAsync(undefined, {
         audioSource: undefined,
         videoSource: undefined,
@@ -293,11 +303,19 @@ export function useVideoRoom({
     setIsVideoEnabled(true);
 
     try {
-      // 백엔드 세션 삭제 (모든 연결이 자동으로 끊어짐)
+      // 먼저 클라이언트 세션 정리 (이벤트 리스너 해제 및 연결 종료)
+      if (currentSession) {
+        try {
+          currentSession.disconnect();
+        } catch (error) {
+          console.error('[useVideoRoom] Failed to disconnect session:', error);
+        }
+      }
+
+      // 그 다음 백엔드 세션 삭제
       if (backendSessionId) {
         await deleteSession(backendSessionId);
       }
-      // session.disconnect()는 호출 불필요 - 백엔드에서 세션 삭제 시 자동 처리됨
     } catch (error) {
       console.error('[useVideoRoom] Failed to leave WebRTC:', error);
     } finally {
