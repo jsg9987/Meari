@@ -15,6 +15,7 @@ import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type Chat
 import type { Content } from "../api/contents.api";
 import { selectRoomContent, getContentRoles, type ContentRole } from "../api/contents.api";
 import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
+import { leaveWebRTC } from "../api/webrtc.api";
 import { useRoomStore } from "../store/room.store";
 import { useRoleStore } from "../store/role.store";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
@@ -337,13 +338,11 @@ export default function ShadowingRoom() {
         setIsPlaying(true);
       }
     },
-    onPhaseWaiting: (message) => {
-      console.log('Phase WAITING received:', message);
+    onPhaseWaiting: () => {
       // 대기 상태로 돌아가기
       resetToWaitingState();
     },
     onRolesConfirmed: (message) => {
-      console.log('Roles confirmed:', message);
       // 대본 데이터 저장
       if (message.segments) {
         setRoleSegments(message.segments);
@@ -369,8 +368,6 @@ export default function ShadowingRoom() {
         allSubtitles.sort((a, b) => a.start_time - b.start_time);
         timeIndexedSubtitlesRef.current = allSubtitles;
 
-        console.log('Time-indexed subtitles prepared for Round:', allSubtitles);
-
         // 모든 사용자 화면에서 캐릭터 선택 모달과 버튼 닫기
         setIsRoleSelectOpen(false);
         setIsRoleAssigned(true);
@@ -378,11 +375,8 @@ export default function ShadowingRoom() {
       }
     },
     onRoundStart: (message) => {
-      console.log('Round start received:', message);
-
       // 대본 데이터 저장
       if (message.segments) {
-        console.log('Saving segments from ROUND_START:', message.segments);
         setRoleSegments(message.segments);
       } else {
         console.warn('No segments in ROUND_START message');
@@ -570,27 +564,33 @@ export default function ShadowingRoom() {
         if (userInfo?.memberId === response.data.data.owner_id) {
           setIsEntered(true);
         } else {
-          // 방장이 아니면 enterRoom API 호출
-          try {
-            await enterRoom(Number(roomId), {});
+          // 방장이 아니면 비밀번호 확인
+          if (response.data.data.has_password) {
+            // 비밀번호가 있는 방이면 모달 표시
+            setIsPasswordModalOpen(true);
+          } else {
+            // 비밀번호가 없는 방이면 바로 입장
+            try {
+              await enterRoom(Number(roomId), {});
 
-            // 입장 후 최신 방 정보 다시 가져오기 (members 업데이트)
-            const updatedResponse = await getRoomDetail(Number(roomId));
-            if (updatedResponse.data.success && updatedResponse.data.data) {
-              setRoomData(updatedResponse.data.data);
+              // 입장 후 최신 방 정보 다시 가져오기 (members 업데이트)
+              const updatedResponse = await getRoomDetail(Number(roomId));
+              if (updatedResponse.data.success && updatedResponse.data.data) {
+                setRoomData(updatedResponse.data.data);
 
-              // 업데이트된 멤버 목록 저장
-              previousMembersRef.current = updatedResponse.data.data.members.map(m => ({
-                member_id: m.member_id,
-                nickname: m.nickname,
-              }));
+                // 업데이트된 멤버 목록 저장
+                previousMembersRef.current = updatedResponse.data.data.members.map(m => ({
+                  member_id: m.member_id,
+                  nickname: m.nickname,
+                }));
+              }
+
+              setIsEntered(true);
+            } catch (error) {
+              console.error('Failed to enter room:', error);
+              alert('방 입장에 실패했습니다.');
+              navigate('/');
             }
-
-            setIsEntered(true);
-          } catch (error) {
-            console.error('Failed to enter room:', error);
-            alert('방 입장에 실패했습니다.');
-            navigate('/');
           }
         }
       } catch (error) {
@@ -985,8 +985,44 @@ export default function ShadowingRoom() {
   const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false); // 비밀번호 입력 모달 상태
+  const [password, setPassword] = useState(""); // 입력한 비밀번호
+  const [passwordError, setPasswordError] = useState(""); // 비밀번호 에러 메시지
 
   const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
+
+  // 비밀번호 입력 후 방 입장
+  const handlePasswordSubmit = async () => {
+    if (!roomId || !password.trim()) {
+      setPasswordError('비밀번호를 입력해주세요');
+      return;
+    }
+
+    try {
+      setPasswordError('');
+      await enterRoom(Number(roomId), { password });
+
+      // 입장 후 최신 방 정보 다시 가져오기 (members 업데이트)
+      const updatedResponse = await getRoomDetail(Number(roomId));
+      if (updatedResponse.data.success && updatedResponse.data.data) {
+        setRoomData(updatedResponse.data.data);
+
+        // 업데이트된 멤버 목록 저장
+        previousMembersRef.current = updatedResponse.data.data.members.map(m => ({
+          member_id: m.member_id,
+          nickname: m.nickname,
+        }));
+      }
+
+      setIsEntered(true);
+      setIsPasswordModalOpen(false);
+      setPassword('');
+    } catch (error) {
+      console.error('Failed to enter room:', error);
+      const errorMessage = (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || '방 입장에 실패했습니다.';
+      setPasswordError(errorMessage);
+    }
+  };
 
   // 모든 참가자가 준비 완료되었는지 확인
   // getRoomDetail의 members 배열 기반으로 인원 수 계산 (WebRTC와 분리)
@@ -1085,15 +1121,25 @@ export default function ShadowingRoom() {
         // 1. OpenVidu 세션 정리 (카메라/마이크 즉시 종료)
         await leaveRef.current();
 
-        // 2. 방 퇴장 API 호출 (완료 대기)
+        // 2. WebRTC 퇴장 API 호출 (완료 대기)
+        try {
+          await leaveWebRTC(Number(roomId));
+        } catch (error) {
+          console.error('Failed to leave WebRTC:', error);
+          // WebRTC leave 실패해도 계속 진행
+        }
+
+        // TODO: TimeOut 시간 제한
+
+        // 3. 방 퇴장 API 호출 (완료 대기)
         await leaveRoom(Number(roomId));
 
-        // 3. 로컬 데이터 정리
+        // 4. 로컬 데이터 정리
         clearRoomData();
         clearRoles(); // 역할 정보 초기화
       }
 
-      // 4. 모든 정리 완료 후 홈으로 이동
+      // 5. 모든 정리 완료 후 홈으로 이동
       navigate("/", { replace: true });
     } catch (error) {
       console.error('Failed to leave room:', error);
@@ -1616,6 +1662,57 @@ export default function ShadowingRoom() {
           )}
         </div>
       </div>
+
+      {/* 비밀번호 입력 모달 */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">비밀번호 입력</h2>
+            <p className="text-sm text-gray-600 mb-4">이 방은 비밀번호로 보호되어 있습니다.</p>
+
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setPasswordError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handlePasswordSubmit();
+                }
+              }}
+              placeholder="비밀번호를 입력하세요"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+              autoFocus
+            />
+
+            {passwordError && (
+              <p className="text-sm text-red-600 mb-4">{passwordError}</p>
+            )}
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setIsPasswordModalOpen(false);
+                  setPassword('');
+                  setPasswordError('');
+                  navigate('/');
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handlePasswordSubmit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                입장하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 컨텐츠 선택 모달 */}
       {isContentSelectOpen && (
