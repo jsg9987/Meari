@@ -6,14 +6,17 @@ pipeline {
     }
 
     stages {
+        // 코드 내려받기
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        // 빌드 단계: 백엔드, 프론트엔드, FastAPI 병렬 빌드
         stage('Build & Docker Image') {
             parallel {
+                // --- Spring Boot 백엔드 빌드 ---
                 stage('Backend Build') {
                     steps {
                         dir('meari-be') {
@@ -32,6 +35,7 @@ pipeline {
                                         string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
                                         string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY')
                                     ]) {
+                                        // Docker 이미지 생성 시 변수(Build-arg) 주입
                                         sh '''
                                         docker build \
                                           --build-arg DB_PASSWORD="${DB_PW}" \
@@ -55,6 +59,7 @@ pipeline {
                     }
                 }
 
+                // --- 프론트엔드 빌드 ---
                 stage('Frontend Build') {
                     steps {
                         dir('meari-fe') {
@@ -86,33 +91,18 @@ pipeline {
                 // --- 임시 FastAPI 빌드 (프로젝트 폴더가 없을 때 사용) ---
                 stage('FastAPI Build') {
                     steps {
-                        script {
-                            // meari-ai 폴더가 없으므로 현재 경로에서 임시 Dockerfile 생성 후 빌드
-                            // 8000번 포트로 단순히 응답만 해주는 초경량 Python 이미지입니다.
-                            sh '''
-                                echo "FROM python:3.9-slim" > Dockerfile.dummy
-                                echo "CMD [\\"python\\", \\"-m\\", \\"http.server\\", \\"8000\\"]" >> Dockerfile.dummy
-                                docker build -t meari-fastapi:latest -f Dockerfile.dummy .
-                                rm Dockerfile.dummy
-                            '''
+                        dir('meari-ai') { // FastAPI 소스 코드가 있는 디렉토리 이름으로 수정하세요
+                            script {
+                                // FastAPI는 별도의 build-arg가 없다면 간단히 빌드합니다.
+                                sh 'docker build -t meari-fastapi:latest .'
+                            }
                         }
                     }
                 }
             }
         }
-                // --- 개발 된다면 FastAPI 빌드 스테이지 추가!! ---
-//                 stage('FastAPI Build') {
-//                     steps {
-//                         dir('meari-ai') { // FastAPI 소스 코드가 있는 디렉토리 이름으로 수정하세요
-//                             script {
-//                                 // FastAPI는 별도의 build-arg가 없다면 간단히 빌드합니다.
-//                                 sh 'docker build -t meari-fastapi:latest .'
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//         }
+
+        // 배포 단계: release 브랜치에 푸시될 때만 실행
         stage('Deploy') {
             when {
                 expression {
@@ -136,6 +126,13 @@ pipeline {
                 ]) {
                     script {
                         sh '''
+                            # GitLab 최신 docker-compose.yml을 배포 경로로 복사
+                            cp docker-compose.yml /home/ubuntu/docker-compose.yml
+
+                            # 배포 경로로 이동
+                            cd /home/ubuntu
+
+                            # .env 파일 생성
                             echo "DB_PASSWORD=${DB_PW}" > .env
                             echo "JWT_SECRET_KEY=${JWT_KEY}" >> .env
                             echo "REDIS_PASSWORD=${REDIS_PW}" >> .env
@@ -146,7 +143,6 @@ pipeline {
                             echo "OPENVIDU_DOMAIN=localhost" >> .env
                             echo "VITE_BASE_SERVER_URL=${BE_URL}" >> .env
                             # --- JWT 설정 (기본값 주입) ---
-                            # 만약 application.yml의 변수명이 다르면 아래 이름을 수정하세요
                             echo "JWT_ACCESS_TOKEN_EXPIRE_PERIOD=43200000" >> .env
                             echo "JWT_REFRESH_TOKEN_EXPIRE_PERIOD=1209600000" >> .env
                             echo "GEMINI_API_KEY=${GEMINI_KEY}" >> .env
@@ -159,6 +155,7 @@ pipeline {
                             echo "CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION=3600" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
 
+                            # docker-compose로 배포 (최신 yml 파일 사용)
                             docker-compose up -d --force-recreate frontend spring-api fastapi
                         '''
                         sh 'docker image prune -f'
@@ -168,6 +165,7 @@ pipeline {
         }
     }
 
+    // 빌드 완료 후 Mattermost 알림
     post {
         success {
             script {

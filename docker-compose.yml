@@ -166,17 +166,29 @@ services:
           memory: 2G
 
   # ============================================================
-  # 7. FastAPI - AI 분석 서버 (환경변수 대응 수정됨)
+  # 7. FastAPI - AI 분석 서버
   # ============================================================
   fastapi:
     image: meari-fastapi:latest
     container_name: meari-fastapi
     environment:
-      DATABASE_URL: postgresql://ssafy:${DB_PASSWORD}@postgres:5432/meari_db
-      REDIS_URL: "redis://${REDIS_PASSWORD:+:$REDIS_PASSWORD@}redis:6379"
-      RABBITMQ_URL: amqp://ssafy:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      # RabbitMQ 설정
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ssafy
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      # AWS S3 설정
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_REGION: ${AWS_REGION}
+      # 로깅 설정
+      LOG_LEVEL: INFO
     ports:
       - "8000:8000"
+    volumes:
+      # HuggingFace 모델 캐시 영구 저장 (첫 다운로드 후 재사용)
+      - huggingface_cache:/root/.cache/huggingface
     networks:
       - meari-network
     depends_on:
@@ -190,7 +202,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 8G
 
 # ============================================================
 # 네트워크 및 볼륨 설정
@@ -204,3 +216,6 @@ volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
+  huggingface_cache:  # HuggingFace 모델 캐시 저장소
+#  openvidu_recordings:
+#  openvidu_config:
