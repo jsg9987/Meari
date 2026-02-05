@@ -56,9 +56,9 @@ const SideBar = ({
         type='button'
         onClick={handleLogoClick}
         className='pt-8 pb-12 cursor-pointer hover:opacity-80 transition-opacity'
-        aria-label='홈으로 이동'
+        aria-label='메인으로 이동'
       >
-        <img src={logoWhite} alt='Meari' className='h-5' />
+        <img src={logoWhite} alt='Meari' className='h-5 pl-4' />
       </button>
 
       {/* 대시보드 메뉴 */}
@@ -72,24 +72,22 @@ const SideBar = ({
               key={topMenuItem.id}
               type='button'
               onClick={() => handleMenuClick(topMenuItem.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                isActive
-                  ? 'text-white'
-                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                isActive ? 'text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
               }`}
               style={isActive ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
               title={topMenuItem.label}
               aria-label={topMenuItem.label}
             >
               <Icon size={22} />
-              <span className='text-sm font-medium'>{topMenuItem.label}</span>
+              <span className='text-md font-medium'>{topMenuItem.label}</span>
             </button>
           )
         })()}
       </div>
 
-      {/* 나머지 메뉴 그룹 */}
-      <div className='flex flex-col gap-2'>
+      {/* 바뀌 메뉴 */}
+      <div className='flex flex-col gap-3'>
         {menuItems.map((item) => {
           const Icon = item.icon
           const isActive = selectedMenu === item.id
@@ -99,25 +97,22 @@ const SideBar = ({
               key={item.id}
               type='button'
               onClick={() => handleMenuClick(item.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                isActive
-                  ? 'text-white'
-                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                isActive ? 'text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
               }`}
               style={isActive ? { backgroundColor: 'var(--color-tab-active)' } : undefined}
               title={item.label}
               aria-label={item.label}
             >
               <Icon size={22} />
-              <span className='text-sm font-medium'>{item.label}</span>
+              <span className='text-md font-medium'>{item.label}</span>
             </button>
           )
         })}
       </div>
 
-      {/* 로그아웃 버튼 & 프로필 */}
+      {/* 로그아웃 및 프로필 */}
       <div className='mt-auto flex flex-col gap-2'>
-        {/* 로그아웃 버튼 */}
         <button
           type='button'
           onClick={handleLogout}
@@ -128,18 +123,13 @@ const SideBar = ({
           <span className='text-sm font-medium'>로그아웃</span>
         </button>
 
-        {/* 프로필 정보 */}
         <div className='flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl'>
           <div className='flex items-center justify-center w-10 h-10 rounded-full bg-blue-500 text-white font-semibold text-sm shrink-0'>
             {userInitial.charAt(0).toUpperCase()}
           </div>
           <div className='flex flex-col overflow-hidden'>
-            <div className='text-white text-sm font-medium truncate'>
-              {userName}
-            </div>
-            <div className='text-white/60 text-xs truncate'>
-              {userEmail}
-            </div>
+            <div className='text-white text-sm font-medium truncate'>{userName}</div>
+            <div className='text-white/60 text-xs truncate'>{userEmail}</div>
           </div>
         </div>
       </div>
