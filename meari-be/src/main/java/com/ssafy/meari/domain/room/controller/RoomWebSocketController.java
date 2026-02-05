@@ -110,6 +110,8 @@ public class RoomWebSocketController {
     ) {
         log.info("역할 해제 요청: roomId={}, memberId={}", roomId, message.getMemberId());
 
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
+
         // 역할이 이미 확정되었는지 확인
         if (roomSessionService.isRolesConfirmed(roomId)) {
             log.warn("역할 해제 실패: roomId={}, 이미 역할이 확정됨", roomId);
@@ -137,6 +139,8 @@ public class RoomWebSocketController {
     ) {
         log.info("채팅 메시지: roomId={}, memberId={}, message={}",
                 roomId, message.getSenderId(), message.getMessage());
+
+        clearDisconnectedIfNeeded(roomId, message.getSenderId());
 
         try {
             // Redis에 채팅 메시지 저장
@@ -175,6 +179,8 @@ public class RoomWebSocketController {
     ) {
         log.info("영상 시청 완료 메시지 수신: roomId={}, memberId={}", roomId, message.getMemberId());
 
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
+
         roomService.watchingComplete(roomId, message.getMemberId());
     }
 
@@ -190,10 +196,23 @@ public class RoomWebSocketController {
         log.info("녹음 완료 메시지 수신: roomId={}, memberId={}, sentenceId={}",
                 roomId, message.getMemberId(), message.getSentenceId());
 
+        clearDisconnectedIfNeeded(roomId, message.getMemberId());
+
         roomService.recordingComplete(roomId, message);
     }
 
 
+
+    /**
+     * 재연결 시 disconnected 마킹 해제
+     * WebSocket 메시지 핸들러에서 호출하여 Grace Period 내 재연결 감지
+     */
+    private void clearDisconnectedIfNeeded(Long roomId, Long memberId) {
+        if (roomSessionService.isDisconnected(roomId, memberId)) {
+            roomSessionService.clearDisconnected(roomId, memberId);
+            log.info("재연결 감지, disconnected 마킹 해제: roomId={}, memberId={}", roomId, memberId);
+        }
+    }
 
     /**
      * 방 상태 변경 브로드캐스트 (외부에서 호출용)
