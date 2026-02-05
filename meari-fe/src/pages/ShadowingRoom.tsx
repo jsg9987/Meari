@@ -68,6 +68,7 @@ export default function ShadowingRoom() {
   const [currentRound, setCurrentRound] = useState(0); // 현재 라운드 (0: 시작 전)
   const [isRoundInProgress, setIsRoundInProgress] = useState(false); // 라운드 진행 중 여부
   const [isReadyLoading, setIsReadyLoading] = useState(false); // 준비 완료 로딩 상태
+  const [isWaitingForRolePick, setIsWaitingForRolePick] = useState(false); // 영상 시청 완료 후 역할 선택 대기 중
   const [participantsReady, setParticipantsReady] = useState<Record<number, boolean>>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [videoReady, setVideoReady] = useState(false);
@@ -239,6 +240,9 @@ export default function ShadowingRoom() {
       }
     },
     onRolePick: async (message) => {
+      // 대기 상태 해제
+      setIsWaitingForRolePick(false);
+
       // store에서 최신 content_id 직접 가져오기 (클로저 문제 해결)
       const storeContentId = useRoomStore.getState().contentId;
       const currentContentId = storeContentId || message.content_id || selectedContent?.content_id;
@@ -560,6 +564,33 @@ export default function ShadowingRoom() {
           nickname: m.nickname,
         }));
 
+        // content_id가 이미 있으면 video_url 가져오기
+        if (response.data.data.content_id) {
+          const existingContentId = response.data.data.content_id;
+          setContentId(existingContentId);
+
+          try {
+            const videoResponse = await getContentVideoUrl(existingContentId);
+            if (videoResponse.data.success && videoResponse.data.data) {
+              const videoUrlFromApi = videoResponse.data.data.video_url;
+              setVideoUrl(videoUrlFromApi);
+
+              // 임시 컨텐츠 객체 생성
+              setSelectedContent({
+                content_id: existingContentId,
+                theme_id: response.data.data.theme_id || 1,
+                title: '선택된 컨텐츠',
+                description: '',
+                video_url: videoUrlFromApi,
+                thumbnail_url: '',
+                duration: 0,
+              });
+            }
+          } catch (error) {
+            console.error('[fetchRoomDetail] Failed to get video URL:', error);
+          }
+        }
+
         // 방장이면 enterRoom API 호출 없이 바로 입장
         if (userInfo?.memberId === response.data.data.owner_id) {
           setIsEntered(true);
@@ -849,6 +880,11 @@ export default function ShadowingRoom() {
 
     try {
       setIsGameStarting(true); // 게임 시작 중 상태로 변경
+
+      // 준비 상태 초기화
+      setIsReady(false);
+      setParticipantsReady({});
+
       // 방장이 게임 시작 API 호출
       const response = await startGame(Number(roomId), { content_id: contentId });
 
@@ -1341,6 +1377,7 @@ export default function ShadowingRoom() {
                           setToastMessage(`Round ${currentRound} 완료`);
                         } else if (roomId && isOwner && contentId) {
                           // 첫 번째 시청 완료 시 finishWatching API 호출 (방장만)
+                          setIsWaitingForRolePick(true); // 역할 선택 대기 시작
                           try {
                             const response = await finishWatching(Number(roomId), { content_id: contentId });
                             if (response.data.success) {
@@ -1351,6 +1388,9 @@ export default function ShadowingRoom() {
                           } catch (error) {
                             console.error('Failed to finish watching:', error);
                           }
+                        } else {
+                          // 방장이 아닌 경우에도 대기 상태로 전환
+                          setIsWaitingForRolePick(true);
                         }
                       }}
                     />
@@ -1396,8 +1436,17 @@ export default function ShadowingRoom() {
                       </div>
                     )}
 
-                    <div className="relative flex flex-col items-center gap-4 z-10">
-                      {!selectedContent ? (
+                    {/* 역할 선택 대기 중 로딩 */}
+                    {isWaitingForRolePick ? (
+                      <div className="relative flex flex-col items-center gap-4 z-10">
+                        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-white text-xl font-semibold">
+                          다른 사용자들을 기다리는 중입니다..
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="relative flex flex-col items-center gap-4 z-10">
+                        {!selectedContent ? (
                         <div className="text-center">
                           <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
                           {isOwner && (
@@ -1498,7 +1547,8 @@ export default function ShadowingRoom() {
                         </div>
                         </div>
                       )}
-                    </div>
+                      </div>
+                    )}
                   </>
                 )}
               </>
@@ -1634,18 +1684,25 @@ export default function ShadowingRoom() {
                   </p>
                 </div>
               ) : status === "connected" && tiles.length > 0 ? (
-                tiles.map((t) => (
-                  <VideoTile
-                    key={t.id}
-                    streamManager={t.streamManager}
-                    muted={t.muted}
-                    label={t.label}
-                    isSpeaker={t.isSpeaker}
-                    isReady={t.id === "me" ? (isReady && !isGameStarting && !isPlaying) : false}
-                    isSettingUp={t.isSettingUp}
-                    videoClassName={layoutMode === "wide" ? "aspect-[21/9]" : undefined}
-                  />
-                ))
+                tiles.map((t) => {
+                  // 각 타일의 준비 상태 확인
+                  const tileIsReady = t.memberId !== undefined && participantsReady[t.memberId] === true;
+                  // 게임 시작 중이거나 영상 재생 중이면 준비 상태 표시 안 함
+                  const showReady = tileIsReady && !isGameStarting && !isPlaying;
+
+                  return (
+                    <VideoTile
+                      key={t.id}
+                      streamManager={t.streamManager}
+                      muted={t.muted}
+                      label={t.label}
+                      isSpeaker={t.isSpeaker}
+                      isReady={showReady}
+                      isSettingUp={t.isSettingUp}
+                      videoClassName={layoutMode === "wide" ? "aspect-[21/9]" : undefined}
+                    />
+                  );
+                })
               ) : (
                 <p className="text-center text-gray-500 text-sm py-8 col-span-2">
                   {status === "connecting" ? "연결 중..." : "참여자가 없습니다"}

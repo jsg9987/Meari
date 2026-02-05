@@ -85,6 +85,7 @@ export interface RoomDetailData {
   has_password: boolean;
   created_at: string;
   members: RoomMember[];
+  content_id?: number | null;
 }
 
 export type RoomDetailResponse = AxiosResponse<ApiResponse<RoomDetailData>>;
