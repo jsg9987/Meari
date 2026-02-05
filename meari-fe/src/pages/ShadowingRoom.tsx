@@ -78,6 +78,17 @@ export default function ShadowingRoom() {
   const previousMembersRef = useRef<Array<{member_id: number; nickname: string}>>([]);
   const memberId = userInfo?.memberId ?? 0;
 
+  // VideoControls 관련 상태
+  const [volume, setVolume] = useState(100);
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
+  const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
+  const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
+  const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(true);
+  const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false); // 비밀번호 입력 모달 상태
+  const [password, setPassword] = useState(""); // 입력한 비밀번호
+  const [passwordError, setPasswordError] = useState(""); // 비밀번호 에러 메시지
+
   // 영상 재생 관련 상태
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -710,7 +721,7 @@ export default function ShadowingRoom() {
         subtitles.push({
           roleName: sub.role_name,
           roleId: sub.role_id,
-          text: sub.text_ko, // TODO: selectedNationality에 따라 text_vn 선택
+          text: selectedNationality === "KR" ? sub.text_ko : sub.text_vn,
           isMyRole: currentRound >= 1 && sub.role_id === mySelectedRoleId, // Round 모드에서만 내 역할 표시
         });
       });
@@ -720,78 +731,7 @@ export default function ShadowingRoom() {
 
     video.addEventListener('timeupdate', updateSubtitle);
     return () => video.removeEventListener('timeupdate', updateSubtitle);
-  }, [mySelectedRoleId, isPlaying, currentRound]);
-
-  // 녹음 스케줄링 (Round 진행 중, 내 역할의 문장에 대해서만)
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!videoReady || !video || !isPlaying || currentRound < 1 || roleSegments.length === 0 || !mySelectedRoleId) {
-      return;
-    }
-
-    console.log('Setting up recording schedule for Round', currentRound);
-
-    const timeouts: number[] = [];
-
-    // 내 역할의 세그먼트 찾기
-    const mySegment = roleSegments.find(seg => seg.role_id === mySelectedRoleId);
-    if (!mySegment) {
-      console.log('No segment found for my role');
-      return;
-    }
-
-    // 각 문장에 대해 녹음 스케줄링
-    mySegment.sentences.forEach((sentence: Sentence) => {
-      const startTime = (sentence.start_time - 0.5) * 1000; // 500ms 전
-      const endTime = (sentence.end_time + 0.5) * 1000; // 500ms 후
-
-      // 녹음 시작 타이머
-      const startTimeout = setTimeout(async () => {
-        try {
-          console.log(`Getting presigned URL for sentence ${sentence.sentence_id}`);
-
-          // Presigned URL 받기
-          const response = await getPresignedUrl({
-            room_id: Number(roomId),
-            round: currentRound,
-            member_id: memberId,
-            sentence_id: sentence.sentence_id,
-          });
-
-          if (response.data.success && response.data.data) {
-            const { upload_url } = response.data.data;
-            presignedUrlsRef.current.set(sentence.sentence_id, upload_url);
-            console.log(`Presigned URL received for sentence ${sentence.sentence_id}`);
-
-            // 녹음 시작
-            console.log(`Starting recording for sentence ${sentence.sentence_id} at ${sentence.start_time - 0.5}s`);
-            currentRecordingSentenceIdRef.current = sentence.sentence_id;
-            startRecordingRef.current();
-          } else {
-            console.error('Failed to get presigned URL:', response.data.error);
-          }
-        } catch (error) {
-          console.error('Failed to get presigned URL:', error);
-        }
-      }, startTime);
-
-      // 녹음 종료 타이머
-      const endTimeout = setTimeout(() => {
-        console.log(`Stopping recording for sentence ${sentence.sentence_id} at ${sentence.end_time + 0.5}s`);
-        stopRecordingRef.current();
-        // sentenceId는 onRecordingComplete에서 초기화 (비동기 onstop 이벤트 이후)
-      }, endTime);
-
-      timeouts.push(startTimeout, endTimeout);
-    });
-
-    // 클린업
-    return () => {
-      console.log('Cleaning up recording schedule');
-      timeouts.forEach(timeout => clearTimeout(timeout));
-      stopRecordingRef.current();
-    };
-  }, [videoReady, isPlaying, currentRound, roleSegments, mySelectedRoleId, roomId, memberId]);
+  }, [mySelectedRoleId, isPlaying, currentRound, selectedNationality]);
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -1018,17 +958,155 @@ export default function ShadowingRoom() {
     leaveRef.current = leave;
   }, [leave]);
 
-  const [volume, setVolume] = useState(100);
-  const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
-  const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
-  const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
-  const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
-  const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false); // 비밀번호 입력 모달 상태
-  const [password, setPassword] = useState(""); // 입력한 비밀번호
-  const [passwordError, setPasswordError] = useState(""); // 비밀번호 에러 메시지
-
   const toggleSubtitle = () => setIsSubtitleEnabled(!isSubtitleEnabled);
+
+  // 쉐도잉 영상 볼륨 적용
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = volume / 100;
+    }
+  }, [volume]);
+
+  // Round 모드: 영상 소리 자동 음소거/해제 (member가 할당된 구간만 음소거)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isPlaying || currentRound < 1 || roleSegments.length === 0) {
+      return;
+    }
+
+    console.log('Setting up video mute control for assigned sentences');
+
+    // 모든 RoleSegment의 sentences를 수집하여 "할당된 구간" 생성
+    const assignedTimeRanges: Array<{ start: number; end: number }> = [];
+
+    roleSegments.forEach((segment) => {
+      segment.sentences.forEach((sentence: Sentence) => {
+        assignedTimeRanges.push({
+          start: sentence.start_time,
+          end: sentence.end_time,
+        });
+      });
+    });
+
+    // 시작 시간 기준으로 정렬
+    assignedTimeRanges.sort((a, b) => a.start - b.start);
+
+    const handleTimeUpdate = () => {
+      const currentTime = video.currentTime;
+
+      // 현재 시간이 할당된 구간에 속하는지 확인
+      const isAssignedTime = assignedTimeRanges.some(
+        (range) => currentTime >= range.start && currentTime <= range.end
+      );
+
+      // 할당된 구간이면 영상 소리 음소거, 아니면 재생
+      video.muted = isAssignedTime;
+    };
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      // 클린업 시 음소거 해제
+      if (video) {
+        video.muted = false;
+      }
+    };
+  }, [isPlaying, currentRound, roleSegments]);
+
+  // 녹음 스케줄링 + 마이크 자동 음소거 (Round 진행 중, 내 역할의 문장에 대해서만)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!videoReady || !video || !isPlaying || currentRound < 1 || roleSegments.length === 0 || !mySelectedRoleId) {
+      return;
+    }
+
+    console.log('Setting up recording schedule and mic control for Round', currentRound);
+
+    const timeouts: number[] = [];
+
+    // 내 역할의 세그먼트 찾기
+    const mySegment = roleSegments.find(seg => seg.role_id === mySelectedRoleId);
+    if (!mySegment) {
+      console.log('No segment found for my role');
+      return;
+    }
+
+    // Round 시작 시 마이크 음소거 (내 차례가 아닐 때 기본 상태)
+    if (publisher && isAudioEnabled) {
+      publisher.publishAudio(false);
+      console.log('Mic muted at round start (not my turn)');
+    }
+
+    // 각 문장에 대해 녹음 스케줄링 + 마이크 제어
+    mySegment.sentences.forEach((sentence: Sentence) => {
+      const startTime = (sentence.start_time - 0.5) * 1000; // 500ms 전
+      const endTime = (sentence.end_time + 0.5) * 1000; // 500ms 후
+
+      // 녹음 시작 타이머 (+ 마이크 켜기)
+      const startTimeout = setTimeout(async () => {
+        try {
+          // 내 차례 시작: 마이크 켜기 (사용자가 수동으로 끈 경우 제외)
+          if (publisher && isAudioEnabled) {
+            publisher.publishAudio(true);
+            console.log(`Mic unmuted for my turn (sentence ${sentence.sentence_id})`);
+          }
+
+          console.log(`Getting presigned URL for sentence ${sentence.sentence_id}`);
+
+          // Presigned URL 받기
+          const response = await getPresignedUrl({
+            room_id: Number(roomId),
+            round: currentRound,
+            member_id: memberId,
+            sentence_id: sentence.sentence_id,
+          });
+
+          if (response.data.success && response.data.data) {
+            const { upload_url } = response.data.data;
+            presignedUrlsRef.current.set(sentence.sentence_id, upload_url);
+            console.log(`Presigned URL received for sentence ${sentence.sentence_id}`);
+
+            // 녹음 시작
+            console.log(`Starting recording for sentence ${sentence.sentence_id} at ${sentence.start_time - 0.5}s`);
+            currentRecordingSentenceIdRef.current = sentence.sentence_id;
+            startRecordingRef.current();
+          } else {
+            console.error('Failed to get presigned URL:', response.data.error);
+          }
+        } catch (error) {
+          console.error('Failed to get presigned URL:', error);
+        }
+      }, startTime);
+
+      // 녹음 종료 타이머 (+ 마이크 끄기)
+      const endTimeout = setTimeout(() => {
+        console.log(`Stopping recording for sentence ${sentence.sentence_id} at ${sentence.end_time + 0.5}s`);
+        stopRecordingRef.current();
+        // sentenceId는 onRecordingComplete에서 초기화 (비동기 onstop 이벤트 이후)
+
+        // 내 차례 종료: 마이크 음소거
+        if (publisher) {
+          publisher.publishAudio(false);
+          console.log(`Mic muted after my turn (sentence ${sentence.sentence_id})`);
+        }
+      }, endTime);
+
+      timeouts.push(startTimeout, endTimeout);
+    });
+
+    // 클린업
+    return () => {
+      console.log('Cleaning up recording schedule and mic control');
+      timeouts.forEach(timeout => clearTimeout(timeout));
+      stopRecordingRef.current();
+
+      // Round 종료 시 마이크 원래 상태로 복원
+      if (publisher && isAudioEnabled) {
+        publisher.publishAudio(true);
+        console.log('Mic restored to original state');
+      }
+    };
+  }, [videoReady, isPlaying, currentRound, roleSegments, mySelectedRoleId, roomId, memberId, publisher, isAudioEnabled]);
 
   // 비밀번호 입력 후 방 입장
   const handlePasswordSubmit = async () => {
@@ -1396,7 +1474,7 @@ export default function ShadowingRoom() {
                     />
 
                     {/* 대본 표시 (WATCHING 및 Round 모드) */}
-                    {currentSubtitles.length > 0 && (
+                    {isSubtitleEnabled && currentSubtitles.length > 0 && (
                       <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-4xl px-4">
                         <div className="space-y-2">
                           {currentSubtitles.map((subtitle, index) => (
