@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -55,13 +54,9 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/ready")
     public void toggleReady(
             @DestinationVariable Long roomId,
-            @Payload ReadyMessage message,
-            @Header("simpSessionId") String sessionId
+            @Payload ReadyMessage message
     ) {
         log.info("준비 상태 변경 요청: roomId={}, memberId={}", roomId, message.getMemberId());
-
-        // WebSocket sessionId 매핑 저장 (비정상 종료 시 사용)
-        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
 
         boolean currentReady = roomSessionService.isReady(roomId, message.getMemberId());
         boolean newReady = !currentReady;
@@ -79,15 +74,10 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/role")
     public void selectRole(
             @DestinationVariable Long roomId,
-            @Payload RoleSelectMessage message,
-            @Header("simpSessionId") String sessionId
+            @Payload RoleSelectMessage message
     ) {
         log.info("역할 선점 요청: roomId={}, memberId={}, roleId={}",
                 roomId, message.getMemberId(), message.getRoleId());
-
-        // WebSocket sessionId 매핑 저장
-        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
-        clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
         // 역할이 이미 확정되었는지 확인
         if (roomSessionService.isRolesConfirmed(roomId)) {
@@ -116,14 +106,9 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/role/release")
     public void releaseRole(
             @DestinationVariable Long roomId,
-            @Payload RoleReleaseMessage message,
-            @Header("simpSessionId") String sessionId
+            @Payload RoleReleaseMessage message
     ) {
         log.info("역할 해제 요청: roomId={}, memberId={}", roomId, message.getMemberId());
-
-        // WebSocket sessionId 매핑 저장
-        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
-        clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
         // 역할이 이미 확정되었는지 확인
         if (roomSessionService.isRolesConfirmed(roomId)) {
@@ -148,15 +133,10 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/chat")
     public void chat(
             @DestinationVariable Long roomId,
-            @Payload ChatMessage message,
-            @Header("simpSessionId") String sessionId
+            @Payload ChatMessage message
     ) {
         log.info("채팅 메시지: roomId={}, memberId={}, message={}",
                 roomId, message.getSenderId(), message.getMessage());
-
-        // WebSocket sessionId 매핑 저장
-        roomSessionService.setSessionMember(sessionId, message.getSenderId(), roomId);
-        clearDisconnectedIfNeeded(roomId, message.getSenderId());
 
         try {
             // Redis에 채팅 메시지 저장
@@ -191,14 +171,9 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/watching/complete")
     public void watchingComplete(
             @DestinationVariable Long roomId,
-            @Payload WatchingCompleteMessage message,
-            @Header("simpSessionId") String sessionId
+            @Payload WatchingCompleteMessage message
     ) {
         log.info("영상 시청 완료 메시지 수신: roomId={}, memberId={}", roomId, message.getMemberId());
-
-        // WebSocket sessionId 매핑 저장
-        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
-        clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
         roomService.watchingComplete(roomId, message.getMemberId());
     }
@@ -210,32 +185,13 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/recording/complete")
     public void recordingComplete(
             @DestinationVariable Long roomId,
-            @Payload RecordingCompleteMessage message,
-            @Header("simpSessionId") String sessionId
+            @Payload RecordingCompleteMessage message
     ) {
         log.info("녹음 완료 메시지 수신: roomId={}, memberId={}, sentenceId={}",
                 roomId, message.getMemberId(), message.getSentenceId());
 
-        // WebSocket sessionId 매핑 저장
-        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
-        clearDisconnectedIfNeeded(roomId, message.getMemberId());
-
         roomService.recordingComplete(roomId, message);
     }
-
-
-
-    /**
-     * 재연결 시 disconnected 마킹 해제
-     * WebSocket 메시지 핸들러에서 호출하여 Grace Period 내 재연결 감지
-     */
-    private void clearDisconnectedIfNeeded(Long roomId, Long memberId) {
-        if (roomSessionService.isDisconnected(roomId, memberId)) {
-            roomSessionService.clearDisconnected(roomId, memberId);
-            log.info("재연결 감지, disconnected 마킹 해제: roomId={}, memberId={}", roomId, memberId);
-        }
-    }
-
 
 
 

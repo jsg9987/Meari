@@ -754,6 +754,15 @@ public class RoomSessionService {
         log.debug("WebSocket sessionId 매핑 삭제: sessionId={}", sessionId);
     }
 
+    /**
+     * WebSocket sessionId 매핑 존재 여부 확인
+     * Interceptor에서 중복 저장 방지용
+     */
+    public boolean hasSessionMapping(String sessionId) {
+        String key = String.format(KEY_SESSION_MEMBER, sessionId);
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+    }
+
     // === 유틸리티 ===
 
     // key의 만료 시간 설정
