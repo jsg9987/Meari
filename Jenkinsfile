@@ -31,7 +31,7 @@ pipeline {
                                         string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
                                         string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
                                         string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
-                                        string(credentialsId: 'DOMAIN', variable: 'DOMAIN')
+                                        string(credentialsId: 'DOMAIN', variable: 'DOMAIN') // 각 EC2에 맞는 도메인값을 주입하기 위한 환경변수
                                     ]) {
                                         sh '''
                                         docker build \
