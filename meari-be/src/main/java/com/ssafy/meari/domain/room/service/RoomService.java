@@ -261,9 +261,14 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // 참여 중인지 확인
+        // 참여 중인지 확인 (WebSocket disconnect로 이미 처리된 경우 정상 종료)
         MemberRoom memberRoom = memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(roomId, memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER_ROOM));
+                .orElse(null);
+
+        if (memberRoom == null) {
+            log.info("이미 퇴장 처리됨 (WebSocket disconnect): roomId={}, memberId={}", roomId, memberId);
+            return;
+        }
 
         // MemberRoom 삭제
         memberRoomRepository.delete(memberRoom);
