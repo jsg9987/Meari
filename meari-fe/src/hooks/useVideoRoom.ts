@@ -278,6 +278,7 @@ export function useVideoRoom({
     setPublisher(null);
     publisherRef.current = null;
     setSubscribers([]);
+    setConnections([]); // ⭐ connections 배열 초기화 추가
     statusRef.current = "idle";
     setStatus("idle");
     setError(null);
