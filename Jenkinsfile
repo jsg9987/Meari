@@ -30,8 +30,7 @@ pipeline {
                                         string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
                                         string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
                                         string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
-                                        string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
-                                        string(credentialsId: 'DOMAIN', variable: 'DOMAIN') // 각 EC2에 맞는 도메인값을 주입하기 위한 환경변수
+                                        string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY')
                                     ]) {
                                         sh '''
                                         docker build \
@@ -45,7 +44,6 @@ pipeline {
                                           --build-arg AWS_SECRET_KEY="${AWS_SECRET}" \
                                           --build-arg AWS_S3_BUCKET="${S3_BUCKET}" \
                                           --build-arg GEMINI_API_KEY="${GEMINI_KEY}" \
-                                          --build-arg DOMAIN="${DOMAIN}" \
                                           -t backend-image:latest .
                                         '''
                                     }
@@ -134,8 +132,7 @@ pipeline {
                     string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
                     string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
                     string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
-                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
-                    string(credentialsId: 'DOMAIN', variable: 'DOMAIN')
+                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET')
                 ]) {
                     script {
                         sh '''
@@ -161,7 +158,6 @@ pipeline {
                             echo "AWS_REGION=ap-northeast-2" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION=3600" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
-                            echo "DOMAIN=${DOMAIN}" >> .env
 
                             docker-compose up -d --force-recreate frontend spring-api fastapi
                         '''
