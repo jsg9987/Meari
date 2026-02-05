@@ -130,7 +130,7 @@ const KopicPanel = () => {
       </div>
 
       {/* 설명 카드 영역 - 높이 고정 및 이미지 절대 배치 */}
-      <div className='grid grid-cols-4 gap-[18px] mb-10'>
+      <div className='grid grid-cols-4 gap-[18px] mb-4'>
         {stepCards.map((card) => (
           <div
             key={card.id}
@@ -138,7 +138,7 @@ const KopicPanel = () => {
           >
             {/* 배지 (시안 스타일: 어두운 배경 + 전구 아이콘) */}
             <div className='inline-flex items-center gap-1.5 mb-3 px-[9px] py-[4px] rounded bg-[#001C27] relative z-10'>
-              <span className='text-[14px] font-bold text-[#38bdf8]'>
+              <span className='text-[14px] font-bold text-[#F4F4F4]'>
                 {card.badge}
               </span>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -168,7 +168,7 @@ const KopicPanel = () => {
 
       {/* 테마 선택 영역 */}
       <div>
-        <h2 className='text-xl font-bold text-gray-900 mb-[18px]'>테마 선택</h2>
+        <h2 className='text-xl font-bold text-gray-900 mb-3'>테마 선택</h2>
         {isLoading ? (
           <div className='grid grid-cols-4 gap-[18px]'>
             {[1, 2, 3, 4].map((index) => (
