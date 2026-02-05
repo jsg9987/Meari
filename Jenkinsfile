@@ -30,7 +30,8 @@ pipeline {
                                         string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
                                         string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
                                         string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
-                                        string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY')
+                                        string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
+                                        string(credentialsId: 'DOMAIN', variable: 'DOMAIN')
                                     ]) {
                                         sh '''
                                         docker build \
@@ -44,6 +45,7 @@ pipeline {
                                           --build-arg AWS_SECRET_KEY="${AWS_SECRET}" \
                                           --build-arg AWS_S3_BUCKET="${S3_BUCKET}" \
                                           --build-arg GEMINI_API_KEY="${GEMINI_KEY}" \
+                                          --build-arg DOMAIN="${DOMAIN}" \
                                           -t backend-image:latest .
                                         '''
                                     }
@@ -132,7 +134,8 @@ pipeline {
                     string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
                     string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
                     string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
-                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET')
+                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
+                    string(credentialsId: 'DOMAIN', variable: 'DOMAIN')
                 ]) {
                     script {
                         sh '''
