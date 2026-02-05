@@ -126,11 +126,9 @@ pipeline {
                 ]) {
                     script {
                         sh '''
-                            # GitLab 최신 docker-compose.yml을 배포 경로로 복사
-                            cp docker-compose.yml /home/ubuntu/docker-compose.yml
-
-                            # 배포 경로로 이동
                             cd /home/ubuntu
+                            docker-compose down --remove-orphans 2>/dev/null || true
+                            cp ${WORKSPACE}/docker-compose.yml /home/ubuntu/docker-compose.yml
 
                             # .env 파일 생성
                             echo "DB_PASSWORD=${DB_PW}" > .env
@@ -155,9 +153,6 @@ pipeline {
                             echo "CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION=3600" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
 
-                            # docker-compose로 배포 (최신 yml 파일 사용)
-                            # 기존 컨테이너 모두 제거 후 전체 재시작 (컨테이너 충돌 방지)
-                            docker-compose down --remove-orphans
                             docker-compose up -d
                         '''
                         sh 'docker image prune -f'
