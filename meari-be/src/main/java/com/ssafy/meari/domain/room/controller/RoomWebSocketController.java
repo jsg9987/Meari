@@ -3,11 +3,15 @@ package com.ssafy.meari.domain.room.controller;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import com.ssafy.meari.domain.room.dto.websocket.ChatMessage;
 import com.ssafy.meari.domain.room.dto.websocket.ReadyMessage;
@@ -51,9 +55,13 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/ready")
     public void toggleReady(
             @DestinationVariable Long roomId,
-            @Payload ReadyMessage message
+            @Payload ReadyMessage message,
+            @Header("simpSessionId") String sessionId
     ) {
         log.info("준비 상태 변경 요청: roomId={}, memberId={}", roomId, message.getMemberId());
+
+        // WebSocket sessionId 매핑 저장 (비정상 종료 시 사용)
+        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
 
         boolean currentReady = roomSessionService.isReady(roomId, message.getMemberId());
         boolean newReady = !currentReady;
@@ -71,10 +79,14 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/role")
     public void selectRole(
             @DestinationVariable Long roomId,
-            @Payload RoleSelectMessage message
+            @Payload RoleSelectMessage message,
+            @Header("simpSessionId") String sessionId
     ) {
         log.info("역할 선점 요청: roomId={}, memberId={}, roleId={}",
                 roomId, message.getMemberId(), message.getRoleId());
+
+        // WebSocket sessionId 매핑 저장
+        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
         clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
         // 역할이 이미 확정되었는지 확인
@@ -104,9 +116,13 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/role/release")
     public void releaseRole(
             @DestinationVariable Long roomId,
-            @Payload RoleReleaseMessage message
+            @Payload RoleReleaseMessage message,
+            @Header("simpSessionId") String sessionId
     ) {
         log.info("역할 해제 요청: roomId={}, memberId={}", roomId, message.getMemberId());
+
+        // WebSocket sessionId 매핑 저장
+        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
         clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
         // 역할이 이미 확정되었는지 확인
@@ -132,10 +148,14 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/chat")
     public void chat(
             @DestinationVariable Long roomId,
-            @Payload ChatMessage message
+            @Payload ChatMessage message,
+            @Header("simpSessionId") String sessionId
     ) {
         log.info("채팅 메시지: roomId={}, memberId={}, message={}",
                 roomId, message.getSenderId(), message.getMessage());
+
+        // WebSocket sessionId 매핑 저장
+        roomSessionService.setSessionMember(sessionId, message.getSenderId(), roomId);
         clearDisconnectedIfNeeded(roomId, message.getSenderId());
 
         try {
@@ -171,9 +191,13 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/watching/complete")
     public void watchingComplete(
             @DestinationVariable Long roomId,
-            @Payload WatchingCompleteMessage message
+            @Payload WatchingCompleteMessage message,
+            @Header("simpSessionId") String sessionId
     ) {
         log.info("영상 시청 완료 메시지 수신: roomId={}, memberId={}", roomId, message.getMemberId());
+
+        // WebSocket sessionId 매핑 저장
+        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
         clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
         roomService.watchingComplete(roomId, message.getMemberId());
@@ -186,10 +210,14 @@ public class RoomWebSocketController {
     @MessageMapping("/room/{roomId}/recording/complete")
     public void recordingComplete(
             @DestinationVariable Long roomId,
-            @Payload RecordingCompleteMessage message
+            @Payload RecordingCompleteMessage message,
+            @Header("simpSessionId") String sessionId
     ) {
         log.info("녹음 완료 메시지 수신: roomId={}, memberId={}, sentenceId={}",
                 roomId, message.getMemberId(), message.getSentenceId());
+
+        // WebSocket sessionId 매핑 저장
+        roomSessionService.setSessionMember(sessionId, message.getMemberId(), roomId);
         clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
         roomService.recordingComplete(roomId, message);
@@ -238,6 +266,45 @@ public class RoomWebSocketController {
             List<Chat> oldChats = chats.subList(0, deleteCount);
             chatRepository.deleteAll(oldChats);
             log.debug("오래된 채팅 메시지 삭제: roomId={}, 삭제 개수={}", roomId, deleteCount);
+        }
+    }
+
+    /**
+     * WebSocket 연결 끊김 이벤트 처리
+     * 클라이언트가 연결을 끊으면 (강제 종료, 네트워크 끊김 등) 즉시 처리
+     */
+    @EventListener
+    public void handleWebSocketDisconnect(SessionDisconnectEvent event) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
+        String sessionId = accessor.getSessionId();
+
+        if (sessionId == null) {
+            log.warn("WebSocket 연결 끊김: sessionId 조회 실패");
+            return;
+        }
+
+        log.info("WebSocket 연결 끊김 감지: sessionId={}", sessionId);
+
+        try {
+            // Redis에서 sessionId 매핑 조회
+            Long memberId = roomSessionService.getSessionMemberId(sessionId);
+            Long roomId = roomSessionService.getSessionRoomId(sessionId);
+
+            if (memberId != null && roomId != null) {
+                // Redis 즉시 삭제 (실시간 상태 반영)
+                roomSessionService.removeMember(roomId, memberId);
+                roomSessionService.clearMemberRoom(memberId);
+                roomSessionService.clearSessionMember(sessionId);
+
+                log.info("비정상 종료: Redis 제거 완료, roomId={}, memberId={}", roomId, memberId);
+
+                // Service 호출해서 DB 정리 및 방장 위임/방 종료 처리
+                roomService.handleAbnormalDisconnect(roomId, memberId);
+            } else {
+                log.debug("WebSocket 연결 끊김: sessionId 매핑 정보 없음 (아직 메시지 미전송 상태)");
+            }
+        } catch (Exception e) {
+            log.error("WebSocket 연결 끊김 처리 중 오류: sessionId={}", sessionId, e);
         }
     }
 }
