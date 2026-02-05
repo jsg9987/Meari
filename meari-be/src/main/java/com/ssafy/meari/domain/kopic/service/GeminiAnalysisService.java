@@ -180,7 +180,7 @@ public class GeminiAnalysisService {
 
             ObjectNode audioPart = objectMapper.createObjectNode();
             ObjectNode inlineData = objectMapper.createObjectNode();
-            inlineData.put("mimeType", "audio/wav");
+            inlineData.put("mimeType", "audio/webm");
             inlineData.put("data", base64Audio);
             audioPart.set("inlineData", inlineData);
 
