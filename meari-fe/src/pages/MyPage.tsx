@@ -26,7 +26,7 @@ const MyPage = () => {
   const [nicknameInput, setNicknameInput] = useState('')
   const [email, setEmail] = useState('')
   const [nativeLanguage, setNativeLanguage] = useState<'KR' | 'VN' | 'EN'>('KR')
-  const [profileImageName, setProfileImageName] = useState('')
+  const [_profileImageName, setProfileImageName] = useState('')
   const [profileImageUrl, setProfileImageUrl] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
