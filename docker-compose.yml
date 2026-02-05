@@ -189,6 +189,7 @@ services:
     volumes:
       # HuggingFace 모델 캐시 영구 저장 (첫 다운로드 후 재사용)
       - huggingface_cache:/root/.cache/huggingface
+      - ./logs/fastapi:/app/logs # 로그 저장
     networks:
       - meari-network
     depends_on:
