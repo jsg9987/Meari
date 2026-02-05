@@ -36,7 +36,7 @@ export default function ShadowingRoom() {
   const { userInfo } = useAuthStore();
   const roomOwnerId = useRoomStore((state) => state.roomData?.owner_id);
   const isOwner = userInfo?.memberId === roomOwnerId;
-  const { roomData, setRoomData, setContentId, clearRoomData } = useRoomStore();
+  const { roomData, contentId, setRoomData, setContentId, clearRoomData } = useRoomStore();
   const {
     availableRoles,
     mySelectedRoleId,
@@ -842,12 +842,15 @@ export default function ShadowingRoom() {
   };
 
   const handleStartShadowing = async () => {
-    if (!roomId) return;
+    if (!roomId || !contentId) {
+      setToastMessage('컨텐츠를 선택해주세요');
+      return;
+    }
 
     try {
       setIsGameStarting(true); // 게임 시작 중 상태로 변경
       // 방장이 게임 시작 API 호출
-      const response = await startGame(Number(roomId));
+      const response = await startGame(Number(roomId), { content_id: contentId });
 
       if (response.data.success) {
         // WebSocket에서 phase가 WATCHING으로 변경되면 카운트다운 시작
@@ -1336,10 +1339,10 @@ export default function ShadowingRoom() {
                         if (currentRound >= 1 && isRoundInProgress) {
                           setIsRoundInProgress(false);
                           setToastMessage(`Round ${currentRound} 완료`);
-                        } else if (roomId && isOwner) {
+                        } else if (roomId && isOwner && contentId) {
                           // 첫 번째 시청 완료 시 finishWatching API 호출 (방장만)
                           try {
-                            const response = await finishWatching(Number(roomId));
+                            const response = await finishWatching(Number(roomId), { content_id: contentId });
                             if (response.data.success) {
                               setIsGameStarting(false);
                             } else {

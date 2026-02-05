@@ -83,39 +83,13 @@ services:
       retries: 5
 
   # ============================================================
-  # 4. OpenVidu - WebRTC 미디어 서버
-  # ============================================================
-  # openvidu:
-  #  image: openvidu/openvidu-dev:2.29.0
-  #  container_name: meari-openvidu
-  #  environment:
-  #    OPENVIDU_SECRET: ${OPENVIDU_SECRET}
-  #    DOMAIN_OR_PUBLIC_IP: ${OPENVIDU_DOMAIN}
-  #    HTTPS_PORT: 4443
-  #    HTTP_PORT: 4442
-  #  ports:
-  #    - "4443:4443"
-  #    - "4442:4442"
-  #    - "3478:3478"
-  #    - "40000-57000:40000-57000/tcp"
-  #    - "40000-57000:40000-57000/udp"
-  #  volumes:
-  #    - openvidu_recordings:/opt/openvidu/recordings
-  #    - openvidu_config:/opt/openvidu/config
-  #  networks:
-  #    - meari-network
-  #  restart: unless-stopped
-  #  deploy:
-  #    resources:
-  #      limits:
-  #        memory: 4G
-
-  # ============================================================
   # 5. Frontend (Nginx + React)
   # ============================================================
   frontend:
     container_name: meari-frontend
     image: frontend-image:latest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "80:80"
       - "443:443"
@@ -133,20 +107,47 @@ services:
   spring-api:
     image: backend-image:latest
     container_name: meari-spring
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meari_db
       SPRING_DATASOURCE_USERNAME: ssafy
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ssafy
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      OPENVIDU_URL: http://openvidu:4443
+      OPENVIDU_URL: http://host.docker.internal:5443/
       OPENVIDU_SECRET: ${OPENVIDU_SECRET}
+      OPENVIDU_PUBLIC_URL: ${OPENVIDU_PUBLIC_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ACCESS_TOKEN_EXPIRE_PERIOD: ${JWT_ACCESS_TOKEN_EXPIRE_PERIOD}
+      JWT_REFRESH_TOKEN_EXPIRE_PERIOD: ${JWT_REFRESH_TOKEN_EXPIRE_PERIOD}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL}
+      OPENAI_API_URL: "https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions"
+      OPENAI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_MODEL: gpt-4o-mini
+      ANTHROPIC_API_URL: "https://gms.ssafy.io/gmsapi/api.anthropic.com/v1/messages"
+      ANTHROPIC_API_KEY: ${GEMINI_API_KEY}
+      ANTHROPIC_MODEL: claude-opus-4-1-20250805
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_REGION: ${AWS_REGION}
+      CLOUD_AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      CLOUD_AWS_CREDENTIALS_SECRET_KEY: ${AWS_SECRET_KEY}
+      CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION: 3600
+      CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION: 900
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
     ports:
       - "8080:8080"
     networks:
@@ -165,17 +166,29 @@ services:
           memory: 2G
 
   # ============================================================
-  # 7. FastAPI - AI 분석 서버 (환경변수 대응 수정됨)
+  # 7. FastAPI - AI 분석 서버
   # ============================================================
   fastapi:
     image: meari-fastapi:latest
     container_name: meari-fastapi
     environment:
-      DATABASE_URL: postgresql://ssafy:${DB_PASSWORD}@postgres:5432/meari_db
-      REDIS_URL: "redis://${REDIS_PASSWORD:+:$REDIS_PASSWORD@}redis:6379"
-      RABBITMQ_URL: amqp://ssafy:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      # RabbitMQ 설정
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ssafy
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      # AWS S3 설정
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_REGION: ${AWS_REGION}
+      # 로깅 설정
+      LOG_LEVEL: INFO
     ports:
       - "8000:8000"
+    volumes:
+      # HuggingFace 모델 캐시 영구 저장 (첫 다운로드 후 재사용)
+      - huggingface_cache:/root/.cache/huggingface
     networks:
       - meari-network
     depends_on:
@@ -189,7 +202,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 8G
 
 # ============================================================
 # 네트워크 및 볼륨 설정
@@ -203,5 +216,6 @@ volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
+  huggingface_cache:  # HuggingFace 모델 캐시 저장소
 #  openvidu_recordings:
 #  openvidu_config:
