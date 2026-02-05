@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import logoWhite from '../../assets/images/common/logo-white.svg'
@@ -304,13 +304,13 @@ const SentenceOrder = () => {
                 </div>
               </div>
 
-              <section className="rounded-xl border border-gray-200 bg-white pt-4 pb-10 px-5 shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
+              <section className="rounded-xl border border-gray-200 bg-white pt-[11px] pb-[35px] px-[15px] shadow-sm">
+                <div className="mb-[3px] flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-xl font-semibold text-black">
                       {isEndCard ? '완료' : `문장 ${Math.min(currentIndex + 1, total)}`}
                     </p>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-sm font-normal text-gray-500">
                       {isEndCard ? '학습이 끝났어요' : '문장 순서를 올바르게 배열하세요'}
                     </p>
                   </div>
@@ -325,7 +325,7 @@ const SentenceOrder = () => {
                       if (questionIndex !== currentIndex) {
                         return (
                           <div key={question.sentence_id} className="min-w-full px-1">
-                            <div className="rounded-xl border border-[#E6E8FF] bg-[#F7F8FF] pb-10 pt-5 text-center" />
+                            <div className="rounded-xl border border-[#E6E8FF] bg-[#F7F8FF] pb-[35px] pt-[15px] text-center" />
                           </div>
                         )
                       }
@@ -337,17 +337,17 @@ const SentenceOrder = () => {
 
                       return (
                         <div key={question.sentence_id} className="min-w-full px-1">
-                          <div className="rounded-xl border border-[#E6E8FF] bg-[#F7F8FF] p-5 text-center">
-                            <div className="flex flex-col items-center gap-2 py-7">
+                          <div className="rounded-xl border border-[#E6E8FF] bg-[#F7F8FF] p-[15px] text-center">
+                            <div className="flex flex-col items-center gap-[3px] py-[23px]">
                               <div className="relative inline-block max-w-[680px] text-center">
                                 <h2 className="text-4xl font-bold text-gray-900">문장 순서 맞추기</h2>
                               </div>
-                              <p className="text-sm text-gray-500">{question.text_vn}</p>
+                              <p className="text-sm font-normal text-gray-500">{question.text_vn}</p>
                             </div>
 
-                            <div className="mx-auto flex max-w-3xl flex-col gap-[10px] px-5">
-                              <div className="rounded-xl border border-[#D7E7FF] bg-white/80 px-6 py-6">
-                                <div className="flex flex-wrap justify-center gap-3 min-h-[52px]">
+                            <div className="mx-auto flex max-w-3xl flex-col gap-[5px] px-[15px]">
+                              <div className="rounded-xl border border-[#D7E7FF] bg-white/80 px-[19px] py-[19px]">
+                                <div className="flex flex-wrap justify-center gap-[7px] min-h-[52px]">
                                   {selectedIds.map((id) => {
                                     const word = wordMap.get(id)
                                     if (!word) return null
@@ -366,13 +366,13 @@ const SentenceOrder = () => {
                                     </span>
                                   )}
                                 </div>
-                                <div className="mt-[6px]">
+                                <div className="mt-[1px]">
                                   <div className="h-0 border-b-2 border-gray-300" />
                                 </div>
                               </div>
 
                               <div>
-                                <div className="flex flex-wrap justify-center gap-3">
+                                <div className="flex flex-wrap justify-center gap-[7px]">
                                   {bankIds.map((id) => {
                                     const word = wordMap.get(id)
                                     if (!word) return null
@@ -389,7 +389,7 @@ const SentenceOrder = () => {
                               </div>
                             </div>
 
-                            <div className="mt-5 px-5 text-sm text-gray-500">
+                            <div className="mt-[15px] px-[15px] text-sm text-gray-500">
                               정답 예시: <span className="font-medium text-gray-700">{ordered}</span>
                             </div>
                           </div>
@@ -397,7 +397,7 @@ const SentenceOrder = () => {
                       )
                     })}
                     <div className="min-w-full px-1">
-                      <div className="rounded-xl border border-[#E6E8FF] bg-[#F7F8FF] pb-10 pt-5 text-center">
+                      <div className="rounded-xl border border-[#E6E8FF] bg-[#F7F8FF] pb-[35px] pt-[15px] text-center">
                         <div className="flex flex-col items-center gap-4 py-10">
                           <h2 className="text-3xl font-bold text-gray-900">학습이 끝났어요!</h2>
                           <p className="text-base text-gray-600">다음으로 이동할까요?</p>
@@ -460,7 +460,7 @@ const SentenceOrder = () => {
       {isWrongModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
           <div className="w-full max-w-sm rounded-xl bg-white p-6 text-center shadow-xl">
-            <p className="text-lg font-semibold text-gray-900">{feedbackMessage ?? '오답입니다'}</p>
+            <p className="text-sm font-normal text-gray-500">{feedbackMessage ?? '오답입니다'}</p>
             <p className="mt-2 text-sm text-gray-600">단어를 다시 배치해주세요.</p>
             <button
               type="button"
