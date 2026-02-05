@@ -14,6 +14,7 @@ export interface VideoTileData {
   isSpeaker?: boolean;
   isReady?: boolean;
   isSettingUp?: boolean; // 세팅 중 (아직 publish 안 함)
+  memberId?: number; // 멤버 ID
 }
 
 interface UseVideoRoomOptions {
@@ -55,53 +56,59 @@ export function useVideoRoom({
   const tiles = useMemo<VideoTileData[]>(() => {
     const arr: VideoTileData[] = [];
     if (publisher) {
-      arr.push({ id: "me", streamManager: publisher, muted: true, label: `${nickname} (나)` });
+      arr.push({ id: "me", streamManager: publisher, muted: true, label: `${nickname} (나)`, memberId });
     }
 
     // 실제 스트림이 있는 참가자들
     subscribers.forEach((s) => {
       const clientData = s.stream.connection.data;
       let name = "참여자";
+      let memberIdFromData: number | undefined;
       try {
         // %/% 구분자로 나눠진 경우 처리 (백엔드에서 추가 데이터를 넣은 경우)
         if (clientData.includes('%/%')) {
           const parts = clientData.split('%/%');
-          // 두 번째 부분(백엔드 데이터)에서 nickname 추출
+          // 두 번째 부분(백엔드 데이터)에서 nickname과 member_id 추출
           const backendData = JSON.parse(parts[1]);
           name = backendData.nickname || name;
+          memberIdFromData = backendData.member_id;
         } else {
           const parsed = JSON.parse(clientData);
           name = parsed.clientData || parsed.nickname || name;
+          memberIdFromData = parsed.member_id;
         }
       } catch (error) {
         console.error('Failed to parse clientData:', clientData, error);
         name = "참여자";
       }
-      arr.push({ id: s.stream.streamId, streamManager: s, label: name });
+      arr.push({ id: s.stream.streamId, streamManager: s, label: name, memberId: memberIdFromData });
     });
 
     // 아직 publish 안 한 참가자들 (세팅 중)
     connections.forEach((conn) => {
       const clientData = conn.data;
       let name = "참여자";
+      let memberIdFromData: number | undefined;
       try {
         if (clientData.includes('%/%')) {
           const parts = clientData.split('%/%');
           const backendData = JSON.parse(parts[1]);
           name = backendData.nickname || name;
+          memberIdFromData = backendData.member_id;
         } else {
           const parsed = JSON.parse(clientData);
           name = parsed.clientData || parsed.nickname || name;
+          memberIdFromData = parsed.member_id;
         }
       } catch (error) {
         console.error('Failed to parse clientData:', clientData, error);
         name = "참여자";
       }
-      arr.push({ id: conn.connectionId, label: name, isSettingUp: true });
+      arr.push({ id: conn.connectionId, label: name, isSettingUp: true, memberId: memberIdFromData });
     });
 
     return arr;
-  }, [publisher, subscribers, connections, nickname]);
+  }, [publisher, subscribers, connections, nickname, memberId]);
 
   const join = useCallback(async () => {
     if (statusRef.current === "connecting" || statusRef.current === "connected") {
