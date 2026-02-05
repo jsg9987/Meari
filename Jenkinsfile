@@ -154,10 +154,11 @@ pipeline {
                             echo "AWS_REGION=ap-northeast-2" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION=3600" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
-                            echo "DOMAIN=${DOMAIN}" >> .env
 
                             # docker-compose로 배포 (최신 yml 파일 사용)
-                            docker-compose up -d --force-recreate frontend spring-api fastapi
+                            # 기존 컨테이너 모두 제거 후 전체 재시작 (컨테이너 충돌 방지)
+                            docker-compose down --remove-orphans
+                            docker-compose up -d
                         '''
                         sh 'docker image prune -f'
                     }
