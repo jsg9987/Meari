@@ -1,5 +1,6 @@
 package com.ssafy.meari.domain.kopic.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.meari.domain.kopic.dto.request.KopicEvaluateRequest;
 import com.ssafy.meari.domain.kopic.dto.request.KopicTotalReportCreateRequest;
 import com.ssafy.meari.domain.kopic.dto.response.KopicEvaluateResponse;
@@ -30,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class KopicEvaluateController {
 
     private final KopicEvaluateService kopicEvaluateService;
+    private final ObjectMapper objectMapper;
 
     @Operation(
             summary = "코픽 통합 리포트 생성",
@@ -47,21 +49,25 @@ public class KopicEvaluateController {
 
     @Operation(
             summary = "코픽 발화 분석 요청",
-            description = "음성 파일을 Gemini AI로 분석합니다. 비동기로 처리되며 202 Accepted를 즉시 반환합니다."
+            description = "음성 파일을 S3에 업로드 후 Gemini AI로 분석합니다. 비동기로 처리되며 202 Accepted를 즉시 반환합니다."
     )
     @PostMapping(value = "/evaluate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<KopicEvaluateResponse>> evaluate(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @Valid @RequestPart("request") KopicEvaluateRequest request,
-            @RequestPart("audio") MultipartFile audioFile
+            @RequestParam("request") String requestJson,
+            @RequestParam("audio") MultipartFile audioFile
     ) {
-        log.debug("코픽 발화 분석 요청: memberId={}, sentenceId={}", userDetails.getMember().getMemberId(), request.getKopicSentenceId());
         try {
+            KopicEvaluateRequest request = objectMapper.readValue(requestJson, KopicEvaluateRequest.class);
+            log.debug("코픽 발화 분석 요청: memberId={}, sentenceId={}, fileName={}",
+                    userDetails.getMember().getMemberId(), request.getKopicSentenceId(), audioFile.getOriginalFilename());
+
             byte[] audioData = audioFile.getBytes();
-            KopicEvaluateResponse response = kopicEvaluateService.evaluate(userDetails.getMember(), request, audioData);
+            String contentType = audioFile.getContentType();
+            KopicEvaluateResponse response = kopicEvaluateService.evaluate(userDetails.getMember(), request, audioData, contentType);
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.success(response));
         } catch (java.io.IOException e) {
-            throw new RuntimeException("음성 파일 읽기 실패", e);
+            throw new RuntimeException("요청 처리 실패", e);
         }
     }
 
