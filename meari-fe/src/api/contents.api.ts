@@ -16,7 +16,8 @@ export interface Content {
   description: string;
   video_url: string;
   thumbnail_url: string;
-  duration: number;
+  duration: number; // total_duration (numeric(10,3) -> 초 단위 소수점 포함)
+  max_people?: number; // 최대 인원수 (선택적)
 }
 
 export type GetThemesResponse = AxiosResponse<ApiResponse<Theme[]>>;

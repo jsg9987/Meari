@@ -42,12 +42,12 @@ export function useVideoRoom({
   const [session, setSession] = useState<Session | null>(null);
   const [publisher, setPublisher] = useState<Publisher | null>(null);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
-  const [connections, setConnections] = useState<Connection[]>([]); // 아직 publish 안 한 연결들
+  const [connections, setConnections] = useState<Connection[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [backendSessionId, setBackendSessionId] = useState<string | null>(null); // 백엔드에서 받은 session_id
+  const [backendSessionId, setBackendSessionId] = useState<string | null>(null);
 
   const ovRef = useRef<OpenVidu | null>(null);
   const statusRef = useRef<ConnectionStatus>("idle");
@@ -64,12 +64,10 @@ export function useVideoRoom({
       const clientData = s.stream.connection.data;
       let name = "참여자";
       let memberIdFromData: number | undefined;
-      console.log('[useVideoRoom] Parsing subscriber clientData:', clientData);
       try {
         // %/% 구분자로 나눠진 경우 처리 (백엔드에서 추가 데이터를 넣은 경우)
         if (clientData.includes('%/%')) {
           const parts = clientData.split('%/%');
-          console.log('[useVideoRoom] Found %/% separator, parts:', parts);
 
           // 첫 번째 부분 파싱
           const firstPart = JSON.parse(parts[0]);
