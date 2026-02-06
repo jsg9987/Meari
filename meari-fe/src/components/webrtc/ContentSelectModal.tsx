@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Clock } from "lucide-react";
+import { X, Clock, Users } from "lucide-react";
 import { getThemeContents, type Content } from "../../api/contents.api";
 
 type ContentSelectModalProps = {
@@ -50,7 +50,7 @@ export default function ContentSelectModal({ themeId, onClose, onSelect }: Conte
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+    const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
@@ -116,6 +116,14 @@ export default function ContentSelectModal({ themeId, onClose, onSelect }: Conte
                       alt={content.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
+                    {/* 왼쪽 상단: 인원수 */}
+                    {content.max_people && (
+                      <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                        <Users size={12} />
+                        <span>{content.max_people}명</span>
+                      </div>
+                    )}
+                    {/* 오른쪽 하단: 영상 길이 */}
                     <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
                       <Clock size={12} />
                       <span>{formatDuration(content.duration)}</span>
