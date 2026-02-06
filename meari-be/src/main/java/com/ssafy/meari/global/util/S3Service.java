@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -23,6 +25,7 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class S3Service {
 
+    private final S3Client s3Client;
     private final S3Presigner s3Presigner;
 
     @Value("${cloud.aws.s3.bucket}")
@@ -94,5 +97,60 @@ public class S3Service {
      */
     public String generateRecordingKey(Long roomId, Integer round, Long memberId, Long sentenceId) {
         return String.format("recordings/%d/round%d/%d/%d.wav", roomId, round, memberId, sentenceId);
+    }
+
+    /**
+     * S3 키 생성 - 코픽 음성 파일용
+     * @param memberId 멤버 ID
+     * @param kopicSentenceId 코픽 문장 ID
+     * @return S3 키 (예: "kopic/1/501.wav")
+     */
+    public String generateKopicKey(Long memberId, Long kopicSentenceId) {
+        return String.format("kopic/%d/%d_%d.wav", memberId, kopicSentenceId, System.currentTimeMillis());
+    }
+
+    /**
+     * 파일 업로드 (바이트 배열)
+     * @param s3Key S3 객체 키
+     * @param data 파일 데이터
+     * @param contentType 콘텐츠 타입
+     */
+    public void uploadFile(String s3Key, byte[] data, String contentType) {
+        log.debug("S3 파일 업로드 시작: bucket={}, key={}, size={}", bucketName, s3Key, data.length);
+
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(s3Key)
+                .contentType(contentType)
+                .build();
+
+        s3Client.putObject(putObjectRequest, RequestBody.fromBytes(data));
+
+        log.info("S3 파일 업로드 완료: key={}", s3Key);
+    }
+
+    /**
+     * 파일 다운로드용 Presigned URL 생성 (GET)
+     * @param s3Key S3 객체 키
+     * @return Presigned URL
+     */
+    public String generatePresignedUrlForDownload(String s3Key) {
+        log.debug("다운로드 Presigned URL 생성 시작: bucket={}, key={}", bucketName, s3Key);
+
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(s3Key)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofSeconds(videoExpirationSeconds))
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
+        String url = presignedRequest.url().toString();
+
+        log.info("다운로드 Presigned URL 생성 완료: key={}, expiresIn={}s", s3Key, videoExpirationSeconds);
+        return url;
     }
 }
