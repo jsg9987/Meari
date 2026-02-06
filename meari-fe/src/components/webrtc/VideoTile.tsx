@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MicOff, VideoOff, CheckCircle2 } from "lucide-react";
+import { MicOff, VideoOff, CheckCircle2, Volume2, VolumeX } from "lucide-react";
 import type { StreamManager } from "openvidu-browser";
 
 interface VideoTileProps {
@@ -17,6 +17,8 @@ export default function VideoTile({ streamManager, muted, label, isSpeaker, isRe
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isAudioActive, setIsAudioActive] = useState(true);
   const [isVideoActive, setIsVideoActive] = useState(true);
+  const [volume, setVolume] = useState(100);
+  const [showVolumeControl, setShowVolumeControl] = useState(false);
 
   useEffect(() => {
     if (!streamManager || !videoRef.current) return;
@@ -39,6 +41,25 @@ export default function VideoTile({ streamManager, muted, label, isSpeaker, isRe
       clearInterval(checkInterval);
     };
   }, [streamManager]);
+
+  // 개별 볼륨 적용 (자신의 비디오가 아닌 경우에만)
+  useEffect(() => {
+    if (videoRef.current && !muted) {
+      videoRef.current.volume = volume / 100;
+    }
+  }, [volume, muted]);
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setVolume(Number(e.target.value));
+  };
+
+  const handleVolumeToggle = () => {
+    if (volume > 0) {
+      setVolume(0);
+    } else {
+      setVolume(100);
+    }
+  };
 
   // 세팅 중인 경우
   if (isSettingUp) {
@@ -117,6 +138,37 @@ export default function VideoTile({ streamManager, muted, label, isSpeaker, isRe
         <div className="absolute top-2 right-2 px-2 py-1 bg-green-500 text-white rounded-lg flex items-center gap-1 text-xs font-medium">
           <CheckCircle2 size={14} />
           <span>준비완료</span>
+        </div>
+      )}
+
+      {/* 개별 볼륨 컨트롤 (자신의 타일이 아닌 경우만 표시) */}
+      {!muted && (
+        <div
+          className="absolute top-2 left-2 flex items-center gap-2 bg-black/60 px-2 py-1.5 rounded-lg backdrop-blur-sm"
+          onMouseEnter={() => setShowVolumeControl(true)}
+          onMouseLeave={() => setShowVolumeControl(false)}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleVolumeToggle();
+            }}
+            className="text-white hover:text-blue-400 transition-colors"
+            title={volume > 0 ? "음소거" : "음소거 해제"}
+          >
+            {volume > 0 ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
+          {showVolumeControl && (
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={handleVolumeChange}
+              onClick={(e) => e.stopPropagation()}
+              className="w-16 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+            />
+          )}
         </div>
       )}
     </div>
