@@ -120,6 +120,7 @@ export default function ShadowingRoom() {
   const [timeUntilStart, setTimeUntilStart] = useState<number | null>(null);
   const currentRecordingSentenceIdRef = useRef<number | null>(null);
   const presignedUrlsRef = useRef<Map<number, string>>(new Map());
+  const s3KeysRef = useRef<Map<number, string>>(new Map());
 
   const nickname = userInfo?.nickname || "User";
 
@@ -169,8 +170,15 @@ export default function ShadowingRoom() {
 
       // 미리 받아놓은 Presigned URL 사용
       const presignedUrl = presignedUrlsRef.current.get(sentenceId);
+      const s3Key = s3KeysRef.current.get(sentenceId);
+
       if (!presignedUrl) {
         console.error(`No presigned URL found for sentence ${sentenceId}`);
+        return;
+      }
+
+      if (!s3Key) {
+        console.error(`No s3_key found for sentence ${sentenceId}`);
         return;
       }
 
@@ -178,8 +186,13 @@ export default function ShadowingRoom() {
       await uploadRecordingToS3(presignedUrl, audioBlob);
       console.log(`Successfully uploaded recording for sentence ${sentenceId}`);
 
-      // 사용한 URL 삭제
+      // WebSocket으로 녹음 완료 알림 전송 (s3_key 포함)
+      sendRecordingComplete(sentenceId, s3Key);
+      console.log(`Recording complete notification sent for sentence ${sentenceId}, s3_key: ${s3Key}`);
+
+      // 사용한 URL과 key 삭제
       presignedUrlsRef.current.delete(sentenceId);
+      s3KeysRef.current.delete(sentenceId);
     } catch (error) {
       console.error('Failed to upload recording:', error);
     }
@@ -216,6 +229,7 @@ export default function ShadowingRoom() {
     toggleReady: wsToggleReady,
     assignRole,
     sendChatMessage,
+    sendRecordingComplete,
   } = useRoomWebSocket({
     roomId: Number(roomId),
     memberId,
@@ -257,7 +271,7 @@ export default function ShadowingRoom() {
           description: '',
           video_url: videoUrlFromApi,
           thumbnail_url: '',
-          duration: 0,
+          total_duration: 0,
         };
       });
 
@@ -461,6 +475,7 @@ export default function ShadowingRoom() {
       setParticipantsReady({});
       currentRecordingSentenceIdRef.current = null;
       presignedUrlsRef.current.clear();
+      s3KeysRef.current.clear();
       timeIndexedSubtitlesRef.current = [];
 
       // Store 초기화
@@ -653,7 +668,7 @@ export default function ShadowingRoom() {
                 description: '',
                 video_url: videoUrlFromApi,
                 thumbnail_url: '',
-                duration: 0,
+                total_duration: 0,
               });
             }
           } catch (error) {
@@ -786,14 +801,85 @@ export default function ShadowingRoom() {
       // 각 활성 문장에 대해 이전/현재/다음 문장 추가
       const addedSentences = new Set<number>(); // 중복 방지
 
-      activeIndices.forEach((currentIndex) => {
+      if (activeIndices.length > 0) {
+        // 활성 문장이 있는 경우 - 기존 로직
+        activeIndices.forEach((currentIndex) => {
+          const allSubtitles = timeIndexedSubtitlesRef.current;
+
+          // 이전 문장 (같은 역할 또는 다른 역할)
+          if (currentIndex > 0 && !addedSentences.has(currentIndex - 1)) {
+            const prevSub = allSubtitles[currentIndex - 1];
+            const userInfo = getNicknameByRoleId(prevSub.role_id);
+            addedSentences.add(currentIndex - 1);
+            subtitles.push({
+              roleName: prevSub.role_name,
+              roleId: prevSub.role_id,
+              text: selectedNationality === "KR" ? prevSub.text_ko : prevSub.text_vn,
+              isMyRole: currentRound >= 1 && prevSub.role_id === mySelectedRoleId,
+              timing: 'prev',
+              nickname: userInfo?.nickname,
+              nicknameColor: userInfo ? generateUserColor(userInfo.memberId) : undefined,
+            });
+          }
+
+          // 현재 문장
+          if (!addedSentences.has(currentIndex)) {
+            const currentSub = allSubtitles[currentIndex];
+            const userInfo = getNicknameByRoleId(currentSub.role_id);
+            addedSentences.add(currentIndex);
+            subtitles.push({
+              roleName: currentSub.role_name,
+              roleId: currentSub.role_id,
+              text: selectedNationality === "KR" ? currentSub.text_ko : currentSub.text_vn,
+              isMyRole: currentRound >= 1 && currentSub.role_id === mySelectedRoleId,
+              timing: 'current',
+              nickname: userInfo?.nickname,
+              nicknameColor: userInfo ? generateUserColor(userInfo.memberId) : undefined,
+            });
+          }
+
+          // 다음 문장
+          if (currentIndex < allSubtitles.length - 1 && !addedSentences.has(currentIndex + 1)) {
+            const nextSub = allSubtitles[currentIndex + 1];
+            const userInfo = getNicknameByRoleId(nextSub.role_id);
+            addedSentences.add(currentIndex + 1);
+            subtitles.push({
+              roleName: nextSub.role_name,
+              roleId: nextSub.role_id,
+              text: selectedNationality === "KR" ? nextSub.text_ko : nextSub.text_vn,
+              isMyRole: currentRound >= 1 && nextSub.role_id === mySelectedRoleId,
+              timing: 'next',
+              nickname: userInfo?.nickname,
+              nicknameColor: userInfo ? generateUserColor(userInfo.memberId) : undefined,
+            });
+          }
+        });
+      } else {
+        // 활성 문장이 없는 경우 - 가장 가까운 이전/다음 문장 표시
         const allSubtitles = timeIndexedSubtitlesRef.current;
 
-        // 이전 문장 (같은 역할 또는 다른 역할)
-        if (currentIndex > 0 && !addedSentences.has(currentIndex - 1)) {
-          const prevSub = allSubtitles[currentIndex - 1];
+        // 가장 가까운 이전 문장 찾기 (방금 끝난 문장)
+        let prevIndex = -1;
+        for (let i = allSubtitles.length - 1; i >= 0; i--) {
+          if (allSubtitles[i].end_time <= currentTime) {
+            prevIndex = i;
+            break;
+          }
+        }
+
+        // 가장 가까운 다음 문장 찾기 (곧 시작될 문장)
+        let nextIndex = -1;
+        for (let i = 0; i < allSubtitles.length; i++) {
+          if (allSubtitles[i].start_time > currentTime) {
+            nextIndex = i;
+            break;
+          }
+        }
+
+        // 이전 문장 추가
+        if (prevIndex >= 0) {
+          const prevSub = allSubtitles[prevIndex];
           const userInfo = getNicknameByRoleId(prevSub.role_id);
-          addedSentences.add(currentIndex - 1);
           subtitles.push({
             roleName: prevSub.role_name,
             roleId: prevSub.role_id,
@@ -805,27 +891,10 @@ export default function ShadowingRoom() {
           });
         }
 
-        // 현재 문장
-        if (!addedSentences.has(currentIndex)) {
-          const currentSub = allSubtitles[currentIndex];
-          const userInfo = getNicknameByRoleId(currentSub.role_id);
-          addedSentences.add(currentIndex);
-          subtitles.push({
-            roleName: currentSub.role_name,
-            roleId: currentSub.role_id,
-            text: selectedNationality === "KR" ? currentSub.text_ko : currentSub.text_vn,
-            isMyRole: currentRound >= 1 && currentSub.role_id === mySelectedRoleId,
-            timing: 'current',
-            nickname: userInfo?.nickname,
-            nicknameColor: userInfo ? generateUserColor(userInfo.memberId) : undefined,
-          });
-        }
-
-        // 다음 문장
-        if (currentIndex < allSubtitles.length - 1 && !addedSentences.has(currentIndex + 1)) {
-          const nextSub = allSubtitles[currentIndex + 1];
+        // 다음 문장 추가
+        if (nextIndex >= 0) {
+          const nextSub = allSubtitles[nextIndex];
           const userInfo = getNicknameByRoleId(nextSub.role_id);
-          addedSentences.add(currentIndex + 1);
           subtitles.push({
             roleName: nextSub.role_name,
             roleId: nextSub.role_id,
@@ -836,7 +905,7 @@ export default function ShadowingRoom() {
             nicknameColor: userInfo ? generateUserColor(userInfo.memberId) : undefined,
           });
         }
-      });
+      }
 
       setCurrentSubtitles(subtitles);
     };
@@ -1174,9 +1243,10 @@ export default function ShadowingRoom() {
           });
 
           if (response.data.success && response.data.data) {
-            const { upload_url } = response.data.data;
+            const { upload_url, s3_key } = response.data.data;
             presignedUrlsRef.current.set(sentence.sentence_id, upload_url);
-            console.log(`Presigned URL received for sentence ${sentence.sentence_id}`);
+            s3KeysRef.current.set(sentence.sentence_id, s3_key);
+            console.log(`Presigned URL received for sentence ${sentence.sentence_id}, s3_key: ${s3_key}`);
 
             // 녹음 시작
             console.log(`Starting recording for sentence ${sentence.sentence_id} at ${sentence.start_time - 0.5}s`);
@@ -1790,7 +1860,7 @@ export default function ShadowingRoom() {
             )}
 
             {/* 컨텐츠 변경 버튼 (방장만) - 게임 시작 전에만 표시 */}
-            {(DISABLE_WEBRTC || status === "connected") && isOwner && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && (
+            {(DISABLE_WEBRTC || status === "connected") && isOwner && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && !isWaitingForRolePick && (
               <button
                 onClick={() => setIsContentSelectOpen(true)}
                 className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
