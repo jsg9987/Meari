@@ -1,22 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mic, FileText, Calendar, Settings, ChevronDown, User, LogOut } from 'lucide-react'
-import logoWhite from '../../assets/images/common/logo-white.svg'
+import { Settings, ChevronDown, User, LogOut } from 'lucide-react'
+import logoDark from '../../assets/images/common/logo-dark-2.svg'
 import { useAuthStore } from '../../store/auth.store'
 
 export type HomeTab = 'shadowing' | 'copik' | 'daily'
 export type Language = 'ko' | 'vi' | 'en'
-
-type HeaderProps = {
-  activeTab: HomeTab
-  onTabChange: (tab: HomeTab) => void
-}
-
-const tabs = [
-  { id: 'shadowing', label: '쉐도잉', icon: Mic },
-  { id: 'copik', label: '코픽', icon: FileText },
-  { id: 'daily', label: '일일 학습', icon: Calendar },
-] as const
 
 const languages = [
   { code: 'ko', label: '한국어', nativeLabel: '한국어' },
@@ -24,27 +13,13 @@ const languages = [
   { code: 'en', label: '영어', nativeLabel: 'English' },
 ] as const
 
-const Header = ({ activeTab, onTabChange }: HeaderProps) => {
-  const activeIndex = tabs.findIndex((tab) => tab.id === activeTab)
+const Header = () => {
   const navigate = useNavigate()
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('ko')
   const [isLanguageOpen, setIsLanguageOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const languageRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
-  const tabsRef = useRef<(HTMLButtonElement | null)[]>([])
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 })
-
-  // 탭 인디케이터 위치 및 너비 계산
-  useEffect(() => {
-    const activeTabElement = tabsRef.current[activeIndex]
-    if (activeTabElement) {
-      setIndicatorStyle({
-        left: activeTabElement.offsetLeft,
-        width: activeTabElement.offsetWidth
-      })
-    }
-  }, [activeIndex])
 
   // Zustand store에서 사용자 정보 및 로그아웃 가져오기
   const userInfo = useAuthStore((state) => state.userInfo)
@@ -88,58 +63,21 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
   }
 
   return (
-    <div className='w-full h-(--header-height) bg-(--color-bg-root)'>
-      <div className='mx-auto grid h-full w-full max-w-300 grid-cols-[1fr_auto_1fr] items-center px-6'>
+    <div className='w-full h-(--header-height) bg-white border-b border-gray-200'>
+      <div className='mx-auto flex h-full w-full items-center justify-between px-6'>
         {/* 로고 */}
         <div className='flex items-center gap-3'>
-          <img src={logoWhite} alt='Meari' className='h-[22px]' />
+          <img src={logoDark} alt='Meari' className='h-7' />
         </div>
 
-        {/* 메뉴 탭 */}
-        <nav className='flex items-center justify-center' aria-label='Main'>
-          <div className='relative flex gap-3'>
-            <div
-              className='absolute top-0 h-full rounded-lg transition-all duration-300 ease-out'
-              style={{
-                left: `${indicatorStyle.left}px`,
-                width: `${indicatorStyle.width}px`,
-                backgroundColor: 'var(--color-tab-active)'
-              }}
-              aria-hidden
-            />
-            <div className='relative z-10 flex gap-[13px] text-[17px] font-medium text-white/80' role='tablist'>
-              {tabs.map((tab, index) => {
-                const Icon = tab.icon
-                return (
-                  <button
-                    key={tab.id}
-                    ref={(el) => {
-                      tabsRef.current[index] = el
-                    }}
-                    type='button'
-                    role='tab'
-                    aria-selected={tab.id === activeTab}
-                    className={`flex items-center justify-center gap-2 px-7 py-2 rounded-lg transition-colors cursor-pointer min-w-[132px] ${tab.id === activeTab ? 'text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
-                      }`}
-                    onClick={() => onTabChange(tab.id)}
-                  >
-                    <Icon size={19} />
-                    <span>{tab.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </nav>
-
         {/* 오른쪽 메뉴 */}
-        <div className='flex items-center justify-end gap-2 text-[17px] text-white/80'>
+        <div className='flex items-center gap-2 text-[17px] text-gray-700'>
           {/* 언어 선택 드롭다운 */}
           <div className='relative' ref={languageRef}>
             <button
               type='button'
               onClick={() => setIsLanguageOpen(!isLanguageOpen)}
-              className='flex items-center gap-1.5 rounded-full px-3 py-1.5 hover:bg-white/5 transition-colors cursor-pointer'
+              className='flex items-center gap-1.5 rounded-full px-3 py-1.5 hover:bg-gray-100 transition-colors cursor-pointer'
             >
               {currentLanguage?.nativeLabel}
               <ChevronDown size={17} className={`transition-transform ${isLanguageOpen ? 'rotate-180' : ''}`} />
@@ -169,7 +107,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
           {/* 설정 버튼 */}
           <button
             type='button'
-            className='flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors cursor-pointer'
+            className='flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors cursor-pointer'
             title='설정'
             onClick={() => navigate('/mypage', { state: { menu: 'settings' } })}
           >
@@ -181,7 +119,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
             <button
               type='button'
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className='flex items-center justify-center w-10 h-10 rounded-full bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors cursor-pointer'
+              className='flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-bg-button)] text-white font-semibold hover:opacity-90 transition-opacity cursor-pointer'
               title='프로필'
             >
               {displayInfo.profileImage ? (

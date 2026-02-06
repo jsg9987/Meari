@@ -68,7 +68,7 @@ const DailyStudyPanel = () => {
   }
 
   return (
-    <section>
+    <section className='px-8 py-6'>
       <div className="flex items-end justify-between mb-10">
         <div>
           <h1 className="text-[1.65rem] font-bold text-gray-900 mb-2">일일 학습 (Daily)</h1>

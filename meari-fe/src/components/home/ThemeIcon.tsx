@@ -1,3 +1,5 @@
+import { Coffee, Globe, Briefcase, Newspaper } from 'lucide-react';
+
 type ThemeIconProps = {
   themeName: string
   className?: string
@@ -33,6 +35,17 @@ const ThemeIcon = ({ themeName, className = 'w-6 h-6' }: ThemeIconProps) => {
             <circle cx="12" cy="10" r="3"></circle>
           </svg>
         )
+      case 'Daily_Life':
+        return <Coffee className={className} />
+    
+      case 'Public':
+        return <Globe className={className} />
+    
+      case 'Work':
+        return <Briefcase className={className} />
+      
+      case 'News':
+        return <Newspaper className={className} />
       default:
         return (
           <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

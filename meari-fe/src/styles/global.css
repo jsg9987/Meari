@@ -37,7 +37,8 @@ body button{
 @layer base {
   :root {
     --color-bg-root: oklch(0.23 0.04 233);
-    --color-bg-button: oklch(0.62 0.21 253);
+    --color-bg-button: oklch(0.23 0.04 233);
+    /* --color-bg-button: oklch(0.62 0.21 253); */
     --color-bg-control-button: oklch(0.34 0.03 255 / 0.5);
     --color-bg-chat-button: oklch(0.64 0.23 255);
     --color-tab-active: oklch(0.63 0.12 232);

@@ -3,18 +3,19 @@ import { useNavigate } from 'react-router-dom'
 import RoomCard from './RoomCard'
 import PasswordModal from '../webrtc/PasswordModal'
 import CreateRoomButton from './CreateRoomButton'
-import ThemeSidebar from './ThemeSidebar'
 import { getRooms, joinRoom, type RoomItem } from '../../api/rooms.api'
 import { getThemes, type Theme } from '../../api/contents.api'
 
 // 테마 목록은 API를 통해 가져옵니다.
 
+type ShadowingPanelProps = {
+  selectedTheme: string
+}
+
 // TODO: useEffect 4번 호출 버그 수정
-const ShadowingPanel = () => {
+const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
   const navigate = useNavigate()
-  const [themes, setThemes] = useState<string[]>(['전체'])
   const [themeData, setThemeData] = useState<Theme[]>([])
-  const [selectedTheme, setSelectedTheme] = useState<string>('전체')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState('')
   const [rooms, setRooms] = useState<RoomItem[]>([])
@@ -89,9 +90,7 @@ const ShadowingPanel = () => {
       try {
         const response = await getThemes()
         if (response.data.success && response.data.data) {
-          const fetchedThemes = response.data.data
-          setThemeData(fetchedThemes)
-          setThemes(['전체', ...fetchedThemes.map(t => t.name)])
+          setThemeData(response.data.data)
         }
       } catch (error) {
         console.error('Failed to load themes:', error)
@@ -114,6 +113,7 @@ const ShadowingPanel = () => {
     setNextCursor(null)
     setHasNext(true)
     fetchRooms(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTheme, debouncedSearchKeyword])
 
   // 무한 스크롤 Observer 설정
@@ -193,27 +193,14 @@ const ShadowingPanel = () => {
   ]
 
   return (
-    <section className='relative'>
-      {/* 왼쪽 사이드바 - 페이지 왼쪽에 고정 */}
-      <div className='fixed left-0 top-[var(--header-height)] h-[calc(100vh-var(--header-height))] overflow-y-auto z-50'>
-        <ThemeSidebar
-          themes={themeData}
-          selectedTheme={selectedTheme}
-          onThemeSelect={setSelectedTheme}
-        />
-      </div>
-
-      {/* 메인 콘텐츠 */}
-      <div className='ml-64 px-8'>
-        {/* 방 생성 버튼 */}
-        <div className='flex items-end justify-end mb-6'>
-          <CreateRoomButton />
-        </div>
-
+    <section className='px-8 py-6'>
         {/* 추천 콘텐츠 섹션 */}
         <div className='mb-8'>
-          <h2 className='text-xl font-bold text-gray-900 mb-4'>추천 쉐도잉 콘텐츠</h2>
-          <div className='flex gap-4 h-[400px]'>
+          <div className='flex items-center justify-between mb-4'>
+            <h2 className='text-xl font-bold text-gray-900'>쉐도잉 콘텐츠</h2>
+            <CreateRoomButton />
+          </div>
+          <div className='flex gap-4 h-100'>
             {/* 왼쪽 큰 사진 */}
             <div
               className='flex-1 relative rounded-xl overflow-hidden shadow-lg cursor-pointer group'
@@ -224,7 +211,7 @@ const ShadowingPanel = () => {
                 alt={featuredContents[0].title}
                 className='w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
               />
-              <div className='absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/50'></div>
+              <div className='absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-black/50'></div>
               <div className='absolute bottom-0 left-0 right-0 p-6 text-white'>
                 <div className='flex items-center gap-3 mb-3'>
                   <span className='px-4 py-1.5 bg-[oklch(0.63_0.12_232)] rounded-full text-sm font-bold'>
@@ -240,7 +227,7 @@ const ShadowingPanel = () => {
             </div>
 
             {/* 오른쪽 세로 두 개 */}
-            <div className='flex flex-col gap-4 w-[380px]'>
+            <div className='flex flex-col gap-4 w-95'>
               {featuredContents.slice(1, 3).map((content) => (
                 <div
                   key={content.id}
@@ -252,7 +239,7 @@ const ShadowingPanel = () => {
                     alt={content.title}
                     className='w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
                   />
-                  <div className='absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/50'></div>
+                  <div className='absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-black/50'></div>
                   <div className='absolute bottom-0 left-0 right-0 p-4 text-white'>
                     <div className='flex items-center gap-2 mb-2'>
                       <span className='px-3 py-1 bg-[oklch(0.63_0.12_232)] rounded-full text-xs font-bold'>
@@ -340,7 +327,6 @@ const ShadowingPanel = () => {
             </div>
           </div>
         )}
-      </div>
 
       {/* 비밀번호 모달 */}
       {isPasswordModalOpen && (

@@ -50,7 +50,6 @@ type VideoCarouselProps = {
 
 const VideoCarousel = ({ onVideoSelect }: VideoCarouselProps) => {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
 
   const nextSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => (prevIndex + 1) % MOCK_VIDEOS.length)
@@ -60,25 +59,18 @@ const VideoCarousel = ({ onVideoSelect }: VideoCarouselProps) => {
     setCurrentIndex((prevIndex) => (prevIndex - 1 + MOCK_VIDEOS.length) % MOCK_VIDEOS.length)
   }
 
-  const goToSlide = (index: number) => {
-    setCurrentIndex(index)
-    setIsAutoPlaying(false)
-  }
-
   const handleVideoClick = (videoId: number) => {
     onVideoSelect?.(videoId)
   }
 
   // 자동 슬라이드
   useEffect(() => {
-    if (!isAutoPlaying) return
-
     const interval = setInterval(() => {
       nextSlide()
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [isAutoPlaying, nextSlide])
+  }, [nextSlide])
 
   const getVisibleVideos = () => {
     const prev = (currentIndex - 1 + MOCK_VIDEOS.length) % MOCK_VIDEOS.length
