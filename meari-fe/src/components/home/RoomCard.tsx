@@ -1,13 +1,16 @@
 type RoomCardProps = {
     roomId: number | string
     title: string
+    themeName: string
     currentPeople: number
+    maxPeople: number
+    status: string
     hasPassword: boolean
     contentTitle?: string
     onClick: () => void
 }
 
-const RoomCard = ({ title, currentPeople, hasPassword, contentTitle, onClick }: RoomCardProps) => {
+const RoomCard = ({ title, themeName, currentPeople, maxPeople, status, hasPassword, onClick }: RoomCardProps) => {
     return (
         <div
             className='rounded-lg overflow-hidden bg-white cursor-pointer shadow-lg hover:shadow-xl hover:scale-[1.02] hover:ring-2 hover:ring-[#2D9CDB] transition-all duration-300'
@@ -18,7 +21,7 @@ const RoomCard = ({ title, currentPeople, hasPassword, contentTitle, onClick }: 
                 {/* 상단 라벨 영역 */}
                 <div className='absolute top-[13px] left-[13px] right-[13px]'>
                     <div className='inline-block bg-[#2D9CDB] text-white text-[13px] px-[9px] py-[4px] rounded'>
-                        {contentTitle || '쉐도잉'}
+                        {themeName}
                     </div>
                 </div>
 
@@ -43,7 +46,7 @@ const RoomCard = ({ title, currentPeople, hasPassword, contentTitle, onClick }: 
                                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                             </svg>
-                            <span>{currentPeople}</span>
+                            <span>{currentPeople}/{maxPeople}</span>
                         </div>
 
                         {/* 잠금 아이콘 */}
@@ -55,9 +58,15 @@ const RoomCard = ({ title, currentPeople, hasPassword, contentTitle, onClick }: 
                         )}
                     </div>
 
-                    {/* 영상 길이 + 섹션 수 - 비워둠 */}
-                    <div className='text-gray-400'>
-                        {/* 추후 구현 */}
+                    {/* 현재 상태 */}
+                    <div className={`text-[13px] font-medium ${
+                        status === 'WAITING' ? 'text-green-500' :
+                        status === 'PLAYING' ? 'text-blue-500' :
+                        'text-gray-400'
+                    }`}>
+                        {status === 'WAITING' ? '대기 중' :
+                         status === 'PLAYING' ? '게임 중' :
+                         status}
                     </div>
                 </div>
             </div>
