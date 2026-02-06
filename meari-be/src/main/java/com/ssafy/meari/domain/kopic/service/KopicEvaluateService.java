@@ -64,14 +64,6 @@ public class KopicEvaluateService {
         KopicSentence sentence = kopicSentenceRepository.findById(request.getKopicSentenceId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_KOPIC_SENTENCE));
 
-        // S3에 음성 파일 업로드
-        String s3Key = s3Service.generateKopicKey(member.getMemberId(), sentence.getKopicSentenceId());
-        s3Service.uploadFile(s3Key, audioData, contentType != null ? contentType : "audio/wav");
-
-        // Presigned URL 발급 (GET용)
-        String presignedUrl = s3Service.generatePresignedUrlForDownload(s3Key);
-        log.debug("S3 업로드 완료 및 Presigned URL 발급: s3Key={}", s3Key);
-
         KopicReport report = KopicReport.builder()
                 .member(member)
                 .theme(sentence.getTheme())
@@ -85,6 +77,13 @@ public class KopicEvaluateService {
         log.debug("코픽 분석 요청 생성: reportId={}, totalReportId={}, sentenceId={}",
                 report.getKopicReportId(), totalReport.getKopicTotalReportId(), sentence.getKopicSentenceId());
 
+        // S3에 음성 파일 업로드
+        String s3Key = s3Service.generateKopicKey(member.getMemberId(), sentence.getKopicSentenceId());
+        s3Service.uploadFile(s3Key, audioData, contentType != null ? contentType : "audio/wav");
+        String audioUrl = s3Service.generatePresignedUrlForDownload(s3Key);
+
+        log.debug("코픽 음성 S3 업로드 완료: s3Key={}", s3Key);
+
         Long reportId = report.getKopicReportId();
         String textKo = sentence.getTextKo();
         Long totalReportId = totalReport.getKopicTotalReportId();
@@ -92,7 +91,7 @@ public class KopicEvaluateService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                geminiAnalysisService.analyze(reportId, textKo, presignedUrl, totalReportId);
+                geminiAnalysisService.analyze(reportId, textKo, audioUrl, totalReportId);
             }
         });
 
