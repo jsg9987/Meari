@@ -1,5 +1,5 @@
-﻿import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import SideBar, { type SideBarMenu } from '../components/common/SideBar'
 import Dashboard from '../components/mypage/Dashboard'
 import SettingsPanel from '../components/mypage/SettingsPanel'
@@ -17,6 +17,8 @@ import { useAuthStore } from '../store/auth.store'
 
 const MyPage = () => {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { logout } = useAuthStore()
   const [activeMenu, setActiveMenu] = useState<SideBarMenu>('dashboard')
   const [autoPlay, setAutoPlay] = useState(false)
   const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large'>('medium')
@@ -26,6 +28,7 @@ const MyPage = () => {
   const [nicknameInput, setNicknameInput] = useState('')
   const [email, setEmail] = useState('')
   const [nativeLanguage, setNativeLanguage] = useState<'KR' | 'VN' | 'EN'>('KR')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_profileImageName, setProfileImageName] = useState('')
   const [profileImageUrl, setProfileImageUrl] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -156,6 +159,11 @@ const MyPage = () => {
     setAutoPlay(false)
     setFontSize('medium')
     setTheme('light')
+  }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/')
   }
 
   const handleVerifySubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -579,7 +587,12 @@ const MyPage = () => {
 
   return (
     <div className='flex min-h-screen w-full'>
-      <SideBar activeMenu={activeMenu} onMenuChange={setActiveMenu} userInitial='U' />
+      <SideBar
+        activeMenu={activeMenu}
+        onMenuChange={setActiveMenu}
+        userInitial='U'
+        onLogout={handleLogout}
+      />
 
       <main className='flex-1 bg-white ml-64'>
         {renderContent()}
