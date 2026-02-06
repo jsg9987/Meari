@@ -30,7 +30,7 @@ public class KopicSentenceResponse {
                 .kopicSentenceId(kopicSentence.getKopicSentenceId())
                 .textKo(kopicSentence.getTextKo())
                 .kopicSentenceUrl(kopicSentence.getKopicSentenceUrl())
-                .kopicPictureUrl("https://res.cloudinary.com/dznamrdwv/image/upload/v1770391114/kopic_picture_" + kopicSentence.getKopicSentenceId() + ".png")
+                .kopicPictureUrl("https://res.cloudinary.com/dznamrdwv/image/upload/kopic_picture_" + kopicSentence.getKopicSentenceId() + ".png")
                 .build();
     }
 }
