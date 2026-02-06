@@ -7,10 +7,13 @@ import com.ssafy.meari.domain.kopic.entity.KopicSentence;
 import com.ssafy.meari.domain.kopic.repository.KopicSentenceRepository;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.report.entity.KopicReport;
+import com.ssafy.meari.domain.report.entity.KopicTotalReport;
 import com.ssafy.meari.domain.report.entity.ReportStatus;
 import com.ssafy.meari.domain.report.repository.KopicReportRepository;
+import com.ssafy.meari.domain.report.repository.KopicTotalReportRepository;
 import com.ssafy.meari.domain.theme.entity.Theme;
 import com.ssafy.meari.global.error.exception.BusinessException;
+import com.ssafy.meari.global.util.S3Service;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -43,7 +46,13 @@ class KopicEvaluateServiceTest {
     private KopicReportRepository kopicReportRepository;
 
     @Mock
+    private KopicTotalReportRepository kopicTotalReportRepository;
+
+    @Mock
     private GeminiAnalysisService geminiAnalysisService;
+
+    @Mock
+    private S3Service s3Service;
 
     @Nested
     @DisplayName("evaluate - 코픽 발화 분석 요청")
@@ -89,11 +98,17 @@ class KopicEvaluateServiceTest {
             // Given
             Member member = mock(Member.class);
             KopicEvaluateRequest request = mock(KopicEvaluateRequest.class);
+            KopicTotalReport totalReport = mock(KopicTotalReport.class);
+            byte[] audioData = "test audio".getBytes();
+            String contentType = "audio/wav";
+
+            given(request.getKopicTotalReportId()).willReturn(1L);
             given(request.getKopicSentenceId()).willReturn(999L);
+            given(kopicTotalReportRepository.findById(1L)).willReturn(Optional.of(totalReport));
             given(kopicSentenceRepository.findById(999L)).willReturn(Optional.empty());
 
             // When & Then
-            assertThatThrownBy(() -> kopicEvaluateService.evaluate(member, request))
+            assertThatThrownBy(() -> kopicEvaluateService.evaluate(member, request, audioData, contentType))
                     .isInstanceOf(BusinessException.class);
         }
     }
