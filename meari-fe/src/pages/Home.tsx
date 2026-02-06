@@ -23,13 +23,7 @@ const Home = () => {
         <Header activeTab={activeTab} onTabChange={setActiveTab} />
       </header>
 
-      <main
-        className='mx-auto w-full max-w-[68.2rem] py-11'
-        style={{
-          transform: 'scale(1.1)',
-          transformOrigin: 'top center'
-        }}
-      >
+      <main className='mx-auto w-full py-11'>
         {renderContent()}
       </main>
     </div>

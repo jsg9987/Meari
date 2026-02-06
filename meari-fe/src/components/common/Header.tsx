@@ -119,7 +119,7 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                     type='button'
                     role='tab'
                     aria-selected={tab.id === activeTab}
-                    className={`flex items-center justify-center gap-2 px-7 py-3 rounded-lg transition-colors cursor-pointer min-w-[132px] ${tab.id === activeTab ? 'text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
+                    className={`flex items-center justify-center gap-2 px-7 py-2 rounded-lg transition-colors cursor-pointer min-w-[132px] ${tab.id === activeTab ? 'text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
                       }`}
                     onClick={() => onTabChange(tab.id)}
                   >
