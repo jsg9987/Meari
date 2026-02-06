@@ -433,17 +433,203 @@ export const getKopicReportsAPI = async (
 
 export const getKopicReports = USE_MOCK_MYPAGE ? getKopicReportsMock : getKopicReportsAPI
 
-// 쉐도잉 리포트 상세 타입 (타입 미정 - 백엔드 확정 후 수정 필요)
+// 쉐도잉 리포트 상세 타입
+export interface SyllableError {
+  type: string // "replace" | "insert" | "delete"
+  position: number
+  expected: string
+  actual: string
+  confidence: number
+  description: string
+}
+
+export interface IntonationData {
+  score: number
+  reference_pitch: number[]
+  user_pitch: number[]
+  time_frames: number[]
+  dtw_path: number[][]
+  feedback: string
+}
+
+export interface SentenceAnalysis {
+  sentence_id: number
+  text_expected: string
+  text_recognized: string
+  accuracy: number
+  mean_confidence: number
+  syllables: string[]
+  syllable_confidences: number[]
+  errors: SyllableError[]
+  intonation: IntonationData
+}
+
+export interface DetailedAnalysisSummary {
+  total_sentences: number
+  analyzed_sentences: number
+  average_accuracy: number
+  average_confidence: number
+  average_intonation: number
+}
+
+export interface DetailedAnalysis {
+  sentences: SentenceAnalysis[]
+  summary: DetailedAnalysisSummary
+}
+
 export interface ShadowingReportDetail {
   shadowing_report_id: number
-  // TODO: 백엔드에서 타입 확정 후 필드 추가
-  data?: unknown
+  member_id: number
+  member_nickname: string
+  room_id: number
+  room_title: string
+  content_id: number
+  content_title: string
+  role_id: number
+  role_name: string
+  accuracy: number
+  intonation: number
+  total_score: number
+  detailed_analysis: DetailedAnalysis
+  status: string // "COMPLETED" | "PROCESSING"
+  created_at: string // ISO 8601 형식
+  updated_at: string // ISO 8601 형식
 }
 
 export type ShadowingReportDetailResponse = AxiosResponse<ApiResponse<ShadowingReportDetail>>
 
-// 쉐도잉 리포트 상세 조회
-export const getShadowingReportDetail = async (
+// 목업 데이터 - 쉐도잉 리포트 상세
+const mockShadowingReportDetail: ShadowingReportDetail = {
+  shadowing_report_id: 1001,
+  member_id: 1,
+  member_nickname: '홍길동',
+  room_id: 123,
+  room_title: '한국어 연습방',
+  content_id: 101,
+  content_title: '일상 대화',
+  role_id: 1,
+  role_name: '손님',
+  accuracy: 85,
+  intonation: 90,
+  total_score: 87,
+  detailed_analysis: {
+    sentences: [
+      {
+        sentence_id: 1,
+        text_expected: '안녕하세요',
+        text_recognized: '안영하세요',
+        accuracy: 80,
+        mean_confidence: 0.9739,
+        syllables: ['안', '영', '하', '세', '요'],
+        syllable_confidences: [0.95, 0.88, 0.98, 0.99, 0.97],
+        errors: [
+          {
+            type: 'replace',
+            position: 1,
+            expected: '녕',
+            actual: '영',
+            confidence: 0.8879,
+            description: "'녕' → '영' 대체"
+          }
+        ],
+        intonation: {
+          score: 85,
+          reference_pitch: [120.5, 125.3, 130.2, 128.9, 122.1],
+          user_pitch: [118.2, 123.8, 131.5, 127.3, 120.8],
+          time_frames: [0.0, 0.1, 0.2, 0.3, 0.4],
+          dtw_path: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4]],
+          feedback: '억양이 매우 자연스럽습니다!'
+        }
+      },
+      {
+        sentence_id: 2,
+        text_expected: '저는 학생입니다',
+        text_recognized: '저는 학생입니다',
+        accuracy: 100,
+        mean_confidence: 0.9856,
+        syllables: ['저', '는', '학', '생', '입', '니', '다'],
+        syllable_confidences: [0.99, 0.98, 0.99, 0.98, 0.97, 0.99, 0.98],
+        errors: [],
+        intonation: {
+          score: 95,
+          reference_pitch: [115.2, 118.5, 125.8, 128.2, 120.5, 118.3, 115.8],
+          user_pitch: [114.8, 118.9, 126.2, 127.8, 120.2, 118.5, 115.5],
+          time_frames: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+          dtw_path: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6]],
+          feedback: '완벽한 억양입니다!'
+        }
+      },
+      {
+        sentence_id: 3,
+        text_expected: '오늘 날씨가 좋네요',
+        text_recognized: '오늘 날시가 조네요',
+        accuracy: 70,
+        mean_confidence: 0.8234,
+        syllables: ['오', '늘', '날', '시', '가', '조', '네', '요'],
+        syllable_confidences: [0.95, 0.93, 0.88, 0.65, 0.89, 0.75, 0.92, 0.94],
+        errors: [
+          {
+            type: 'replace',
+            position: 3,
+            expected: '씨',
+            actual: '시',
+            confidence: 0.6523,
+            description: "'씨' → '시' 대체"
+          },
+          {
+            type: 'replace',
+            position: 5,
+            expected: '좋',
+            actual: '조',
+            confidence: 0.7489,
+            description: "'좋' → '조' 대체"
+          }
+        ],
+        intonation: {
+          score: 78,
+          reference_pitch: [122.3, 124.5, 128.9, 132.1, 130.5, 125.8, 123.2, 120.5],
+          user_pitch: [120.8, 123.2, 127.5, 130.8, 129.2, 124.5, 122.8, 119.8],
+          time_frames: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+          dtw_path: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7]],
+          feedback: '약간 평평한 억양입니다. 감정을 좀 더 넣어보세요.'
+        }
+      }
+    ],
+    summary: {
+      total_sentences: 10,
+      analyzed_sentences: 10,
+      average_accuracy: 85,
+      average_confidence: 0.9234,
+      average_intonation: 85
+    }
+  },
+  status: 'COMPLETED',
+  created_at: '2025-01-30T10:00:00',
+  updated_at: '2025-01-30T10:30:00'
+}
+
+// 목업 API - 쉐도잉 리포트 상세 조회
+export const getShadowingReportDetailMock = async (
+  reportId: number
+): Promise<ShadowingReportDetailResponse> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        data: {
+          success: true,
+          data: {
+            ...mockShadowingReportDetail,
+            shadowing_report_id: reportId
+          },
+          error: null
+        }
+      } as ShadowingReportDetailResponse)
+    }, 500)
+  })
+}
+
+// 실제 API - 쉐도잉 리포트 상세 조회
+export const getShadowingReportDetailAPI = async (
   reportId: number
 ): Promise<ShadowingReportDetailResponse> => {
   const response = await axiosInstance.get<ApiResponse<ShadowingReportDetail>>(
@@ -451,6 +637,11 @@ export const getShadowingReportDetail = async (
   )
   return response
 }
+
+// 환경 변수에 따라 목업 또는 실제 API 사용
+export const getShadowingReportDetail = USE_MOCK_MYPAGE
+  ? getShadowingReportDetailMock
+  : getShadowingReportDetailAPI
 
 // 사전 학습 타입
 export interface PreStudyItem {

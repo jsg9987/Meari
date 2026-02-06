@@ -3,16 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import {
   getShadowingReports,
   getKopicReports,
-  getPreStudyItems,
   getShadowingReportDetail,
   type ShadowingReport,
   type ShadowingReportDetail,
-  type KopicReport,
-  type PreStudyItem
+  type KopicReport
 } from '../../api/mypage.api'
 import { getKopicTotalReport, type KopicTotalReportResponse } from '../../api/kopic.api'
 
-type ReportTabType = 'shadowing' | 'kopic' | 'prestudy'
+type ReportTabType = 'shadowing' | 'kopic'
 
 // 스켈레톤 UI 컴포넌트
 const ShadowingReportSkeleton = () => (
@@ -67,10 +65,6 @@ const ReportTab = () => {
   const hasMoreKopicRef = useRef(true)
   const isLoadingKopicRef = useRef(false)
 
-  // 사전 학습 상태
-  const [preStudyItems, setPreStudyItems] = useState<PreStudyItem[]>([])
-  const [isLoadingPreStudy, setIsLoadingPreStudy] = useState(false)
-
   // 상세 패널 상태
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null)
   const [selectedReportType, setSelectedReportType] = useState<'shadowing' | 'kopic' | null>(null)
@@ -118,13 +112,17 @@ const ReportTab = () => {
     }
   }, [])
 
-  // 초기 로드
+  // 쉐도잉 탭 활성화 시 초기 로드
   useEffect(() => {
-    loadShadowingReports(true)
-  }, [])
+    if (activeTab === 'shadowing') {
+      loadShadowingReports(true)
+    }
+  }, [activeTab])
 
   // 무한 스크롤
   useEffect(() => {
+    if (activeTab !== 'shadowing') return
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
@@ -144,7 +142,7 @@ const ReportTab = () => {
         observer.unobserve(currentTarget)
       }
     }
-  }, [loadShadowingReports])
+  }, [activeTab, loadShadowingReports])
 
   // 코픽 리포트 로드
   const loadKopicReports = useCallback(async (reset: boolean = false) => {
@@ -204,25 +202,6 @@ const ReportTab = () => {
       }
     }
   }, [activeTab, loadKopicReports])
-
-  // 사전 학습 로드
-  useEffect(() => {
-    if (activeTab === 'prestudy' && preStudyItems.length === 0) {
-      setIsLoadingPreStudy(true)
-      getPreStudyItems()
-        .then((response) => {
-          if (response.data.success && response.data.data) {
-            setPreStudyItems(response.data.data.items)
-          }
-        })
-        .catch((error) => {
-          console.error('Failed to load prestudy items:', error)
-        })
-        .finally(() => {
-          setIsLoadingPreStudy(false)
-        })
-    }
-  }, [activeTab, preStudyItems.length])
 
   // 쉐도잉 리포트 클릭 핸들러
   const handleShadowingReportClick = async (reportId: number) => {
@@ -308,17 +287,6 @@ const ReportTab = () => {
           }`}
         >
           코픽(OPIc) 리포트
-        </button>
-        <button
-          type='button'
-          onClick={() => setActiveTab('prestudy')}
-          className={`flex-1 px-4 py-2.5 font-semibold rounded-md transition-all ${
-            activeTab === 'prestudy'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-          }`}
-        >
-          사전 학습
         </button>
       </div>
 
@@ -467,65 +435,11 @@ const ReportTab = () => {
             </div>
           </div>
         )}
-
-        {/* 사전 학습 */}
-        {activeTab === 'prestudy' && (
-          <div className='p-4 flex flex-col h-[calc(100vh-280px)]'>
-            <div className='flex-1 overflow-y-auto space-y-2.5 scrollbar-hide'>
-              {isLoadingPreStudy ? (
-                <div className='text-center py-12 text-gray-500 text-sm'>로딩 중...</div>
-              ) : (
-                <>
-                  {preStudyItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className='bg-gray-50 rounded-lg p-3 flex items-center justify-between border border-gray-200'
-                    >
-                      <div className='flex items-center gap-3'>
-                        <input
-                          type='checkbox'
-                          checked={item.isCompleted}
-                          readOnly
-                          className='w-4 h-4 text-blue-600 rounded cursor-not-allowed'
-                        />
-                        <div>
-                          <h3 className='text-sm font-semibold text-gray-900'>
-                            {item.contentName}
-                          </h3>
-                          {item.completedAt && (
-                            <p className='text-xs text-gray-500'>완료일: {item.completedAt}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        {item.isCompleted ? (
-                          <span className='px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium'>
-                            완료
-                          </span>
-                        ) : (
-                          <span className='px-2.5 py-1 bg-gray-200 text-gray-700 rounded-full text-xs font-medium'>
-                            미완료
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {preStudyItems.length === 0 && (
-                    <div className='text-center py-12 text-gray-500 text-sm'>
-                      학습 항목이 없습니다.
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* 오른쪽 슬라이드 패널 */}
       <div
-        className={`fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out overflow-y-auto z-50 border-l border-gray-200 ${
+        className={`fixed top-0 right-0 h-full w-[900px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out overflow-y-auto z-50 border-l border-gray-200 ${
           selectedReportId ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -659,22 +573,199 @@ const ReportTab = () => {
               </div>
             )}
 
-            {/* 쉐도잉 리포트 (임시 - 타입 미정) */}
-            {!isLoadingDetail && selectedReportType === 'shadowing' && selectedReportDetail && (
-              <div className='space-y-6'>
-                <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
-                  <p className='text-sm font-semibold text-blue-900'>
-                    쉐도잉 리포트 #{selectedReportId}
-                  </p>
-                </div>
+            {/* 쉐도잉 리포트 상세 */}
+            {!isLoadingDetail &&
+              selectedReportType === 'shadowing' &&
+              selectedReportDetail &&
+              'content_title' in selectedReportDetail && (
+                <div className='space-y-6'>
+                  {/* 헤더 정보 */}
+                  <div className='bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-5'>
+                    <div className='space-y-2'>
+                      <p className='text-sm font-semibold text-green-900'>
+                        쉐도잉 리포트 #{selectedReportDetail.shadowing_report_id}
+                      </p>
+                      <h3 className='text-xl font-bold text-gray-900'>
+                        {selectedReportDetail.content_title}
+                      </h3>
+                      <div className='flex items-center gap-4 text-sm text-gray-600'>
+                        <span>방: {selectedReportDetail.room_title}</span>
+                        <span>역할: {selectedReportDetail.role_name}</span>
+                      </div>
+                      <p className='text-xs text-gray-500'>
+                        {new Date(selectedReportDetail.created_at).toLocaleString('ko-KR')}
+                      </p>
+                    </div>
+                  </div>
 
-                <div className='bg-yellow-50 rounded-lg p-5 border border-yellow-200'>
-                  <p className='text-sm text-yellow-800 text-center'>
-                    쉐도잉 리포트 상세 화면은 백엔드 API 타입 확정 후 구현됩니다.
-                  </p>
+                  {/* 전체 점수 요약 */}
+                  <div className='bg-gradient-to-br from-green-50 to-teal-50 rounded-lg p-6 border border-green-200'>
+                    <h3 className='font-semibold text-gray-900 mb-4 text-lg'>전체 요약</h3>
+                    <div className='grid grid-cols-3 gap-4'>
+                      <div className='bg-white rounded-lg p-4 border border-green-100 text-center'>
+                        <p className='text-xs text-gray-500 mb-1'>정확도</p>
+                        <p className='text-2xl font-bold text-green-600'>
+                          {selectedReportDetail.accuracy}%
+                        </p>
+                      </div>
+                      <div className='bg-white rounded-lg p-4 border border-green-100 text-center'>
+                        <p className='text-xs text-gray-500 mb-1'>억양</p>
+                        <p className='text-2xl font-bold text-teal-600'>
+                          {selectedReportDetail.intonation}%
+                        </p>
+                      </div>
+                      <div className='bg-white rounded-lg p-4 border border-green-100 text-center'>
+                        <p className='text-xs text-gray-500 mb-1'>총점</p>
+                        <p className='text-2xl font-bold text-emerald-600'>
+                          {selectedReportDetail.total_score}점
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 전체 분석 요약 */}
+                  {selectedReportDetail.detailed_analysis && (
+                    <div className='bg-white rounded-lg p-5 border border-gray-200'>
+                      <h3 className='font-semibold text-gray-900 mb-4 text-lg'>분석 요약</h3>
+                      <div className='grid grid-cols-2 gap-3 text-sm'>
+                        <div className='flex justify-between items-center p-3 bg-gray-50 rounded-lg'>
+                          <span className='text-gray-600'>전체 문장</span>
+                          <span className='font-bold text-gray-900'>
+                            {selectedReportDetail.detailed_analysis.summary.total_sentences}개
+                          </span>
+                        </div>
+                        <div className='flex justify-between items-center p-3 bg-gray-50 rounded-lg'>
+                          <span className='text-gray-600'>분석 완료</span>
+                          <span className='font-bold text-gray-900'>
+                            {selectedReportDetail.detailed_analysis.summary.analyzed_sentences}개
+                          </span>
+                        </div>
+                        <div className='flex justify-between items-center p-3 bg-gray-50 rounded-lg'>
+                          <span className='text-gray-600'>평균 정확도</span>
+                          <span className='font-bold text-green-600'>
+                            {selectedReportDetail.detailed_analysis.summary.average_accuracy}%
+                          </span>
+                        </div>
+                        <div className='flex justify-between items-center p-3 bg-gray-50 rounded-lg'>
+                          <span className='text-gray-600'>평균 억양</span>
+                          <span className='font-bold text-teal-600'>
+                            {selectedReportDetail.detailed_analysis.summary.average_intonation}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 문장별 상세 분석 */}
+                  {selectedReportDetail.detailed_analysis?.sentences && (
+                    <div className='space-y-4'>
+                      <h3 className='font-semibold text-gray-900 text-lg'>문장별 분석</h3>
+                      {selectedReportDetail.detailed_analysis.sentences.map((sentence, index) => (
+                        <div
+                          key={sentence.sentence_id}
+                          className='bg-white rounded-lg p-5 border border-gray-200 space-y-4'
+                        >
+                          {/* 문장 헤더 */}
+                          <div className='flex justify-between items-start'>
+                            <h4 className='font-semibold text-gray-900'>문장 {index + 1}</h4>
+                            <div className='flex gap-2'>
+                              <span className='px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium'>
+                                정확도 {sentence.accuracy}%
+                              </span>
+                              <span className='px-2 py-1 bg-teal-100 text-teal-700 rounded text-xs font-medium'>
+                                억양 {sentence.intonation.score}%
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* 예상 문장 vs 인식된 문장 */}
+                          <div className='space-y-2'>
+                            <div className='bg-blue-50 rounded-lg p-3 border border-blue-100'>
+                              <p className='text-xs font-semibold text-blue-900 mb-1'>예상 문장</p>
+                              <p className='text-sm text-blue-800'>{sentence.text_expected}</p>
+                            </div>
+                            <div className='bg-purple-50 rounded-lg p-3 border border-purple-100'>
+                              <p className='text-xs font-semibold text-purple-900 mb-1'>
+                                인식된 문장 (STT)
+                              </p>
+                              <p className='text-sm text-purple-800'>{sentence.text_recognized}</p>
+                            </div>
+                          </div>
+
+                          {/* 오류 분석 */}
+                          {sentence.errors && sentence.errors.length > 0 && (
+                            <div className='bg-red-50 rounded-lg p-4 border border-red-100'>
+                              <p className='text-xs font-semibold text-red-900 mb-3'>
+                                오류 분석 ({sentence.errors.length}개)
+                              </p>
+                              <div className='space-y-2'>
+                                {sentence.errors.map((error, errorIdx) => (
+                                  <div
+                                    key={errorIdx}
+                                    className='bg-white rounded p-2 border border-red-200'
+                                  >
+                                    <div className='flex items-center gap-2 mb-1'>
+                                      <span className='px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium uppercase'>
+                                        {error.type}
+                                      </span>
+                                      <span className='text-xs text-gray-500'>
+                                        위치: {error.position}
+                                      </span>
+                                      <span className='text-xs text-gray-500'>
+                                        신뢰도: {(error.confidence * 100).toFixed(1)}%
+                                      </span>
+                                    </div>
+                                    <p className='text-xs text-gray-700'>{error.description}</p>
+                                    <p className='text-xs text-red-600 mt-1'>
+                                      <span className='line-through'>{error.expected}</span>{' '}
+                                      → <span className='font-semibold'>{error.actual}</span>
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 억양 피드백 */}
+                          {sentence.intonation.feedback && (
+                            <div className='bg-teal-50 rounded-lg p-3 border border-teal-100'>
+                              <p className='text-xs font-semibold text-teal-900 mb-1'>억양 피드백</p>
+                              <p className='text-sm text-teal-800'>{sentence.intonation.feedback}</p>
+                            </div>
+                          )}
+
+                          {/* 음절별 신뢰도 (선택적 표시) */}
+                          <div className='bg-gray-50 rounded-lg p-3 border border-gray-100'>
+                            <p className='text-xs font-semibold text-gray-900 mb-2'>
+                              평균 신뢰도: {(sentence.mean_confidence * 100).toFixed(1)}%
+                            </p>
+                            <div className='flex flex-wrap gap-1.5'>
+                              {sentence.syllables.map((syllable, syllableIdx) => {
+                                const confidence = sentence.syllable_confidences[syllableIdx] || 0
+                                const bgColor =
+                                  confidence >= 0.8
+                                    ? 'bg-green-100 text-green-800 border-green-200'
+                                    : confidence >= 0.6
+                                      ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                      : 'bg-red-100 text-red-800 border-red-200'
+                                return (
+                                  <span
+                                    key={syllableIdx}
+                                    className={`px-2 py-1 rounded text-xs font-medium border ${bgColor}`}
+                                    title={`신뢰도: ${(confidence * 100).toFixed(1)}%`}
+                                  >
+                                    {syllable}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
           </div>
         )}
       </div>
