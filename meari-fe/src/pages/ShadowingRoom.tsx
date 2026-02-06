@@ -706,9 +706,6 @@ export default function ShadowingRoom() {
       return () => clearTimeout(timer);
     } else if (timeUntilStart === 0) {
       // 카운트다운이 0이 되면 영상 재생
-      console.log('=== Round playback starting ===');
-      console.log('Current round:', currentRound);
-
       setTimeUntilStart(null);
       setIsPlaying(true); // 먼저 isPlaying을 true로 설정하여 video 요소 렌더링
 
@@ -1197,16 +1194,16 @@ export default function ShadowingRoom() {
     console.log('Video device changed to:', deviceId);
   };
 
-  // 방 입장 후 즉시 WebRTC 연결 (publisher 생성, 아직 publish 안 함)
+  // 방 입장 후 미디어 체크 완료 시 WebRTC 연결 (publisher 생성, 아직 publish 안 함)
   useEffect(() => {
     // WebRTC 비활성화 시 연결하지 않음
     if (DISABLE_WEBRTC) return;
 
-    if (isEntered && roomId && status === 'idle') {
+    if (isEntered && roomId && status === 'idle' && isMediaChecked) {
       join();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEntered, roomId, status]);
+  }, [isEntered, roomId, status, isMediaChecked]);
 
   // 브라우저 뒤로가기 감지 및 처리
   useEffect(() => {
