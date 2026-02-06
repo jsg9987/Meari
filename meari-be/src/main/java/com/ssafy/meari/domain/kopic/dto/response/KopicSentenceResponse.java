@@ -22,11 +22,15 @@ public class KopicSentenceResponse {
     @Schema(description = "코픽 문장 음성 URL", example = "https://...")
     private String kopicSentenceUrl;
 
+    @Schema(description = "코픽 참고사진 URL", example = "https://...")
+    private String kopicPictureUrl;
+
     public static KopicSentenceResponse from(KopicSentence kopicSentence) {
         return KopicSentenceResponse.builder()
                 .kopicSentenceId(kopicSentence.getKopicSentenceId())
                 .textKo(kopicSentence.getTextKo())
                 .kopicSentenceUrl(kopicSentence.getKopicSentenceUrl())
+                .kopicPictureUrl("https://res.cloudinary.com/dznamrdwv/image/upload/v1770391114/kopic_picture_" + kopicSentence.getKopicSentenceId() + ".png")
                 .build();
     }
 }
