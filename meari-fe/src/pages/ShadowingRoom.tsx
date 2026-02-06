@@ -27,7 +27,7 @@ type LayoutMode = "narrow" | "grid" | "wide";
 // WebRTC 비활성화 플래그
 // true로 설정하면 WebRTC 없이 쉐도잉 기능만 테스트
 // ========================================
-const DISABLE_WEBRTC = true;
+const DISABLE_WEBRTC = false;
 
 // TODO: 헤더 변경, 비디오 타일 변경
 export default function ShadowingRoom() {
@@ -91,6 +91,7 @@ export default function ShadowingRoom() {
 
   // 영상 재생 관련 상태
   const videoRef = useRef<HTMLVideoElement>(null);
+  const needPlayOnCanPlayRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   // Round용 자막 데이터 (여러 역할의 대본을 동시에 표시)
@@ -395,9 +396,20 @@ export default function ShadowingRoom() {
         timeIndexedSubtitlesRef.current = allSubtitles;
       }
 
-      // 게임 시작 시 즉시 영상 재생
+      // 게임 시작 시 영상 재생 준비
       if (message.phase === 'WATCHING') {
+        needPlayOnCanPlayRef.current = true;
         setIsPlaying(true);
+
+        // Fallback: 비디오 메타데이터 로드가 지연되는 경우 대비하여 1.5초 후 재생 시도
+        setTimeout(() => {
+          if (needPlayOnCanPlayRef.current && videoRef.current) {
+            console.log('Fallback: Playing video after 1.5s delay');
+            videoRef.current.play().catch(err => {
+              console.error('Fallback video play failed:', err);
+            });
+          }
+        }, 1500);
       }
     },
     onPhaseWaiting: () => {
@@ -1148,40 +1160,47 @@ export default function ShadowingRoom() {
     }
   }, [volume]);
 
-  // Round 모드: 영상 소리 자동 음소거/해제 (member가 할당된 구간만 음소거)
+  // Round 모드: 영상 소리 자동 음소거/해제 (기본 음소거, 할당되지 않은 구간만 ±500ms 음소거 해제)
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !isPlaying || currentRound < 1 || roleSegments.length === 0) {
       return;
     }
 
-    console.log('Setting up video mute control for assigned sentences');
+    console.log('Setting up video mute control for unassigned sentences');
 
-    // 모든 RoleSegment의 sentences를 수집하여 "할당된 구간" 생성
-    const assignedTimeRanges: Array<{ start: number; end: number }> = [];
-
+    // 할당된 문장의 sentence_id들을 Set으로 수집
+    const assignedSentenceIds = new Set<number>();
     roleSegments.forEach((segment) => {
       segment.sentences.forEach((sentence: Sentence) => {
-        assignedTimeRanges.push({
-          start: sentence.start_time,
-          end: sentence.end_time,
-        });
+        assignedSentenceIds.add(sentence.sentence_id);
       });
     });
 
+    // 할당되지 않은 문장들의 시간 범위 (±500ms) 계산
+    const unassignedTimeRanges: Array<{ start: number; end: number }> = [];
+    timeIndexedSubtitlesRef.current.forEach((subtitle) => {
+      if (!assignedSentenceIds.has(subtitle.sentence_id)) {
+        unassignedTimeRanges.push({
+          start: subtitle.start_time - 0.5, // 500ms 전
+          end: subtitle.end_time + 0.5,     // 500ms 후
+        });
+      }
+    });
+
     // 시작 시간 기준으로 정렬
-    assignedTimeRanges.sort((a, b) => a.start - b.start);
+    unassignedTimeRanges.sort((a, b) => a.start - b.start);
 
     const handleTimeUpdate = () => {
       const currentTime = video.currentTime;
 
-      // 현재 시간이 할당된 구간에 속하는지 확인
-      const isAssignedTime = assignedTimeRanges.some(
+      // 현재 시간이 할당되지 않은 구간의 음성 시간대(±500ms)에 속하는지 확인
+      const isUnassignedVoiceTime = unassignedTimeRanges.some(
         (range) => currentTime >= range.start && currentTime <= range.end
       );
 
-      // 할당된 구간이면 영상 소리 음소거, 아니면 재생
-      video.muted = isAssignedTime;
+      // 기본적으로 음소거, 할당되지 않은 구간의 음성 시간대만 음소거 해제
+      video.muted = !isUnassignedVoiceTime;
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -1359,6 +1378,22 @@ export default function ShadowingRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEntered, roomId, status, isMediaChecked]);
 
+  // WebRTC 연결 완료 후 스트림 publish (다른 사람들에게 보이기 시작)
+  useEffect(() => {
+    // WebRTC 비활성화 시 실행하지 않음
+    if (DISABLE_WEBRTC) return;
+
+    if (status === 'connected' && publisher && isMediaChecked) {
+      // 100ms 지연 후 publishStream 호출 (안정성 확보)
+      const timer = setTimeout(() => {
+        console.log('Publishing stream after connection established');
+        publishStream();
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [status, publisher, isMediaChecked, publishStream]);
+
   // 브라우저 뒤로가기 감지 및 처리
   useEffect(() => {
     const handlePopState = async () => {
@@ -1509,8 +1544,7 @@ export default function ShadowingRoom() {
       toggleVideo();
     }
 
-    // 세팅 완료 후 스트림 publish (다른 사람들에게 보이기 시작)
-    publishStream();
+    // publishStream() 호출 제거 - useEffect에서 status === 'connected'일 때 자동 호출됨
   };
 
   // 방 정보 로딩 중
@@ -1634,6 +1668,16 @@ export default function ShadowingRoom() {
                       style={{ pointerEvents: 'none' }}
                       onLoadedMetadata={() => setVideoReady(true)}
                       onPlay={() => setVideoReady(true)}
+                      onCanPlay={() => {
+                        // 비디오 메타데이터 로드 완료 후 재생
+                        if (needPlayOnCanPlayRef.current && videoRef.current) {
+                          console.log('onCanPlay: Playing video');
+                          needPlayOnCanPlayRef.current = false; // 한 번만 실행되도록
+                          videoRef.current.play().catch(err => {
+                            console.error('onCanPlay video play failed:', err);
+                          });
+                        }
+                      }}
                       onEnded={async () => {
                         // 영상 재생 완료 시 처리
                         setIsPlaying(false);
