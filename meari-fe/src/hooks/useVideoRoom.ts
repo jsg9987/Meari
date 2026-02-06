@@ -246,10 +246,11 @@ export function useVideoRoom({
       });
 
       // 이미 세션에 있는 connections를 수동으로 추가 (늦게 들어온 경우 대비)
+      // stream이 없는 connection만 추가 (이미 publish한 connection은 streamCreated 이벤트로 처리)
       const existingConnections = mySession.remoteConnections;
       if (existingConnections) {
         Object.values(existingConnections).forEach((conn) => {
-          if (conn.connectionId !== mySession.connection?.connectionId) {
+          if (conn.connectionId !== mySession.connection?.connectionId && !conn.stream) {
             setConnections((prev) => [...prev, conn]);
           }
         });
