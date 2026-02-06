@@ -464,7 +464,11 @@ const ReportTab = () => {
             )}
 
             {/* 코픽 리포트 - PROCESSING 상태 */}
-            {!isLoadingDetail && selectedReportType === 'kopic' && selectedReportDetail && 'status' in selectedReportDetail && selectedReportDetail.status === 'PROCESSING' && (
+            {!isLoadingDetail &&
+              selectedReportType === 'kopic' &&
+              selectedReportDetail &&
+              'kopic_total_report_id' in selectedReportDetail &&
+              selectedReportDetail.status === 'PROCESSING' && (
               <div className='space-y-6'>
                 <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-4'>
                   <p className='text-sm font-semibold text-yellow-900'>
@@ -501,7 +505,11 @@ const ReportTab = () => {
             )}
 
             {/* 코픽 리포트 - COMPLETED 상태 */}
-            {!isLoadingDetail && selectedReportType === 'kopic' && selectedReportDetail && 'status' in selectedReportDetail && selectedReportDetail.status === 'COMPLETED' && (
+            {!isLoadingDetail &&
+              selectedReportType === 'kopic' &&
+              selectedReportDetail &&
+              'kopic_total_report_id' in selectedReportDetail &&
+              selectedReportDetail.status === 'COMPLETED' && (
               <div className='space-y-6'>
                 <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
                   <p className='text-sm font-semibold text-blue-900'>
