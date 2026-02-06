@@ -42,6 +42,7 @@ export const kopicSessionData = {
     themeImageUrl: '',
     kopicTotalReportId: 0,
     sentences: [] as KopicSentence[],
+    reportIds: [] as number[], // 각 문제별 reportId 저장
 }
 
 // 세션 데이터 초기화
@@ -51,6 +52,7 @@ const clearKopicSession = () => {
     kopicSessionData.themeImageUrl = ''
     kopicSessionData.kopicTotalReportId = 0
     kopicSessionData.sentences = []
+    kopicSessionData.reportIds = []
     sessionStorage.removeItem(KOPIC_SESSION_STORAGE_KEY)
 }
 
@@ -79,8 +81,6 @@ export default function KopicEvaluation() {
 
     const currentSentence = sentences[currentIndex]
     const totalSentences = sentences.length
-    const safeSentenceAudioUrl =
-        currentSentence?.kopic_sentence_url?.startsWith('http') ? currentSentence.kopic_sentence_url : ''
 
     // 뒤로가기/새로고침 시 세션 초기화
     useEffect(() => {
@@ -207,12 +207,19 @@ export default function KopicEvaluation() {
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
 
-                submitKopicAnswer(
-                    kopicSessionData.kopicTotalReportId,
-                    currentSentence.kopic_sentence_id,
-                    audioBlob,
-                    currentSentence.text_ko
-                )
+                // 분석 요청 및 reportId 저장
+                try {
+                    const result = await submitKopicAnswer(
+                        kopicSessionData.kopicTotalReportId,
+                        currentSentence.kopic_sentence_id,
+                        audioBlob,
+                        currentSentence.text_ko
+                    )
+                    // reportId 저장
+                    kopicSessionData.reportIds[currentIndex] = result.kopic_report_id
+                } catch (error) {
+                    console.error('Failed to submit answer:', error)
+                }
 
                 mediaRecorder.stream.getTracks().forEach(track => track.stop())
 
@@ -382,15 +389,16 @@ export default function KopicEvaluation() {
 
                 {/* 질문 컨텐츠 영역 */}
                 <div className="flex flex-col items-center justify-center max-w-5xl mx-auto w-full px-16">
-                    {/* 문장 음성 */}
-                    <div className="w-full aspect-video bg-gray-100 rounded-xl overflow-hidden mb-6 shadow-lg p-6 flex items-center justify-center">
-                        {safeSentenceAudioUrl ? (
-                            <audio controls preload="none" className="w-full max-w-xl">
-                                <source src={safeSentenceAudioUrl} />
-                                브라우저가 오디오 재생을 지원하지 않습니다.
-                            </audio>
+                    {/* 문장 이미지 */}
+                    <div className="w-full aspect-video bg-gray-100 rounded-xl overflow-hidden mb-6 shadow-lg flex items-center justify-center">
+                        {currentSentence.kopic_picture_url ? (
+                            <img
+                                src={currentSentence.kopic_picture_url}
+                                alt="KOPIC 상황 이미지"
+                                className="w-full h-full object-contain"
+                            />
                         ) : (
-                            <p className="text-gray-400">샘플 음성이 없습니다.</p>
+                            <p className="text-gray-400">이미지가 없습니다.</p>
                         )}
                     </div>
 

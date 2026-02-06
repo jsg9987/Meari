@@ -5,6 +5,7 @@ export interface KopicSentence {
     kopic_sentence_id: number;
     text_ko: string;
     kopic_sentence_url: string;
+    kopic_picture_url?: string;
     time_limit?: number;
 }
 
@@ -231,5 +232,17 @@ export const createKopicTotalReport = async (themeId: number) => {
 // ===== total-report 조회(진행률/최종 결과) =====
 export const getKopicTotalReport = async (totalReportId: number) => {
     const response = await axiosInstance.get<KopicTotalReportResponse>(`/kopic/total-report/${totalReportId}`);
+    return response;
+};
+
+// ===== 개별 리포트 조회 =====
+export interface KopicReportResponse {
+    success: boolean;
+    data: KopicReportItem;
+    error: { code: string; message: string } | null;
+}
+
+export const getKopicReport = async (reportId: number) => {
+    const response = await axiosInstance.get<KopicReportResponse>(`/kopic/report/${reportId}`);
     return response;
 };
