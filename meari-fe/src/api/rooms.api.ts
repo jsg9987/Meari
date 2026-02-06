@@ -85,6 +85,7 @@ export interface RoomDetailData {
   has_password: boolean;
   created_at: string;
   members: RoomMember[];
+  content_id?: number | null;
 }
 
 export type RoomDetailResponse = AxiosResponse<ApiResponse<RoomDetailData>>;
@@ -279,32 +280,34 @@ export const joinRoomReal = async (
 export const joinRoom = useMock ? joinRoomMock : joinRoomReal;
 
 // --- Start Game (게임 시작) ---
+export interface StartGameRequest {
+  content_id: number;
+}
+
 export interface StartGameData {
   message: string;
 }
 
 export type StartGameResponse = AxiosResponse<ApiResponse<StartGameData>>;
 
-// TODO: 실제 구현시 필요한 데이터로 body 수정 필요
-export const startGame = async (roomId: number): Promise<StartGameResponse> => {
-  const response = await axiosInstance.post<ApiResponse<StartGameData>>(`/rooms/${roomId}/start`, {
-    content_id: 1
-  });
+export const startGame = async (roomId: number, payload: StartGameRequest): Promise<StartGameResponse> => {
+  const response = await axiosInstance.post<ApiResponse<StartGameData>>(`/rooms/${roomId}/start`, payload);
   return response;
 };
 
 // --- Watching Finish (영상 시청 완료) ---
+export interface WatchingFinishRequest {
+  content_id: number;
+}
+
 export interface WatchingFinishData {
   message: string;
 }
 
 export type WatchingFinishResponse = AxiosResponse<ApiResponse<WatchingFinishData>>;
 
-// TODO: 실제 구현시 선택된 content의 content_id 사용
-export const finishWatching = async (roomId: number): Promise<WatchingFinishResponse> => {
-  const response = await axiosInstance.post<ApiResponse<WatchingFinishData>>(`/rooms/${roomId}/watching/finish`, {
-    content_id: 1
-  });
+export const finishWatching = async (roomId: number, payload: WatchingFinishRequest): Promise<WatchingFinishResponse> => {
+  const response = await axiosInstance.post<ApiResponse<WatchingFinishData>>(`/rooms/${roomId}/watching/finish`, payload);
   return response;
 };
 

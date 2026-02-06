@@ -80,7 +80,7 @@ const DailyStudyPanel = () => {
       <DailyActivityHeatmap className="w-full mb-4.5" />
 
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-4.5">콘텐츠 선택</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-3">콘텐츠 선택</h2>
       </div>
 
       <div className="flex gap-4">
@@ -92,14 +92,14 @@ const DailyStudyPanel = () => {
               onClick={() => handleCardClick(index)}
               className={`
                 relative rounded-2xl overflow-hidden cursor-pointer
-                transition-all duration-500 ease-out min-h-[380px]
+                transition-all duration-500 ease-out min-h-[300px]
                 ${getCardStyle(card, isActive)}
                 ${isActive ? 'flex-[2.5]' : 'flex-1'}
               `}
             >
               {isActive ? (
                 <div className="p-6 h-full flex flex-col">
-                  <div className="flex justify-between items-start mb-12">
+                  <div className="flex justify-between items-start mb-8">
                     <div className="w-10 h-10 bg-[#56CCF2] rounded-full flex items-center justify-center">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <path
@@ -114,9 +114,9 @@ const DailyStudyPanel = () => {
                     <span className="text-sm text-gray-400 font-medium">{card.badge}</span>
                   </div>
 
-                  <p className="text-gray-400 text-md mb-2">{card.subtitle}</p>
+                  <p className="text-gray-400 text-sm mb-2">{card.subtitle}</p>
 
-                  <h3 className="text-3xl font-bold text-[#1A1A1A] mb-12">{card.title}</h3>
+                  <h3 className="text-2xl font-bold text-[#1A1A1A] mb-12">{card.title}</h3>
 
                   <button
                     onClick={(e) => handleStart(card.path, card.isLocked, e)}
@@ -133,7 +133,7 @@ const DailyStudyPanel = () => {
                 </div>
               ) : (
                 <div className="p-6 h-full flex flex-col">
-                  <div className="flex justify-between items-start mb-12">
+                  <div className="flex justify-between items-start mb-8">
                     <div
                       className={`w-10 h-10 ${
                         card.themeColor === 'dark' ? 'bg-white/20' : 'bg-white/30'
@@ -152,7 +152,7 @@ const DailyStudyPanel = () => {
                     <span className="text-sm font-medium opacity-90">{card.badge}</span>
                   </div>
 
-                  <p className="text-sm opacity-80 mb-4">{card.subtitle}</p>
+                  <p className="text-sm opacity-80 mb-2">{card.subtitle}</p>
 
                   <h3 className="text-2xl font-bold mb-auto">{card.title}</h3>
 

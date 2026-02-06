@@ -16,7 +16,8 @@ export interface Content {
   description: string;
   video_url: string;
   thumbnail_url: string;
-  duration: number;
+  total_duration: number; // numeric(10,3) -> 초 단위 소수점 포함
+  max_people?: number; // 최대 인원수 (선택적)
 }
 
 export type GetThemesResponse = AxiosResponse<ApiResponse<Theme[]>>;
@@ -87,7 +88,7 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
             description: '한국어 일상 대화 쉐도잉 연습',
             video_url: '/src/assets/video/[ Kor & Eng Sub ] [ Korean Shadowing ] 그래서 쪼끔은 후회해？ - So do you regret it？ Even a little？ [7kpGMG0H4pM].f137.mp4',
             thumbnail_url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400',
-            duration: 167,
+            total_duration: 167,
           },
           {
             content_id: 2,
@@ -96,7 +97,7 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
             description: '전화로 식당 예약하는 대화 연습',
             video_url: 'https://example.com/video2.mp4',
             thumbnail_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-            duration: 240,
+            total_duration: 240,
           },
           {
             content_id: 3,
@@ -105,7 +106,7 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
             description: '식당에서 직원에게 메뉴 추천을 받는 상황',
             video_url: 'https://example.com/video3.mp4',
             thumbnail_url: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400',
-            duration: 200,
+            total_duration: 200,
           },
         ],
         2: [
@@ -116,7 +117,7 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
             description: '비즈니스 미팅을 시작하는 인사말과 소개',
             video_url: 'https://example.com/video4.mp4',
             thumbnail_url: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=400',
-            duration: 300,
+            total_duration: 300,
           },
           {
             content_id: 5,
@@ -125,7 +126,7 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
             description: '제품이나 서비스를 소개하는 프레젠테이션',
             video_url: 'https://example.com/video5.mp4',
             thumbnail_url: 'https://images.unsplash.com/photo-1560439514-4e9645039924?w=400',
-            duration: 360,
+            total_duration: 360,
           },
         ],
         3: [
@@ -136,7 +137,7 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
             description: '호텔에서 체크인하는 대화',
             video_url: 'https://example.com/video6.mp4',
             thumbnail_url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400',
-            duration: 220,
+            total_duration: 220,
           },
           {
             content_id: 7,
@@ -145,7 +146,7 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
             description: '여행지에서 길을 물어보는 상황',
             video_url: 'https://example.com/video7.mp4',
             thumbnail_url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
-            duration: 150,
+            total_duration: 150,
           },
         ],
         4: [
@@ -156,7 +157,7 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
             description: '옷가게에서 사이즈와 색상 확인하기',
             video_url: 'https://example.com/video8.mp4',
             thumbnail_url: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400',
-            duration: 190,
+            total_duration: 190,
           },
           {
             content_id: 9,
@@ -165,7 +166,7 @@ export const getThemeContentsMock = async (themeId: number): Promise<GetThemeCon
             description: '구매한 제품을 환불하는 대화',
             video_url: 'https://example.com/video9.mp4',
             thumbnail_url: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=400',
-            duration: 210,
+            total_duration: 210,
           },
         ],
       };

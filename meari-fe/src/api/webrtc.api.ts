@@ -48,6 +48,14 @@ export const deleteSession = async (sessionId: string): Promise<void> => {
   await axiosInstance.delete(`/openvidu/sessions/${sessionId}`);
 };
 
+// WebRTC 퇴장
+export type LeaveWebRTCResponse = AxiosResponse<ApiResponse<null>>;
+
+export const leaveWebRTC = async (roomId: number): Promise<LeaveWebRTCResponse> => {
+  const response = await axiosInstance.delete<ApiResponse<null>>(`/rooms/${roomId}/webrtc/leave`);
+  return response;
+};
+
 export async function getTokenMock(sessionName: string): Promise<string> {
   return new Promise((resolve) => {
     setTimeout(() => {

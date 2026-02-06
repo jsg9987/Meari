@@ -2,8 +2,8 @@
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { kopicSessionData } from './KopicEvaluation'
-import { getKopicTotalReport } from '../api/kopic.api'
-import type { KopicReportItem, KopicTotalReportItem } from '../api/kopic.api'
+import { getKopicReport } from '../api/kopic.api'
+import type { KopicReportItem } from '../api/kopic.api'
 import logoWhite from '../assets/images/common/logo-white.svg'
 
 const KOPIC_SESSION_STORAGE_KEY = 'kopic_session'
@@ -27,8 +27,8 @@ const loadKopicSession = (): KopicSessionSnapshot | null => {
     }
 }
 
-const CircularProgress = ({ score, size = 200 }: { score: number; size?: number }) => {
-    const [displayScore, setDisplayScore] = useState(0)
+const CircularProgress = ({ score, size = 200 }: { score: number | null; size?: number }) => {
+    const [displayScore, setDisplayScore] = useState<number | null>(score)
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -40,7 +40,7 @@ const CircularProgress = ({ score, size = 200 }: { score: number; size?: number 
     const strokeWidth = 12
     const radius = (size - strokeWidth) / 2
     const circumference = 2 * Math.PI * radius
-    const progress = (displayScore / 100) * circumference
+    const progress = displayScore !== null ? (displayScore / 100) * circumference : 0
     const offset = circumference - progress
 
     return (
@@ -61,22 +61,26 @@ const CircularProgress = ({ score, size = 200 }: { score: number; size?: number 
                     strokeWidth={strokeWidth}
                 />
                 {/* 진행 원 */}
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    fill="none"
-                    stroke="#2D9CDB"
-                    strokeWidth={strokeWidth}
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={offset}
-                    className="transition-all duration-1000 ease-out"
-                />
+                {displayScore !== null && (
+                    <circle
+                        cx={size / 2}
+                        cy={size / 2}
+                        r={radius}
+                        fill="none"
+                        stroke="#2D9CDB"
+                        strokeWidth={strokeWidth}
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                        className="transition-all duration-1000 ease-out"
+                    />
+                )}
             </svg>
             {/* 점수 텍스트 */}
             <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-4xl font-bold text-gray-900">{score}점</span>
+                <span className="text-4xl font-bold text-gray-900">
+                    {displayScore !== null ? `${displayScore}점` : '-'}
+                </span>
             </div>
         </div>
     )
@@ -110,26 +114,45 @@ const ReportItem = ({
     const feedback = analysis?.feedback
     const originalSentence = analysis?.original_sentence
     const targetSentence = analysis?.target_sentence
+    const isProcessing = item.status === 'PROCESSING' || !analysis
 
     return (
         <div className="border border-gray-200 rounded-lg overflow-hidden">
             {/* 헤더 (클릭하여 펼치기) */}
             <button
-                onClick={onToggle}
-                className="w-full px-4 py-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
+                onClick={isProcessing ? undefined : onToggle}
+                disabled={isProcessing}
+                className={`relative w-full px-4 py-4 bg-gray-50 transition-colors flex items-center justify-between text-left ${
+                    isProcessing ? 'cursor-not-allowed' : 'hover:bg-gray-100 cursor-pointer'
+                }`}
             >
-                <span className="text-gray-700 font-medium">
-                    질문 {index + 1}: {item.text_ko}
-                </span>
-                {isExpanded ? (
-                    <ChevronUp size={20} className="text-gray-400" />
-                ) : (
-                    <ChevronDown size={20} className="text-gray-400" />
+                {/* 블러 처리된 배경 콘텐츠 */}
+                <div className={`flex items-center justify-between flex-1 ${isProcessing ? 'blur-sm' : ''}`}>
+                    <span className="text-gray-700 font-medium">
+                        질문 {index + 1}: {item.text_ko}
+                    </span>
+                    {!isProcessing && (
+                        isExpanded ? (
+                            <ChevronUp size={20} className="text-gray-400" />
+                        ) : (
+                            <ChevronDown size={20} className="text-gray-400" />
+                        )
+                    )}
+                </div>
+
+                {/* 로딩 오버레이 */}
+                {isProcessing && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-[2px]">
+                        <div className="flex items-center gap-2 text-sm text-blue-600 font-medium">
+                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                            리포트 생성 중입니다..
+                        </div>
+                    </div>
                 )}
             </button>
 
-            {/* 상세 내용 */}
-            {isExpanded && (
+            {/* 상세 내용 (생성 중이 아닐 때만 펼침) */}
+            {isExpanded && !isProcessing && analysis && (
                 <div className="px-4 py-4 bg-white border-t border-gray-100">
                     {/* 사용한 발화 */}
                     {item.user_answer && (
@@ -140,50 +163,43 @@ const ReportItem = ({
                         </div>
                     )}
 
-                    {analysis ? (
-                        <div className="space-y-3">
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                                <p className="text-sm font-medium text-gray-900 mb-2">답변 피드백</p>
+                    <div className="space-y-3">
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 mb-2">답변 피드백</p>
 
-                                <div className="space-y-2 text-sm text-gray-700">
-                                    <div>
-                                        <span className="font-medium">내 답변(STT):</span>{' '}
-                                        <span className="text-gray-800">{originalSentence || '-'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">모범 답변:</span>{' '}
-                                        <span className="text-blue-600">"{targetSentence || '-'}"</span>
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">아쉬운 점:</span>{' '}
-                                        <span className="text-red-600">{feedback?.missed_point ?? '-'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">교정 표현:</span>{' '}
-                                        <span className="text-blue-600">
-                                            "{feedback?.correction ?? '-'}"
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">팁:</span>{' '}
-                                        <span className="text-green-600">{feedback?.tip ?? '-'}</span>
-                                    </div>
+                            <div className="space-y-2 text-sm text-gray-700">
+                                <div>
+                                    <span className="font-medium">내 답변(STT):</span>{' '}
+                                    <span className="text-gray-800">{originalSentence || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="font-medium">모범 답변:</span>{' '}
+                                    <span className="text-blue-600">"{targetSentence || '-'}"</span>
+                                </div>
+                                <div>
+                                    <span className="font-medium">아쉬운 점:</span>{' '}
+                                    <span className="text-red-600">{feedback?.missed_point ?? '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="font-medium">교정 표현:</span>{' '}
+                                    <span className="text-blue-600">
+                                        "{feedback?.correction ?? '-'}"
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="font-medium">팁:</span>{' '}
+                                    <span className="text-green-600">{feedback?.tip ?? '-'}</span>
                                 </div>
                             </div>
-
-                            {/* 점수 표시 */}
-                            <div className="flex gap-4 text-sm">
-                                <span className="text-gray-600">
-                                    정확도: <strong className="text-gray-900">{item.accuracy ?? '-'}</strong>
-                                </span>
-                                <span className="text-gray-600">
-                                    총점: <strong className="text-gray-900">{item.total_score ?? '-'}</strong>
-                                </span>
-                            </div>
                         </div>
-                    ) : (
-                        <p className="text-sm text-gray-500">분석 중입니다.</p>
-                    )}
+
+                        {/* 점수 표시 */}
+                        <div className="flex gap-4 text-sm">
+                            <span className="text-gray-600">
+                                점수: <strong className="text-gray-900">{item.accuracy ?? '-'}</strong>
+                            </span>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -194,7 +210,7 @@ export default function KopicReport() {
     const navigate = useNavigate()
     const [reportItems, setReportItems] = useState<(KopicReportItem | null)[]>([])
     const [expandedIndex, setExpandedIndex] = useState<number>(0)
-    const [averageScore, setAverageScore] = useState(0)
+    const [averageScore, setAverageScore] = useState<number | null>(null)
     const [progressMessage, setProgressMessage] = useState<string | null>(null)
     const [isSessionReady, setIsSessionReady] = useState(false)
 
@@ -242,7 +258,7 @@ export default function KopicReport() {
         navigate('/')
     }
 
-    // 비동기 분석 결과 조회
+    // 비동기 분석 결과 조회 (각 문제별 개별 조회)
     useEffect(() => {
         if (!isSessionReady) {
             return
@@ -257,92 +273,104 @@ export default function KopicReport() {
             return
         }
 
+        const reportIds = kopicSessionData.reportIds
+        if (!reportIds || reportIds.length === 0) {
+            setProgressMessage('리포트 정보를 찾을 수 없습니다. 다시 시작해주세요.')
+            return
+        }
+
         let cancelled = false
-        let intervalId: ReturnType<typeof setInterval> | null = null
+        const intervalIds: Map<number, ReturnType<typeof setInterval>> = new Map()
+        const items: (KopicReportItem | null)[] = new Array(reportIds.length).fill(null)
+        setReportItems(items)
 
-        const mapTotalReportItem = (item: KopicTotalReportItem): KopicReportItem => ({
-            kopic_report_id: item.kopic_report_id,
-            status: 'COMPLETED',
-            kopic_sentence_id: item.kopic_sentence_id,
-            text_ko: item.text_ko,
-            user_answer: '',
-            audio_url: '',
-            accuracy: item.accuracy,
-            total_score: item.total_score,
-            detailed_analysis: item.detailed_analysis,
-        })
-
-        const fetchTotalReport = async () => {
+        // 각 reportId에 대해 개별 조회
+        const fetchReport = async (reportId: number, index: number) => {
             try {
-                const response = await getKopicTotalReport(kopicTotalReportId)
+                const response = await getKopicReport(reportId)
                 if (cancelled) {
                     return
                 }
 
-                if (!response.data.success || !response.data.data) {
-                    setProgressMessage('분석 결과를 불러오지 못했습니다.')
-                    return
-                }
+                if (response.data.success && response.data.data) {
+                    const item = response.data.data
 
-                const totalReport = response.data.data
-                const reportData = totalReport.report_data || []
-                const mappedItems = reportData.map(mapTotalReportItem)
-
-                if (totalReport.total_count && totalReport.total_count > mappedItems.length) {
-                    const paddedItems: (KopicReportItem | null)[] = new Array(
-                        totalReport.total_count
-                    ).fill(null)
-                    mappedItems.forEach((item, index) => {
-                        paddedItems[index] = item
+                    setReportItems(prev => {
+                        const newItems = [...prev]
+                        newItems[index] = item
+                        return newItems
                     })
-                    setReportItems(paddedItems)
-                } else {
-                    setReportItems(mappedItems)
-                }
 
-                if (totalReport.total_score !== null && totalReport.total_score !== undefined) {
-                    setAverageScore(Math.round(totalReport.total_score))
-                } else if (
-                    totalReport.avg_accuracy !== null &&
-                    totalReport.avg_accuracy !== undefined
-                ) {
-                    setAverageScore(Math.round(totalReport.avg_accuracy))
-                }
+                    // 평균 점수 업데이트 (모든 리포트가 완료되었을 때만)
+                    setReportItems(currentItems => {
+                        const allCompleted = currentItems.every(
+                            item => item !== null && item.status !== 'PROCESSING'
+                        )
 
-                if (totalReport.status === 'PROCESSING') {
-                    const completed = totalReport.completed_count ?? reportData.length
-                    const total = totalReport.total_count ?? reportData.length
-                    if (total) {
-                        setProgressMessage(`${completed}/${total} 분석 중...`)
-                    } else {
-                        setProgressMessage('분석 중...')
+                        if (allCompleted) {
+                            const completedItems = currentItems.filter(
+                                (item): item is KopicReportItem => item !== null && item.accuracy !== null && item.accuracy !== undefined
+                            )
+                            if (completedItems.length > 0) {
+                                const totalScore = completedItems.reduce((sum, item) => sum + (item.accuracy || 0), 0)
+                                setAverageScore(Math.round(totalScore / completedItems.length))
+                            }
+                        } else {
+                            setAverageScore(null)
+                        }
+
+                        return currentItems
+                    })
+
+                    // PROCESSING 상태가 아니면 polling 중지
+                    if (item.status !== 'PROCESSING') {
+                        const intervalId = intervalIds.get(reportId)
+                        if (intervalId) {
+                            clearInterval(intervalId)
+                            intervalIds.delete(reportId)
+                        }
                     }
-                } else {
-                    setProgressMessage(null)
-                    if (intervalId) {
-                        clearInterval(intervalId)
-                        intervalId = null
-                    }
+
+                    // 모든 리포트가 완료되면 진행 메시지 제거
+                    setReportItems(currentItems => {
+                        const allCompleted = currentItems.every(
+                            item => item !== null && item.status !== 'PROCESSING'
+                        )
+                        if (allCompleted) {
+                            setProgressMessage(null)
+                        } else {
+                            const completed = currentItems.filter(item => item !== null).length
+                            setProgressMessage(`${completed}/${reportIds.length} 분석 중...`)
+                        }
+                        return currentItems
+                    })
                 }
             } catch (error) {
                 if (!cancelled) {
-                    setProgressMessage('분석 결과를 불러오지 못했습니다.')
-                }
-                if (intervalId) {
-                    clearInterval(intervalId)
-                    intervalId = null
+                    console.error(`Failed to fetch report ${reportId}:`, error)
                 }
             }
         }
 
-        fetchTotalReport()
-        intervalId = setInterval(fetchTotalReport, 2000)
+        // 모든 리포트를 비동기 병렬로 조회 시작
+        reportIds.forEach((reportId, index) => {
+            if (reportId) {
+                // 즉시 첫 조회
+                fetchReport(reportId, index)
+                // 2초마다 polling
+                const intervalId = setInterval(() => {
+                    fetchReport(reportId, index)
+                }, 2000)
+                intervalIds.set(reportId, intervalId)
+            }
+        })
+
+        setProgressMessage(`0/${reportIds.length} 분석 중...`)
 
         return () => {
             cancelled = true
-            if (intervalId) {
-                clearInterval(intervalId)
-            }
+            intervalIds.forEach(intervalId => clearInterval(intervalId))
+            intervalIds.clear()
         }
     }, [themeId, navigate, kopicTotalReportId, isSessionReady])
 

@@ -282,6 +282,7 @@ class RoomServiceTest {
 
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));  // Redis에 memberId=1 있음
             given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
             given(roomSessionService.getAllRoles(1L)).willReturn(Collections.emptyMap());
             // 게임 상태 정보 모두 null
@@ -315,6 +316,7 @@ class RoomServiceTest {
 
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));
             given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, true));
             given(roomSessionService.getAllRoles(1L)).willReturn(Collections.emptyMap());
             // 컨텐츠 선택됨, 게임은 아직 시작 전
@@ -343,6 +345,7 @@ class RoomServiceTest {
 
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));
             given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
             given(roomSessionService.getAllRoles(1L)).willReturn(Collections.emptyMap());
             // 게임 시작됨, 영상 시청 중
@@ -371,6 +374,7 @@ class RoomServiceTest {
 
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));
             given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
             given(roomSessionService.getAllRoles(1L)).willReturn(Map.of(1L, "1"));
             // 역할 선택 중, 아직 미확정
@@ -399,6 +403,7 @@ class RoomServiceTest {
 
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));
             given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
             given(roomSessionService.getAllRoles(1L)).willReturn(Map.of(1L, "1"));
             // 역할 확정됨
@@ -427,6 +432,7 @@ class RoomServiceTest {
 
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(List.of(memberRoom));
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));
             given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
             given(roomSessionService.getAllRoles(1L)).willReturn(Map.of(1L, "1"));
             // 라운드 1 진행 중
@@ -454,6 +460,50 @@ class RoomServiceTest {
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_ROOM);
         }
+
+        @Test
+        @DisplayName("성공 - Redis 필터링: 비정상 종료한 사람은 표시 안 됨")
+        void getRoomDetail_Success_FilterOutDisconnectedMembers() {
+            // Given
+            Member disconnectedMember = Member.builder()
+                    .email("disconnected@test.com")
+                    .password("password")
+                    .nickname("나간사람")
+                    .build();
+            ReflectionTestUtils.setField(disconnectedMember, "memberId", 2L);
+
+            MemberRoom memberRoom1 = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(testMember)  // memberId=1
+                    .build();
+
+            MemberRoom memberRoom2 = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(disconnectedMember)  // memberId=2 (비정상 종료)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            // DB에는 2명의 MemberRoom이 있음
+            given(memberRoomRepository.findByRoomIdWithMember(1L))
+                    .willReturn(List.of(memberRoom1, memberRoom2));
+            // Redis에는 memberId=1만 있음 (2번은 비정상 종료로 제거됨)
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));
+            given(roomSessionService.getAllReadyStatus(1L)).willReturn(Map.of(1L, false));
+            given(roomSessionService.getAllRoles(1L)).willReturn(Collections.emptyMap());
+            given(roomSessionService.getContentId(1L)).willReturn(null);
+            given(roomSessionService.getPhase(1L)).willReturn(null);
+            given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
+
+            // When
+            RoomDetailResponse response = roomService.getRoomDetail(1L);
+
+            // Then
+            assertThat(response).isNotNull();
+            assertThat(response.getMembers()).hasSize(1);  // Redis에 있는 1명만 반환
+            assertThat(response.getMembers().get(0).getMemberId()).isEqualTo(1L);
+            assertThat(response.getMembers().get(0).getNickname()).isEqualTo("테스터");
+            // memberId=2 (나간사람)은 포함되지 않음
+        }
     }
 
     @Nested
@@ -479,7 +529,9 @@ class RoomServiceTest {
             RoomEnterRequest request = new RoomEnterRequest();
 
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
-            given(memberRoomRepository.existsByRoom_RoomIdAndMember_MemberId(1L, 2L)).willReturn(false);
+            given(roomSessionService.isMember(1L, 2L)).willReturn(false);  // Redis에 없음
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(1L, 2L))
+                    .willReturn(Optional.empty());  // DB에도 없음
             given(memberRoomRepository.countByRoom_RoomId(1L)).willReturn(1L);
             given(memberRepository.findById(2L)).willReturn(Optional.of(anotherMember));
 
@@ -508,7 +560,9 @@ class RoomServiceTest {
             ReflectionTestUtils.setField(request, "password", "1234");
 
             given(roomRepository.findById(2L)).willReturn(Optional.of(privateRoom));
-            given(memberRoomRepository.existsByRoom_RoomIdAndMember_MemberId(2L, 2L)).willReturn(false);
+            given(roomSessionService.isMember(2L, 2L)).willReturn(false);  // Redis에 없음
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(2L, 2L))
+                    .willReturn(Optional.empty());  // DB에도 없음
             given(memberRoomRepository.countByRoom_RoomId(2L)).willReturn(1L);
             given(memberRepository.findById(2L)).willReturn(Optional.of(anotherMember));
 
@@ -541,21 +595,60 @@ class RoomServiceTest {
             assertThatThrownBy(() -> roomService.enterRoom(2L, request, 2L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_ROOM_PASSWORD);
+
+            // 비밀번호 체크에서 걸리므로 Redis 체크 안함
+            verify(roomSessionService, never()).isMember(anyLong(), anyLong());
         }
 
         @Test
-        @DisplayName("실패 - 이미 입장한 방")
+        @DisplayName("실패 - 이미 입장한 방 (Redis에 존재)")
         void enterRoom_Fail_AlreadyJoined() {
             // Given
             RoomEnterRequest request = new RoomEnterRequest();
 
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
-            given(memberRoomRepository.existsByRoom_RoomIdAndMember_MemberId(1L, 2L)).willReturn(true);
+            // Redis에 있으면 현재 접속 중 → 중복 입장 에러
+            given(roomSessionService.isMember(1L, 2L)).willReturn(true);
 
             // When & Then
             assertThatThrownBy(() -> roomService.enterRoom(1L, request, 2L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_ALREADY_JOINED);
+
+            // Redis 체크에서 걸리므로 DB 조회 안함
+            verify(memberRoomRepository, never()).findByRoom_RoomIdAndMember_MemberId(anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("성공 - DB 잔존 데이터 삭제 후 재입장")
+        void enterRoom_Success_DeleteStaleData() {
+            // Given
+            RoomEnterRequest request = new RoomEnterRequest();
+            MemberRoom staleData = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(anotherMember)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            // Redis에는 없음 (비정상 종료로 이미 제거됨)
+            given(roomSessionService.isMember(1L, 2L)).willReturn(false);
+            // DB에 잔존 데이터 존재
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(1L, 2L))
+                    .willReturn(Optional.of(staleData));
+            given(memberRoomRepository.countByRoom_RoomId(1L)).willReturn(1L);
+            given(memberRepository.findById(2L)).willReturn(Optional.of(anotherMember));
+
+            // When
+            roomService.enterRoom(1L, request, 2L);
+
+            // Then
+            // 잔존 데이터 삭제
+            verify(memberRoomRepository).delete(staleData);
+            // 새로운 MemberRoom 저장
+            verify(memberRoomRepository).save(any(MemberRoom.class));
+            // Redis에 추가
+            verify(roomSessionService).addMember(1L, 2L);
+            verify(roomSessionService).setMemberRoom(2L, 1L);
         }
 
         @Test
@@ -573,8 +666,10 @@ class RoomServiceTest {
             RoomEnterRequest request = new RoomEnterRequest();
 
             given(roomRepository.findById(3L)).willReturn(Optional.of(fullRoom));
-            given(memberRoomRepository.existsByRoom_RoomIdAndMember_MemberId(3L, 2L)).willReturn(false);
-            given(memberRoomRepository.countByRoom_RoomId(3L)).willReturn(2L);
+            given(roomSessionService.isMember(3L, 2L)).willReturn(false);  // Redis에 없음
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(3L, 2L))
+                    .willReturn(Optional.empty());  // DB에도 없음
+            given(memberRoomRepository.countByRoom_RoomId(3L)).willReturn(2L);  // 정원 초과
 
             // When & Then
             assertThatThrownBy(() -> roomService.enterRoom(3L, request, 2L))
@@ -603,6 +698,134 @@ class RoomServiceTest {
             assertThatThrownBy(() -> roomService.enterRoom(4L, request, 2L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_JOINABLE);
+
+            // 입장 가능 상태 체크에서 걸리므로 Redis 체크 안함
+            verify(roomSessionService, never()).isMember(anyLong(), anyLong());
+        }
+    }
+
+    @Nested
+    @DisplayName("비정상 종료 처리")
+    class HandleAbnormalDisconnect {
+
+        @Test
+        @DisplayName("성공 - 일반 멤버 비정상 종료")
+        void handleAbnormalDisconnect_Success_NormalMember() {
+            // Given
+            Member anotherMember = Member.builder()
+                    .email("another@test.com")
+                    .password("password")
+                    .nickname("다른사용자")
+                    .build();
+            ReflectionTestUtils.setField(anotherMember, "memberId", 2L);
+
+            MemberRoom memberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(anotherMember)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(1L, 2L))
+                    .willReturn(Optional.of(memberRoom));
+            given(memberRoomRepository.countByRoom_RoomId(1L)).willReturn(1L);
+
+            // When
+            roomService.handleAbnormalDisconnect(1L, 2L);
+
+            // Then
+            verify(memberRoomRepository).delete(memberRoom);
+            verify(memberRoomRepository).countByRoom_RoomId(1L);
+            // Redis 작업은 이미 Controller에서 처리되어 여기서는 호출 안됨
+        }
+
+        @Test
+        @DisplayName("성공 - 방장 비정상 종료, 위임")
+        void handleAbnormalDisconnect_Success_OwnerDisconnect_Delegate() {
+            // Given
+            Member nextOwner = Member.builder()
+                    .email("next@test.com")
+                    .password("password")
+                    .nickname("다음방장")
+                    .build();
+            ReflectionTestUtils.setField(nextOwner, "memberId", 2L);
+
+            MemberRoom ownerMemberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(testMember)  // 방장
+                    .build();
+
+            MemberRoom nextMemberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(nextOwner)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(1L, 1L))
+                    .willReturn(Optional.of(ownerMemberRoom));
+            given(memberRoomRepository.findFirstByRoomIdOrderByCreatedAtAsc(1L))
+                    .willReturn(Optional.of(nextMemberRoom));
+            given(memberRoomRepository.countByRoom_RoomId(1L)).willReturn(1L);
+
+            // When
+            roomService.handleAbnormalDisconnect(1L, 1L);
+
+            // Then
+            verify(memberRoomRepository).delete(ownerMemberRoom);
+            assertThat(testRoom.getOwner().getMemberId()).isEqualTo(2L);  // 방장 위임됨
+            verify(memberRoomRepository).countByRoom_RoomId(1L);
+        }
+
+        @Test
+        @DisplayName("성공 - 마지막 사람 비정상 종료, 방 종료")
+        void handleAbnormalDisconnect_Success_LastMember_RoomCompleted() {
+            // Given
+            MemberRoom memberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(testMember)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(1L, 1L))
+                    .willReturn(Optional.of(memberRoom));
+            given(memberRoomRepository.findFirstByRoomIdOrderByCreatedAtAsc(1L))
+                    .willReturn(Optional.empty());
+            given(memberRoomRepository.countByRoom_RoomId(1L)).willReturn(0L);  // 남은 인원 0
+
+            // When
+            roomService.handleAbnormalDisconnect(1L, 1L);
+
+            // Then
+            verify(memberRoomRepository).delete(memberRoom);
+            assertThat(testRoom.getStatus()).isEqualTo(RoomStatus.COMPLETED);
+            verify(roomSessionService).clearRoomSession(1L);
+        }
+
+        @Test
+        @DisplayName("성공 - 방이 존재하지 않으면 무시")
+        void handleAbnormalDisconnect_Success_RoomNotFound_Ignored() {
+            // Given
+            given(roomRepository.findById(999L)).willReturn(Optional.empty());
+
+            // When
+            roomService.handleAbnormalDisconnect(999L, 1L);
+
+            // Then
+            verify(memberRoomRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("성공 - MemberRoom이 존재하지 않으면 무시")
+        void handleAbnormalDisconnect_Success_MemberRoomNotFound_Ignored() {
+            // Given
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(1L, 999L))
+                    .willReturn(Optional.empty());
+
+            // When
+            roomService.handleAbnormalDisconnect(1L, 999L);
+
+            // Then
+            verify(memberRoomRepository, never()).delete(any());
         }
     }
 

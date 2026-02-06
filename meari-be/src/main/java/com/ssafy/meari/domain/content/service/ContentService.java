@@ -73,6 +73,7 @@ public class ContentService {
                         .title(content.getTitle())
                         .thumbnailUrl(content.getThumbnailUrl())
                         .maxPeople(content.getMaxPeople())
+                        .totalDuration(content.getTotalDuration())
                         .build())
                 .collect(Collectors.toList());
     }

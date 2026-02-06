@@ -49,39 +49,39 @@ class KopicEvaluateServiceTest {
     @DisplayName("evaluate - 코픽 발화 분석 요청")
     class EvaluateTest {
 
-//        @Test
-//        @DisplayName("성공: PROCESSING 상태의 리포트를 생성하고 비동기 분석을 시작한다")
-//        void evaluate_success() {
-//            // Given
-//            Member member = mock(Member.class);
-//            given(member.getMemberId()).willReturn(1L);
-//
-//            Theme theme = mock(Theme.class);
-//
-//            KopicSentence sentence = mock(KopicSentence.class);
-//            given(sentence.getKopicSentenceId()).willReturn(501L);
-//            given(sentence.getTheme()).willReturn(theme);
-//            given(sentence.getTextKo()).willReturn("오늘 점심 메뉴는 뭐예요?");
-//
-//            KopicEvaluateRequest request = mock(KopicEvaluateRequest.class);
-//            given(request.getKopicSentenceId()).willReturn(501L);
-//            given(request.getAudioUrl()).willReturn("https://s3.../test.wav");
-//
-//            given(kopicSentenceRepository.findById(501L)).willReturn(Optional.of(sentence));
-//            given(kopicReportRepository.save(any(KopicReport.class))).willAnswer(invocation -> {
-//                KopicReport report = invocation.getArgument(0);
-//                ReflectionTestUtils.setField(report, "kopicReportId", 1001L);
-//                return report;
-//            });
-//
-//            // When
-//            KopicEvaluateResponse response = kopicEvaluateService.evaluate(member, request);
-//
-//            // Then
-//            assertThat(response.getKopicReportId()).isEqualTo(1001L);
-//            assertThat(response.getStatus()).isEqualTo("PROCESSING");
-//            verify(geminiAnalysisService).analyze(1001L, "오늘 점심 메뉴는 뭐예요?", "https://s3.../test.wav", );
-//        }
+        @Test
+        @DisplayName("성공: PROCESSING 상태의 리포트를 생성하고 비동기 분석을 시작한다")
+        void evaluate_success() {
+            // Given
+            Member member = mock(Member.class);
+            given(member.getMemberId()).willReturn(1L);
+
+            Theme theme = mock(Theme.class);
+
+            KopicSentence sentence = mock(KopicSentence.class);
+            given(sentence.getKopicSentenceId()).willReturn(501L);
+            given(sentence.getTheme()).willReturn(theme);
+            given(sentence.getTextKo()).willReturn("오늘 점심 메뉴는 뭐예요?");
+
+            KopicEvaluateRequest request = mock(KopicEvaluateRequest.class);
+            given(request.getKopicSentenceId()).willReturn(501L);
+            given(request.getAudioUrl()).willReturn("https://s3.../test.wav");
+
+            given(kopicSentenceRepository.findById(501L)).willReturn(Optional.of(sentence));
+            given(kopicReportRepository.save(any(KopicReport.class))).willAnswer(invocation -> {
+                KopicReport report = invocation.getArgument(0);
+                ReflectionTestUtils.setField(report, "kopicReportId", 1001L);
+                return report;
+            });
+
+            // When
+            KopicEvaluateResponse response = kopicEvaluateService.evaluate(member, request);
+
+            // Then
+            assertThat(response.getKopicReportId()).isEqualTo(1001L);
+            assertThat(response.getStatus()).isEqualTo("PROCESSING");
+            verify(geminiAnalysisService).analyze(1001L, "오늘 점심 메뉴는 뭐예요?", "https://s3.../test.wav");
+        }
 
         @Test
         @DisplayName("실패: 존재하지 않는 코픽 문장 ID로 요청하면 예외 발생")
@@ -137,6 +137,7 @@ class KopicEvaluateServiceTest {
             given(report.getMember()).willReturn(member);
             given(report.getKopicSentence()).willReturn(sentence);
             given(report.getAccuracy()).willReturn(85);
+            given(report.getIntonation()).willReturn(80);
             given(report.getStatus()).willReturn(ReportStatus.COMPLETED);
             given(report.getDetailedAnalysis()).willReturn("{\"missed_point\":\"test\",\"correction\":\"test\",\"tip\":\"test\"}");
             given(kopicReportRepository.findById(1001L)).willReturn(Optional.of(report));
@@ -148,6 +149,7 @@ class KopicEvaluateServiceTest {
             assertThat(response.getKopicReportId()).isEqualTo(1001L);
             assertThat(response.getStatus()).isEqualTo("COMPLETED");
             assertThat(response.getAccuracy()).isEqualTo(85);
+            assertThat(response.getIntonation()).isEqualTo(80);
             assertThat(response.getDetailedAnalysis()).isNotNull();
         }
 

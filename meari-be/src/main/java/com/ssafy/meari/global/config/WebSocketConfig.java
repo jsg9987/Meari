@@ -1,5 +1,6 @@
 package com.ssafy.meari.global.config;
 
+import com.ssafy.meari.domain.room.interceptor.RoomSessionMappingInterceptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtChannelInterceptor jwtChannelInterceptor;
+    private final RoomSessionMappingInterceptor roomSessionMappingInterceptor;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -47,8 +49,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        // JWT 인증 인터셉터 등록
+        // JWT 인증 인터셉터 등록 (먼저 실행)
         registration.interceptors(jwtChannelInterceptor);
-        log.info("WebSocket JWT 인증 인터셉터 등록 완료");
+        // sessionId 매핑 인터셉터 등록 (JWT 인증 후 실행)
+        registration.interceptors(roomSessionMappingInterceptor);
+        log.info("WebSocket 인터셉터 등록 완료: JWT 인증, sessionId 매핑");
     }
 }

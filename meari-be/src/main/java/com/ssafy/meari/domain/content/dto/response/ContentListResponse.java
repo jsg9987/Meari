@@ -1,5 +1,7 @@
 package com.ssafy.meari.domain.content.dto.response;
 
+import java.math.BigDecimal;
+
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -26,4 +28,7 @@ public class ContentListResponse {
 
     @Schema(description = "최대 참여 인원", example = "2")
     private Integer maxPeople;
+
+    @Schema(description = "영상의 길이", example = "94.510")
+    private BigDecimal totalDuration;
 }

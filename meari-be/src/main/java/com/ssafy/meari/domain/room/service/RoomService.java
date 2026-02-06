@@ -34,9 +34,9 @@ import com.ssafy.meari.domain.theme.entity.Theme;
 import com.ssafy.meari.domain.theme.repository.ThemeRepository;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Set;
+
+import java.util.*;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -44,8 +44,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -145,6 +143,7 @@ public class RoomService {
 
     /**
      * 방 상세 조회
+     * Redis의 실제 참여자로 필터링하여 이미 나간 사람이 보이지 않도록 처리
      */
     public RoomDetailResponse getRoomDetail(Long roomId) {
         log.info("방 상세 조회: roomId={}", roomId);
@@ -152,8 +151,21 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // 참여자 목록 조회
-        List<MemberRoom> memberRooms = memberRoomRepository.findByRoomIdWithMember(roomId);
+        // DB에서 모든 참여 기록 조회
+        List<MemberRoom> allMemberRooms = memberRoomRepository.findByRoomIdWithMember(roomId);
+
+        // Redis의 현재 실제 참여자 조회 (연결이 끊기지 않은 사람들)
+        Set<String> redisMembers = roomSessionService.getMembers(roomId);
+
+        // DB 데이터를 Redis로 필터링 (실제 참여 중인 멤버만 남김)
+        // 이렇게 하면 나갔을 때 leaveRoom이 호출되지 않은 경우에도
+        // Redis의 실제 상태를 기준으로 표시됨
+        List<MemberRoom> memberRooms = allMemberRooms.stream()
+                .filter(mr -> redisMembers != null &&
+                             redisMembers.contains(mr.getMember().getMemberId().toString()))
+                .collect(Collectors.toList());
+
+        log.debug("방 상세 조회 필터링: 전체={}, 필터 후={}", allMemberRooms.size(), memberRooms.size());
 
         // Redis에서 준비 상태, 역할 선점 정보 조회
         Map<Long, Boolean> readyStatus = roomSessionService.getAllReadyStatus(roomId);
@@ -179,6 +191,8 @@ public class RoomService {
 
     /**
      * 방 입장
+     * 비정상 종료는 SessionDisconnectEvent에서 즉시 처리되므로,
+     * 여기서는 단순히 DB 중복만 체크 (Redis는 이미 정리됨)
      */
     @Transactional
     public void enterRoom(Long roomId, RoomEnterRequest request, Long memberId) {
@@ -197,10 +211,17 @@ public class RoomService {
             throw new BusinessException(ErrorCode.INVALID_ROOM_PASSWORD);
         }
 
-        // 이미 참여 중인지 확인
-        if (memberRoomRepository.existsByRoom_RoomIdAndMember_MemberId(roomId, memberId)) {
+        // Redis에 이미 있으면 중복 입장 (현재 접속 중)
+        if (roomSessionService.isMember(roomId, memberId)) {
             throw new BusinessException(ErrorCode.ROOM_ALREADY_JOINED);
         }
+
+        // DB에 잔존 데이터가 있으면 삭제 (비정상 종료 후 재입장)
+        memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(roomId, memberId)
+                .ifPresent(existingMemberRoom -> {
+                    memberRoomRepository.delete(existingMemberRoom);
+                    log.info("비정상 종료 잔존 데이터 삭제: roomId={}, memberId={}", roomId, memberId);
+                });
 
         // 정원 확인
         long currentCount = memberRoomRepository.countByRoom_RoomId(roomId);
@@ -231,7 +252,7 @@ public class RoomService {
     }
 
     /**
-     * 방 퇴장
+     * 방 퇴장 (정상 퇴장)
      */
     @Transactional
     public void leaveRoom(Long roomId, Long memberId) {
@@ -240,9 +261,14 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // 참여 중인지 확인
+        // 참여 중인지 확인 (WebSocket disconnect로 이미 처리된 경우 정상 종료)
         MemberRoom memberRoom = memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(roomId, memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER_ROOM));
+                .orElse(null);
+
+        if (memberRoom == null) {
+            log.info("이미 퇴장 처리됨 (WebSocket disconnect): roomId={}, memberId={}", roomId, memberId);
+            return;
+        }
 
         // MemberRoom 삭제
         memberRoomRepository.delete(memberRoom);
@@ -270,6 +296,50 @@ public class RoomService {
         }
 
         log.info("방 퇴장 완료: roomId={}, memberId={}", roomId, memberId);
+    }
+
+    /**
+     * 비정상 종료 처리 (WebSocket 연결 끊김)
+     * SessionDisconnectEvent에서 호출됨
+     */
+    @Transactional
+    public void handleAbnormalDisconnect(Long roomId, Long memberId) {
+        log.info("비정상 종료 처리 시작: roomId={}, memberId={}", roomId, memberId);
+
+        Room room = roomRepository.findById(roomId).orElse(null);
+        if (room == null) {
+            log.warn("비정상 종료 처리: 방이 존재하지 않음, roomId={}", roomId);
+            return;
+        }
+
+        MemberRoom memberRoom = memberRoomRepository
+                .findByRoom_RoomIdAndMember_MemberId(roomId, memberId)
+                .orElse(null);
+
+        if (memberRoom == null) {
+            log.warn("비정상 종료 처리: MemberRoom이 존재하지 않음, roomId={}, memberId={}", roomId, memberId);
+            return;
+        }
+
+        // DB에서 삭제
+        memberRoomRepository.delete(memberRoom);
+        log.debug("비정상 종료: MemberRoom 삭제 완료, roomId={}, memberId={}", roomId, memberId);
+
+        // 방장이었으면 위임
+        if (room.getOwner().getMemberId().equals(memberId)) {
+            Long newOwnerId = handleOwnerLeave(room);
+            log.info("비정상 종료: 방장 위임 완료, roomId={}, newOwnerId={}", roomId, newOwnerId);
+        }
+
+        // 남은 인원 확인
+        long remainingCount = memberRoomRepository.countByRoom_RoomId(roomId);
+        if (remainingCount == 0) {
+            room.updateStatus(RoomStatus.COMPLETED);
+            roomSessionService.clearRoomSession(roomId);
+            log.info("비정상 종료: 마지막 사람 퇴장으로 방 종료, roomId={}", roomId);
+        }
+
+        log.info("비정상 종료 처리 완료: roomId={}, memberId={}, 남은 인원={}", roomId, memberId, remainingCount);
     }
 
     /**
