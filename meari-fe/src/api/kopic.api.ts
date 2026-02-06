@@ -8,16 +8,14 @@ export interface KopicSentence {
     time_limit?: number;
 }
 
-export interface KopicDetailedAnalysisFeedback {
-    missed_point: string;
-    correction: string;
-    tip: string;
-}
-
 export interface KopicDetailedAnalysis {
+    feedback: {
+        missed_point: string;
+        correction: string;
+        tip: string;
+    };
     original_sentence: string;
     target_sentence: string;
-    feedback: KopicDetailedAnalysisFeedback;
 }
 
 export interface KopicAnalyzeResponse {
@@ -60,6 +58,7 @@ export interface KopicTotalReportItem {
     kopic_sentence_id: number;
     text_ko: string;
     accuracy: number;
+    intonation: number;
     total_score: number;
     detailed_analysis: KopicDetailedAnalysis | null;
 }
@@ -133,13 +132,13 @@ const generateMockResult = (sentenceId: number, textKo: string): KopicReportItem
         accuracy: 85 + Math.floor(Math.random() * 10),
         total_score: 80 + Math.floor(Math.random() * 10),
         detailed_analysis: {
-            original_sentence: '모의 답변입니다.',
-            target_sentence: '더 자연스러운 모범 답변입니다.',
             feedback: {
                 missed_point: '핵심 정보가 부족합니다.',
                 correction: '구체적인 정보를 포함해 답해보세요.',
                 tip: '상황에 맞는 인사나 부탁 표현을 추가하면 자연스럽습니다.'
-            }
+            },
+            original_sentence: `${textKo} (모의 발화)`,
+            target_sentence: textKo
         }
     };
 };
