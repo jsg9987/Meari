@@ -64,18 +64,24 @@ export function useVideoRoom({
       const clientData = s.stream.connection.data;
       let name = "참여자";
       let memberIdFromData: number | undefined;
+      console.log('[useVideoRoom] Parsing subscriber clientData:', clientData);
       try {
         // %/% 구분자로 나눠진 경우 처리 (백엔드에서 추가 데이터를 넣은 경우)
         if (clientData.includes('%/%')) {
           const parts = clientData.split('%/%');
+          console.log('[useVideoRoom] Found %/% separator, parts:', parts);
+          // 첫 번째 부분(클라이언트 데이터)에서 먼저 파싱
+          const clientDataParsed = JSON.parse(parts[0]);
           // 두 번째 부분(백엔드 데이터)에서 nickname과 member_id 추출
           const backendData = JSON.parse(parts[1]);
-          name = backendData.nickname || name;
-          memberIdFromData = backendData.member_id;
+          name = backendData.nickname || clientDataParsed.nickname || name;
+          memberIdFromData = backendData.member_id || clientDataParsed.member_id;
+          console.log('[useVideoRoom] Parsed with separator - name:', name, 'memberId:', memberIdFromData);
         } else {
           const parsed = JSON.parse(clientData);
           name = parsed.clientData || parsed.nickname || name;
           memberIdFromData = parsed.member_id;
+          console.log('[useVideoRoom] Parsed without separator - name:', name, 'memberId:', memberIdFromData);
         }
       } catch (error) {
         console.error('Failed to parse clientData:', clientData, error);
@@ -89,16 +95,23 @@ export function useVideoRoom({
       const clientData = conn.data;
       let name = "참여자";
       let memberIdFromData: number | undefined;
+      console.log('[useVideoRoom] Parsing connection clientData:', clientData);
       try {
         if (clientData.includes('%/%')) {
           const parts = clientData.split('%/%');
+          console.log('[useVideoRoom] Found %/% separator, parts:', parts);
+          // 첫 번째 부분(클라이언트 데이터)에서 먼저 파싱
+          const clientDataParsed = JSON.parse(parts[0]);
+          // 두 번째 부분(백엔드 데이터)에서 nickname과 member_id 추출
           const backendData = JSON.parse(parts[1]);
-          name = backendData.nickname || name;
-          memberIdFromData = backendData.member_id;
+          name = backendData.nickname || clientDataParsed.nickname || name;
+          memberIdFromData = backendData.member_id || clientDataParsed.member_id;
+          console.log('[useVideoRoom] Parsed with separator - name:', name, 'memberId:', memberIdFromData);
         } else {
           const parsed = JSON.parse(clientData);
           name = parsed.clientData || parsed.nickname || name;
           memberIdFromData = parsed.member_id;
+          console.log('[useVideoRoom] Parsed without separator - name:', name, 'memberId:', memberIdFromData);
         }
       } catch (error) {
         console.error('Failed to parse clientData:', clientData, error);
@@ -200,7 +213,13 @@ export function useVideoRoom({
         token = webrtcResponse.data.data.token;
       }
 
-      await mySession.connect(token, { clientData: nickname });
+      // clientData에 nickname과 member_id를 JSON으로 전달
+      await mySession.connect(token, {
+        clientData: JSON.stringify({
+          nickname,
+          member_id: memberId
+        })
+      });
 
       // 이미 세션에 있는 connections를 수동으로 추가 (늦게 들어온 경우 대비)
       const existingConnections = mySession.remoteConnections;
