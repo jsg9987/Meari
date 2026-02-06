@@ -43,7 +43,10 @@ public class RoomSessionService {
     private static final String KEY_MEMBER_AUDIO_URLS = "room:%d:round:%d:member:%d:audio_urls";
     private static final String KEY_ROUND_TIMEOUT = "room:%d:round:%d:timeout";
     private static final String KEY_ROUND_COMPLETED = "room:%d:round:%d:completed";
-    private static final String KEY_WATCHING_COMPLETE = "room:%d:round:%d:watching_complete";
+    private static final String KEY_WATCHING_COMPLETE_ROOM = "room:%d:watching_complete"; // 게임 시작 전 영상 시청 완료 (room-level)
+    private static final String KEY_WATCHING_COMPLETE = "room:%d:round:%d:watching_complete"; // 라운드별 영상 시청 완료 (round-level)
+    private static final String KEY_SESSION_MEMBER = "session:%s:member"; // WebSocket sessionId → memberId 매핑
+    private static final String KEY_SESSION_ROOM = "session:%s:room"; // WebSocket sessionId → roomId 매핑
 
     // === 참여자 관리 ===
 
@@ -349,27 +352,27 @@ public class RoomSessionService {
         return com.ssafy.meari.domain.room.entity.GamePhase.valueOf(value);
     }
 
-    // === 영상 시청 완료 추적 ===
+    // === 영상 시청 완료 추적 (Room-level: 게임 시작 전) ===
 
     /**
-     * 영상 시청 완료 마킹
+     * 영상 시청 완료 마킹 (게임 시작 전 인트로 영상)
      */
     public void markWatchingComplete(Long roomId, Long memberId) {
-        String key = String.format(KEY_WATCHING_COMPLETE, roomId);
+        String key = String.format(KEY_WATCHING_COMPLETE_ROOM, roomId);
         redisTemplate.opsForSet().add(key, memberId.toString());
         setExpire(key);
         log.debug("방 {} 영상 시청 완료 마킹: memberId={}", roomId, memberId);
     }
 
     /**
-     * 현재 방 참여자 모두 영상 시청을 완료했는지 확인
+     * 현재 방 참여자 모두 영상 시청을 완료했는지 확인 (게임 시작 전)
      */
     public boolean isAllWatchingComplete(Long roomId) {
         Set<String> members = getMembers(roomId);
         if (members == null || members.isEmpty()) {
             return false;
         }
-        String key = String.format(KEY_WATCHING_COMPLETE, roomId);
+        String key = String.format(KEY_WATCHING_COMPLETE_ROOM, roomId);
         for (String memberIdStr : members) {
             Boolean isMember = redisTemplate.opsForSet().isMember(key, memberIdStr);
             if (!Boolean.TRUE.equals(isMember)) {
@@ -383,7 +386,7 @@ public class RoomSessionService {
      * 영상 시청 완료 집합 초기화 (게임 시작 시 WATCHING 진입 시 호출)
      */
     public void clearWatchingComplete(Long roomId) {
-        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE, roomId));
+        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE_ROOM, roomId));
         log.debug("방 {} 영상 시청 완료 집합 초기화", roomId);
     }
 
@@ -560,8 +563,10 @@ public class RoomSessionService {
         return true;
     }
 
+    // === 영상 시청 완료 추적 (Round-level: 라운드별) ===
+
     /**
-     * 영상 시청 완료 마킹 (WATCHING_COMPLETE 수신 시)
+     * 영상 시청 완료 마킹 (WATCHING_COMPLETE 수신 시, 라운드별)
      */
     public void addMemberWatchingComplete(Long roomId, Integer round, Long memberId) {
         String key = String.format(KEY_WATCHING_COMPLETE, roomId, round);
@@ -571,7 +576,7 @@ public class RoomSessionService {
     }
 
     /**
-     * 모든 멤버가 영상 시청 완료 메시지를 보냈는지 확인
+     * 모든 멤버가 영상 시청 완료 메시지를 보냈는지 확인 (라운드별)
      */
     public boolean isAllWatchingComplete(Long roomId, Integer round) {
         Set<String> members = getMembers(roomId);
@@ -622,7 +627,15 @@ public class RoomSessionService {
         redisTemplate.delete(String.format(KEY_CONTENT, roomId));
         redisTemplate.delete(String.format(KEY_PHASE, roomId));
         redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
-        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE, roomId));
+        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE_ROOM, roomId));
+
+        // round별 watching_complete는 패턴 매칭으로 삭제
+        String pattern = String.format("room:%d:round:*:watching_complete", roomId);
+        Set<String> keys = redisTemplate.keys(pattern);
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
+
         log.info("방 {} 세션 전체 삭제", roomId);
     }
 
@@ -638,7 +651,15 @@ public class RoomSessionService {
         redisTemplate.delete(String.format(KEY_CONTENT, roomId));
         redisTemplate.delete(String.format(KEY_PHASE, roomId));
         redisTemplate.delete(String.format(KEY_DISCONNECTED, roomId));
-        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE, roomId));
+        redisTemplate.delete(String.format(KEY_WATCHING_COMPLETE_ROOM, roomId));
+
+        // round별 watching_complete는 패턴 매칭으로 삭제
+        String pattern = String.format("room:%d:round:*:watching_complete", roomId);
+        Set<String> keys = redisTemplate.keys(pattern);
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
+
         log.info("방 {} 게임 상태 초기화 (준비 단계로 복귀, phase 삭제)", roomId);
     }
 
@@ -680,6 +701,66 @@ public class RoomSessionService {
         String key = String.format(KEY_ROUND_COMPLETED, roomId, round);
         String value = redisTemplate.opsForValue().get(key);
         return "true".equals(value);
+    }
+
+    // === WebSocket sessionId 매핑 관리 ===
+
+    /**
+     * WebSocket sessionId → memberId, roomId 매핑 저장
+     * 비정상 종료 시 어떤 멤버가 나갔는지 확인하기 위해 사용
+     */
+    public void setSessionMember(String sessionId, Long memberId, Long roomId) {
+        String memberKey = String.format(KEY_SESSION_MEMBER, sessionId);
+        String roomKey = String.format(KEY_SESSION_ROOM, sessionId);
+
+        redisTemplate.opsForValue().set(memberKey, memberId.toString());
+        redisTemplate.opsForValue().set(roomKey, roomId.toString());
+
+        setExpire(memberKey);
+        setExpire(roomKey);
+
+        log.debug("WebSocket sessionId 매핑 저장: sessionId={}, memberId={}, roomId={}",
+                 sessionId, memberId, roomId);
+    }
+
+    /**
+     * WebSocket sessionId로 memberId 조회
+     */
+    public Long getSessionMemberId(String sessionId) {
+        String key = String.format(KEY_SESSION_MEMBER, sessionId);
+        String value = redisTemplate.opsForValue().get(key);
+        return value != null ? Long.parseLong(value) : null;
+    }
+
+    /**
+     * WebSocket sessionId로 roomId 조회
+     */
+    public Long getSessionRoomId(String sessionId) {
+        String key = String.format(KEY_SESSION_ROOM, sessionId);
+        String value = redisTemplate.opsForValue().get(key);
+        return value != null ? Long.parseLong(value) : null;
+    }
+
+    /**
+     * WebSocket sessionId 매핑 제거
+     */
+    public void clearSessionMember(String sessionId) {
+        String memberKey = String.format(KEY_SESSION_MEMBER, sessionId);
+        String roomKey = String.format(KEY_SESSION_ROOM, sessionId);
+
+        redisTemplate.delete(memberKey);
+        redisTemplate.delete(roomKey);
+
+        log.debug("WebSocket sessionId 매핑 삭제: sessionId={}", sessionId);
+    }
+
+    /**
+     * WebSocket sessionId 매핑 존재 여부 확인
+     * Interceptor에서 중복 저장 방지용
+     */
+    public boolean hasSessionMapping(String sessionId) {
+        String key = String.format(KEY_SESSION_MEMBER, sessionId);
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
     // === 유틸리티 ===

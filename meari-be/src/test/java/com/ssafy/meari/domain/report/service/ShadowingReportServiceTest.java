@@ -6,6 +6,7 @@ import com.ssafy.meari.domain.content.repository.ContentRepository;
 import com.ssafy.meari.domain.content.repository.RoleRepository;
 import com.ssafy.meari.domain.member.entity.Member;
 import com.ssafy.meari.domain.member.repository.MemberRepository;
+import com.ssafy.meari.domain.report.dto.response.ShadowingPracticeHistoryResponse;
 import com.ssafy.meari.domain.report.dto.response.ShadowingReportDetailResponse;
 import com.ssafy.meari.domain.report.dto.response.ShadowingReportListItemResponse;
 import com.ssafy.meari.domain.report.entity.KopicTotalReport;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -42,6 +44,9 @@ class ShadowingReportServiceTest {
 
     @Autowired
     private ShadowingReportRepository shadowingReportRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Autowired
     private MemberRepository memberRepository;
@@ -62,6 +67,7 @@ class ShadowingReportServiceTest {
     private Theme theme;
     private Room room;
     private Content content;
+    private Role role;
 
     @BeforeEach
     void setUp() {
@@ -90,6 +96,18 @@ class ShadowingReportServiceTest {
                 .orElseGet(() -> contentRepository.save(Content.builder()
                         .theme(theme)
                         .title("테스트 콘텐츠")
+                        .videoUrl("http://example.com/video.mp4")
+                        .thumbnailUrl("http://example.com/thumbnail.png")
+                        .maxPeople(4)
+                        .totalDuration(new java.math.BigDecimal("120.500"))
+                        .build()));
+
+        // Role이 없으면 생성 (테스트 데이터용)
+        // ⚠️ Role은 Content와 @ManyToOne 관계이므로 content 필수
+        role = roleRepository.findById(1L)
+                .orElseGet(() -> roleRepository.save(Role.builder()
+                        .content(content)
+                        .name("학생 1")
                         .build()));
     }
 
@@ -183,8 +201,8 @@ class ShadowingReportServiceTest {
         System.out.println("\n========== 두 번째 페이지 조회 ==========");
         LocalDateTime secondPageCursor = firstPage.getNextCursor() != null
                 ? LocalDateTime.ofInstant(
-                        java.time.Instant.ofEpochMilli(firstPage.getNextCursor()),
-                        ZoneId.systemDefault())
+                java.time.Instant.ofEpochMilli(firstPage.getNextCursor()),
+                ZoneId.systemDefault())
                 : null;
 
         System.out.printf("전달된 커서 (timestamp): %s%n", firstPage.getNextCursor());
@@ -217,7 +235,7 @@ class ShadowingReportServiceTest {
         boolean firstPageSorted = true;
         for (int i = 1; i < firstPageTimes.size(); i++) {
             if (!firstPageTimes.get(i).isBefore(firstPageTimes.get(i - 1)) &&
-                !firstPageTimes.get(i).isEqual(firstPageTimes.get(i - 1))) {
+                    !firstPageTimes.get(i).isEqual(firstPageTimes.get(i - 1))) {
                 firstPageSorted = false;
                 break;
             }
@@ -228,7 +246,7 @@ class ShadowingReportServiceTest {
         boolean secondPageSorted = true;
         for (int i = 1; i < secondPageTimes.size(); i++) {
             if (!secondPageTimes.get(i).isBefore(secondPageTimes.get(i - 1)) &&
-                !secondPageTimes.get(i).isEqual(secondPageTimes.get(i - 1))) {
+                    !secondPageTimes.get(i).isEqual(secondPageTimes.get(i - 1))) {
                 secondPageSorted = false;
                 break;
             }
@@ -495,6 +513,307 @@ class ShadowingReportServiceTest {
         assertThat(response.getContents()).hasSize(3);
         assertThat(response.isHasNext()).isFalse();
         assertThat(response.getNextCursor()).isNull();
+    }
+
+    // ========== 최근 5회 연습 이력 조회 테스트 ==========
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - 성공 (5개 이상 리포트 존재)")
+    void getRecentPracticeHistory_Success_MoreThanFive() {
+        // Given: 10개의 COMPLETED 리포트 생성
+        for (int i = 0; i < 10; i++) {
+            Role role = roleRepository.findById(i % 2 == 0 ? 1L : 2L).orElseThrow();
+            ShadowingReport report = ShadowingReport.builder()
+                    .member(member)
+                    .room(room)
+                    .role(role)
+                    .content(content)
+                    .round(1)
+                    .build();
+            ShadowingReport saved = shadowingReportRepository.save(report);
+            int score = 80 + (i % 15);
+            saved.updateAnalysisResult(score, score, "{\"sentences\": []}");
+        }
+
+        // 영속성 컨텍스트 플러시: DB에 데이터 반영
+        entityManager.flush();
+
+        // When: 최근 5회 조회
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: 정확히 5개만 반환
+        assertThat(responses).hasSize(5);
+        assertThat(responses.get(0).getIdx()).isEqualTo(1);
+        assertThat(responses.get(4).getIdx()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - 성공 (5개 미만 리포트 존재)")
+    void getRecentPracticeHistory_Success_LessThanFive() {
+        // Given: 3개의 COMPLETED 리포트 생성
+        for (int i = 0; i < 3; i++) {
+            Role role = roleRepository.findById(1L).orElseThrow();
+            ShadowingReport report = ShadowingReport.builder()
+                    .member(member)
+                    .room(room)
+                    .role(role)
+                    .content(content)
+                    .round(1)
+                    .build();
+            ShadowingReport saved = shadowingReportRepository.save(report);
+            saved.updateAnalysisResult(85, 85, "{\"sentences\": []}");
+        }
+
+        // When: 최근 5회 조회
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: 3개만 반환
+        assertThat(responses).hasSize(3);
+        assertThat(responses.get(0).getIdx()).isEqualTo(1);
+        assertThat(responses.get(1).getIdx()).isEqualTo(2);
+        assertThat(responses.get(2).getIdx()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - 성공 (리포트 없음)")
+    void getRecentPracticeHistory_Success_NoReports() {
+        // Given: 리포트 없음 (member만 존재)
+
+        // When: 최근 5회 조회
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: 빈 배열 반환
+        assertThat(responses).isEmpty();
+    }
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - idx 순차 번호 검증")
+    void getRecentPracticeHistory_IdxSequence() {
+        // Given: 4개의 COMPLETED 리포트 생성
+        for (int i = 0; i < 4; i++) {
+            Role role = roleRepository.findById(1L).orElseThrow();
+            ShadowingReport report = ShadowingReport.builder()
+                    .member(member)
+                    .room(room)
+                    .role(role)
+                    .content(content)
+                    .round(1)
+                    .build();
+            ShadowingReport saved = shadowingReportRepository.save(report);
+            saved.updateAnalysisResult(85, 85, "{}");
+        }
+
+        // 영속성 컨텍스트 플러시
+        entityManager.flush();
+
+        // When
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: idx가 1부터 4까지 순차적으로 증가
+        for (int i = 0; i < responses.size(); i++) {
+            assertThat(responses.get(i).getIdx()).isEqualTo(i + 1);
+        }
+    }
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - date 포맷 검증 (YYYY-MM-DD)")
+    void getRecentPracticeHistory_DateFormat() {
+        // Given: 1개의 COMPLETED 리포트 생성
+        Role role = roleRepository.findById(1L).orElseThrow();
+        ShadowingReport report = ShadowingReport.builder()
+                .member(member)
+                .room(room)
+                .role(role)
+                .content(content)
+                .round(1)
+                .build();
+        ShadowingReport saved = shadowingReportRepository.save(report);
+        saved.updateAnalysisResult(85, 85, "{}");
+
+        // When
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: date가 YYYY-MM-DD 형식
+        assertThat(responses).hasSize(1);
+        String date = responses.get(0).getDate();
+        assertThat(date).matches("\\d{4}-\\d{2}-\\d{2}");
+    }
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - errorsCount 계산 검증")
+    void getRecentPracticeHistory_ErrorsCountCalculation() {
+        // Given: errorsCount가 2인 리포트 생성
+        String detailedAnalysisJson = "{\"sentences\": [{\"errors\": [{\"type\": \"replace\"}, {\"type\": \"delete\"}]}]}";
+
+        Role role = roleRepository.findById(1L).orElseThrow();
+        ShadowingReport report = ShadowingReport.builder()
+                .member(member)
+                .room(room)
+                .role(role)
+                .content(content)
+                .round(1)
+                .build();
+        ShadowingReport saved = shadowingReportRepository.save(report);
+        saved.updateAnalysisResult(85, 85, detailedAnalysisJson);
+
+        // 영속성 컨텍스트 플러시
+        entityManager.flush();
+
+        // When
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: errorsCount = 2
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).getErrorsCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - errorsCount 다중 문장 계산")
+    void getRecentPracticeHistory_ErrorsCountMultipleSentences() {
+        // Given: 여러 문장의 오류를 포함하는 리포트
+        String detailedAnalysisJson = """
+                {
+                  "sentences": [
+                    {"errors": [{"type": "replace"}, {"type": "delete"}]},
+                    {"errors": [{"type": "insert"}]},
+                    {"errors": []}
+                  ]
+                }
+                """;
+
+        Role role = roleRepository.findById(1L).orElseThrow();
+        ShadowingReport report = ShadowingReport.builder()
+                .member(member)
+                .room(room)
+                .role(role)
+                .content(content)
+                .round(1)
+                .build();
+        ShadowingReport saved = shadowingReportRepository.save(report);
+        saved.updateAnalysisResult(85, 85, detailedAnalysisJson);
+
+        // 영속성 컨텍스트 플러시
+        entityManager.flush();
+
+        // When
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: errorsCount = 2 + 1 + 0 = 3
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).getErrorsCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - JSON 파싱 실패 시 errorsCount=0")
+    void getRecentPracticeHistory_InvalidJsonErrorsCountZero() {
+        // Given: 잘못된 JSON 형식의 리포트
+        String invalidJson = "{invalid json}";
+
+        Role role = roleRepository.findById(1L).orElseThrow();
+        ShadowingReport report = ShadowingReport.builder()
+                .member(member)
+                .room(room)
+                .role(role)
+                .content(content)
+                .round(1)
+                .build();
+        ShadowingReport saved = shadowingReportRepository.save(report);
+        saved.updateAnalysisResult(85, 85, invalidJson);
+
+        // When
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: JSON 파싱 실패 시 errorsCount = 0
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).getErrorsCount()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - COMPLETED 상태만 조회")
+    void getRecentPracticeHistory_OnlyCompletedStatus() {
+        // Given: COMPLETED 리포트 3개 + PROCESSING 리포트 2개 생성
+        for (int i = 0; i < 3; i++) {
+            Role role = roleRepository.findById(1L).orElseThrow();
+            ShadowingReport report = ShadowingReport.builder()
+                    .member(member)
+                    .room(room)
+                    .role(role)
+                    .content(content)
+                    .round(1)
+                    .build();
+            ShadowingReport saved = shadowingReportRepository.save(report);
+            saved.updateAnalysisResult(85, 85, "{}");
+        }
+
+        // PROCESSING 상태로 유지 (updateAnalysisResult 호출 안 함)
+        for (int i = 0; i < 2; i++) {
+            Role role = roleRepository.findById(1L).orElseThrow();
+            ShadowingReport report = ShadowingReport.builder()
+                    .member(member)
+                    .room(room)
+                    .role(role)
+                    .content(content)
+                    .round(2)
+                    .build();
+            shadowingReportRepository.save(report);
+        }
+
+        // 영속성 컨텍스트 플러시
+        entityManager.flush();
+
+        // When: 최근 5회 조회
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: COMPLETED 상태의 3개만 반환
+        assertThat(responses).hasSize(3);
+        for (ShadowingPracticeHistoryResponse response : responses) {
+            assertThat(response.getAccuracy()).isEqualTo(85);
+            assertThat(response.getIntonation()).isEqualTo(85);
+        }
+    }
+
+    @Test
+    @DisplayName("최근 5회 연습 이력 조회 - 최근순 정렬 (createdAt DESC)")
+    void getRecentPracticeHistory_SortedByCreatedAtDesc() throws InterruptedException {
+        // Given: 시간 간격을 두고 3개의 COMPLETED 리포트 생성
+        java.util.List<Long> reportIds = new java.util.ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            Role role = roleRepository.findById(1L).orElseThrow();
+            ShadowingReport report = ShadowingReport.builder()
+                    .member(member)
+                    .room(room)
+                    .role(role)
+                    .content(content)
+                    .round(1)
+                    .build();
+            ShadowingReport saved = shadowingReportRepository.save(report);
+            saved.updateAnalysisResult(80 + i, 80 + i, "{}");
+            reportIds.add(saved.getShadowingReportId());
+            Thread.sleep(10); // 시간차 생성
+        }
+
+        // 영속성 컨텍스트 플러시
+        entityManager.flush();
+
+        // When: 최근 5회 조회
+        java.util.List<ShadowingPracticeHistoryResponse> responses = shadowingReportService.getRecentPracticeHistory(
+                member.getMemberId());
+
+        // Then: 최근 리포트가 먼저 반환 (DESC 정렬)
+        // 마지막으로 생성된 리포트(accuracy=82)가 첫 번째여야 함
+        assertThat(responses).hasSize(3);
+        assertThat(responses.get(0).getAccuracy()).isEqualTo(82);
+        assertThat(responses.get(1).getAccuracy()).isEqualTo(81);
+        assertThat(responses.get(2).getAccuracy()).isEqualTo(80);
     }
 
 }

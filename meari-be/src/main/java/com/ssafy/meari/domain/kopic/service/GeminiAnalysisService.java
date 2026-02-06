@@ -1,23 +1,20 @@
 package com.ssafy.meari.domain.kopic.service;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ssafy.meari.domain.report.entity.KopicReport;
 import com.ssafy.meari.domain.report.repository.KopicReportRepository;
-
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Base64;
+
 
 @Slf4j
 @Service
@@ -63,14 +60,14 @@ public class GeminiAnalysisService {
 
             채점 기준
             - 내용 적절성 (70%)
-            STT 텍스트가 질문의 요구를 충족하는 핵심 의미를 포함하고 있는가.  
+            STT 텍스트가 질문의 요구를 충족하는 핵심 의미를 포함하고 있는가.
             문장이 불완전하더라도 질문에 대한 응답 의도가 명확하면 높은 점수를 부여한다.
 
-            - 문법 정확성 (20%) 
+            - 문법 정확성 (20%)
             STT 결과 기준으로 문법적 오류나 비문 여부를 평가하되, 발음으로 인한 오류는 별도로 추론하거나 보정하지 않는다.
 
             - 표현 명확성 (10%)
-            원어민 수준의 자연스러움이 아닌, 의미 전달의 명확성만을 평가한다.  
+            원어민 수준의 자연스러움이 아닌, 의미 전달의 명확성만을 평가한다.
             발음, 억양, 말의 부드러움은 평가 대상이 아니다.
 
             JSON 결과 규격
@@ -114,7 +111,7 @@ public class GeminiAnalysisService {
 
     @Async("geminiAnalysisExecutor")
     @Transactional
-    public void analyze(Long kopicReportId, String textKo, String audioUrl, Long kopicTotalReportId) {
+    public void analyze(Long kopicReportId, String textKo, byte[] audioData, Long kopicTotalReportId) {
         KopicReport report = kopicReportRepository.findById(kopicReportId)
                 .orElse(null);
 
@@ -125,11 +122,12 @@ public class GeminiAnalysisService {
 
         try {
             String userMessage = String.format(
-                    "원문: \"%s\"\n음성 파일 URL: \"%s\"\n\n위 음성을 분석하여 JSON 형식으로 응답하세요.",
-                    textKo, audioUrl
+                    "원문: \"%s\"\n\n위 음성을 분석하여 JSON 형식으로 응답하세요.",
+                    textKo
             );
 
-            String requestBody = buildGeminiRequest(userMessage);
+            String base64Audio = Base64.getEncoder().encodeToString(audioData);
+            String requestBody = buildGeminiRequest(userMessage, base64Audio);
             String url = String.format("%s/models/%s:generateContent", baseUrl, model);
 
             HttpHeaders headers = new HttpHeaders();
@@ -141,7 +139,6 @@ public class GeminiAnalysisService {
 
             String content = extractContentFromResponse(response.getBody());
             String jsonResponse = extractJson(content);
-            log.debug("Gemini raw json response: {}", jsonResponse);
             JsonNode jsonNode = objectMapper.readTree(jsonResponse);
 
             int accuracy = jsonNode.get("accuracy").asInt();
@@ -162,7 +159,8 @@ public class GeminiAnalysisService {
         }
     }
 
-    private String buildGeminiRequest(String userMessage) {
+
+    private String buildGeminiRequest(String userMessage, String base64Audio) {
         try {
             ObjectNode root = objectMapper.createObjectNode();
 
@@ -173,12 +171,20 @@ public class GeminiAnalysisService {
             systemInstruction.set("parts", objectMapper.createArrayNode().add(systemPart));
             root.set("system_instruction", systemInstruction);
 
-            // contents
+            // contents - text part + audio inlineData part
             ObjectNode content = objectMapper.createObjectNode();
             content.put("role", "user");
-            ObjectNode userPart = objectMapper.createObjectNode();
-            userPart.put("text", userMessage);
-            content.set("parts", objectMapper.createArrayNode().add(userPart));
+
+            ObjectNode textPart = objectMapper.createObjectNode();
+            textPart.put("text", userMessage);
+
+            ObjectNode audioPart = objectMapper.createObjectNode();
+            ObjectNode inlineData = objectMapper.createObjectNode();
+            inlineData.put("mimeType", "audio/webm");
+            inlineData.put("data", base64Audio);
+            audioPart.set("inlineData", inlineData);
+
+            content.set("parts", objectMapper.createArrayNode().add(textPart).add(audioPart));
             root.set("contents", objectMapper.createArrayNode().add(content));
 
             // generationConfig
@@ -203,6 +209,7 @@ public class GeminiAnalysisService {
                 .path("text")
                 .asText();
     }
+
 
     private String extractJson(String response) {
         String trimmed = response.trim();

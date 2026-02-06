@@ -5,6 +5,113 @@ import axiosInstance from './axiosInstance'
 // 환경 변수에 따라 목업 또는 실제 API 사용
 const USE_MOCK_MYPAGE = import.meta.env.VITE_USE_MOCK_MYPAGE === 'true'
 
+export interface MyPageProfile {
+  nickname: string
+  email: string
+  profile_image_url: string
+  native_language: 'KR' | 'VN' | 'EN'
+}
+
+export type MyPageProfileResponse = AxiosResponse<ApiResponse<MyPageProfile>>
+
+export const getMyPageProfile = async (): Promise<MyPageProfileResponse> => {
+  const response = await axiosInstance.get<ApiResponse<MyPageProfile>>('/mypage')
+  return response
+}
+
+export interface UpdateMyPageProfilePayload {
+  nickname: string
+  native_language: 'KR' | 'VN' | 'EN'
+}
+
+export type UpdateMyPageProfileResponse = AxiosResponse<ApiResponse<null>>
+
+export const updateMyPageProfile = async (
+  payload: UpdateMyPageProfilePayload
+): Promise<UpdateMyPageProfileResponse> => {
+  const response = await axiosInstance.patch<ApiResponse<null>>('/mypage/change', payload)
+  return response
+}
+
+export interface CheckPasswordPayload {
+  password: string
+}
+
+export type CheckPasswordResponse = AxiosResponse<ApiResponse<null>>
+
+export const checkMyPagePassword = async (
+  payload: CheckPasswordPayload
+): Promise<CheckPasswordResponse> => {
+  const response = await axiosInstance.post<ApiResponse<null>>('/mypage/check-password', payload)
+  return response
+}
+
+export interface ChangePasswordPayload {
+  new_password: string
+}
+
+export type ChangePasswordResponse = AxiosResponse<ApiResponse<null>>
+
+export const changeMyPagePassword = async (
+  payload: ChangePasswordPayload
+): Promise<ChangePasswordResponse> => {
+  const response = await axiosInstance.patch<ApiResponse<null>>('/mypage/change/pw', payload)
+  return response
+}
+
+export interface UploadProfileImagePayload {
+  fileName: string
+  contentType: string
+  fileSize: number
+  width: number
+  height: number
+}
+
+export interface UploadProfileImageData {
+  uploadUrl: string
+  s3Key: string
+  profileUrl: string
+  expiresIn: number
+}
+
+export type UploadProfileImageResponse = AxiosResponse<ApiResponse<UploadProfileImageData>>
+
+export const requestProfileImageUploadUrl = async (
+  payload: UploadProfileImagePayload
+): Promise<UploadProfileImageResponse> => {
+  const response = await axiosInstance.post<ApiResponse<UploadProfileImageData>>(
+    '/member/profile-image/upload-url',
+    payload
+  )
+  return response
+}
+
+export interface ConfirmProfileImagePayload {
+  profileUrl: string
+}
+
+export type ConfirmProfileImageResponse = AxiosResponse<ApiResponse<null>>
+
+export const confirmProfileImage = async (
+  payload: ConfirmProfileImagePayload
+): Promise<ConfirmProfileImageResponse> => {
+  const response = await axiosInstance.post<ApiResponse<null>>('/member/profile-image', payload)
+  return response
+}
+
+export interface GetProfileImageData {
+  profileUrl: string
+}
+
+export type GetProfileImageResponse = AxiosResponse<ApiResponse<GetProfileImageData>>
+
+export const getProfileImage = async (memberId: number): Promise<GetProfileImageResponse> => {
+  const response = await axiosInstance.get<ApiResponse<GetProfileImageData>>(
+    `/member/${memberId}/profile-image`
+  )
+  return response
+}
+
 // 쉐도잉 연습 기록 타입
 export interface ShadowingPracticeRecord {
   idx: number
