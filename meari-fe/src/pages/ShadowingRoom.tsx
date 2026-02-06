@@ -233,10 +233,15 @@ export default function ShadowingRoom() {
     onReady: (message) => {
       // 준비 상태 메시지 수신
       if (message.member_id !== undefined && message.ready !== undefined) {
-        setParticipantsReady(prev => ({
-          ...prev,
-          [message.member_id!]: message.ready!,
-        }));
+        console.log('[onReady] Received ready message:', message);
+        setParticipantsReady(prev => {
+          const updated = {
+            ...prev,
+            [message.member_id!]: message.ready!,
+          };
+          console.log('[onReady] Updated participantsReady:', updated);
+          return updated;
+        });
 
         // 내 준비 상태 업데이트
         if (message.member_id === memberId) {
@@ -289,16 +294,9 @@ export default function ShadowingRoom() {
     },
     onRoleAssigned: (message) => {
       // 역할 선점 성공 시 선택된 역할 ID 저장 (아직 확정은 아님)
-      console.log('[onRoleAssigned] Message received:', message);
-      console.log('[onRoleAssigned] Current memberId:', memberId);
-      console.log('[onRoleAssigned] Message member_id:', message.member_id);
-      console.log('[onRoleAssigned] Type comparison - memberId type:', typeof memberId, 'message.member_id type:', typeof message.member_id);
-      console.log('[onRoleAssigned] Equality check:', message.member_id === memberId);
-
       if (message.role_id && message.member_id) {
         // 모든 멤버의 역할 선택 상태는 항상 업데이트
         setMemberRole(message.member_id, message.role_id);
-        console.log('[onRoleAssigned] setMemberRole called for member:', message.member_id, 'role:', message.role_id);
 
         // 본인이 선택한 경우에만 mySelectedRole 업데이트 및 toast 표시
         if (message.member_id === memberId) {
@@ -474,11 +472,21 @@ export default function ShadowingRoom() {
               }
             }
 
-            // 현재 멤버 목록 저장
-            previousMembersRef.current = response.data.data.members.map(m => ({
+            // 현재 멤버 목록 저장 및 준비 상태 동기화
+            const members = response.data.data.members;
+            previousMembersRef.current = members.map(m => ({
               member_id: m.member_id,
               nickname: m.nickname,
             }));
+
+            // 멤버들의 준비 상태를 participantsReady에 반영 (기존 상태 유지하면서 업데이트)
+            setParticipantsReady(prev => {
+              const updated = { ...prev };
+              members.forEach(m => {
+                updated[m.member_id] = m.is_ready;
+              });
+              return updated;
+            });
           }
         } catch (error) {
           console.error('Failed to refresh room detail:', error);
@@ -527,11 +535,19 @@ export default function ShadowingRoom() {
           if (response.data.success && response.data.data) {
             setRoomData(response.data.data);
 
-            // 현재 멤버 목록 저장
-            previousMembersRef.current = response.data.data.members.map(m => ({
+            // 현재 멤버 목록 저장 및 준비 상태 동기화
+            const members = response.data.data.members;
+            previousMembersRef.current = members.map(m => ({
               member_id: m.member_id,
               nickname: m.nickname,
             }));
+
+            // 멤버들의 준비 상태를 participantsReady에 반영 (서버 상태로 완전 동기화)
+            const updatedReadyState: Record<number, boolean> = {};
+            members.forEach(m => {
+              updatedReadyState[m.member_id] = m.is_ready;
+            });
+            setParticipantsReady(updatedReadyState);
           }
         } catch (error) {
           console.error('Failed to refresh room detail:', error);
@@ -569,11 +585,19 @@ export default function ShadowingRoom() {
 
         setRoomData(response.data.data);
 
-        // 초기 멤버 목록 저장
+        // 초기 멤버 목록 저장 및 준비 상태 동기화
         previousMembersRef.current = response.data.data.members.map(m => ({
           member_id: m.member_id,
           nickname: m.nickname,
         }));
+
+        // 초기 멤버들의 준비 상태를 participantsReady에 반영
+        const initialReadyState: Record<number, boolean> = {};
+        response.data.data.members.forEach(m => {
+          initialReadyState[m.member_id] = m.is_ready;
+        });
+        console.log('[fetchRoomDetail] Initial participantsReady:', initialReadyState);
+        setParticipantsReady(initialReadyState);
 
         // content_id가 이미 있으면 video_url 가져오기
         if (response.data.data.content_id) {
@@ -620,11 +644,18 @@ export default function ShadowingRoom() {
               if (updatedResponse.data.success && updatedResponse.data.data) {
                 setRoomData(updatedResponse.data.data);
 
-                // 업데이트된 멤버 목록 저장
+                // 업데이트된 멤버 목록 저장 및 준비 상태 동기화
                 previousMembersRef.current = updatedResponse.data.data.members.map(m => ({
                   member_id: m.member_id,
                   nickname: m.nickname,
                 }));
+
+                // 멤버들의 준비 상태를 participantsReady에 반영
+                const initialReadyState: Record<number, boolean> = {};
+                updatedResponse.data.data.members.forEach(m => {
+                  initialReadyState[m.member_id] = m.is_ready;
+                });
+                setParticipantsReady(initialReadyState);
               }
 
               setIsEntered(true);
@@ -1124,11 +1155,18 @@ export default function ShadowingRoom() {
       if (updatedResponse.data.success && updatedResponse.data.data) {
         setRoomData(updatedResponse.data.data);
 
-        // 업데이트된 멤버 목록 저장
+        // 업데이트된 멤버 목록 저장 및 준비 상태 동기화
         previousMembersRef.current = updatedResponse.data.data.members.map(m => ({
           member_id: m.member_id,
           nickname: m.nickname,
         }));
+
+        // 멤버들의 준비 상태를 participantsReady에 반영
+        const initialReadyState: Record<number, boolean> = {};
+        updatedResponse.data.data.members.forEach(m => {
+          initialReadyState[m.member_id] = m.is_ready;
+        });
+        setParticipantsReady(initialReadyState);
       }
 
       setIsEntered(true);
@@ -1768,12 +1806,30 @@ export default function ShadowingRoom() {
                   // 게임 시작 중이거나 영상 재생 중이면 준비 상태 표시 안 함
                   const showReady = tileIsReady && !isGameStarting && !isPlaying;
 
+                  // 방장 여부에 따라 라벨 수정
+                  const isOwnerTile = t.memberId !== undefined && t.memberId === roomOwnerId;
+                  const displayLabel = isOwnerTile ? `[방장] ${t.label}` : t.label;
+
+                  // 디버깅: 타일 정보 로그
+                  console.log('[VideoTile Debug]', {
+                    label: t.label,
+                    displayLabel,
+                    memberId: t.memberId,
+                    roomOwnerId,
+                    isOwnerTile,
+                    tileIsReady,
+                    showReady,
+                    participantsReady: participantsReady[t.memberId ?? -1],
+                    isGameStarting,
+                    isPlaying
+                  });
+
                   return (
                     <VideoTile
                       key={t.id}
                       streamManager={t.streamManager}
                       muted={t.muted}
-                      label={t.label}
+                      label={displayLabel}
                       isSpeaker={t.isSpeaker}
                       isReady={showReady}
                       isSettingUp={t.isSettingUp}
