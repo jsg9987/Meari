@@ -54,8 +54,8 @@ public class KopicEvaluateController {
     @PostMapping(value = "/evaluate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<KopicEvaluateResponse>> evaluate(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @RequestParam("request") String requestJson,
-            @RequestParam("audio") MultipartFile audioFile
+            @RequestPart("request") String requestJson,
+            @RequestPart("audio") MultipartFile audioFile
     ) {
         try {
             KopicEvaluateRequest request = objectMapper.readValue(requestJson, KopicEvaluateRequest.class);

@@ -47,6 +47,9 @@ public class KopicReport extends BaseEntity {
     @Column(name = "accuracy")
     private Integer accuracy;
 
+    @Column(name = "intonation")
+    private Integer intonation;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "detailed_analysis", columnDefinition = "jsonb", nullable = true)
     private String detailedAnalysis;
