@@ -13,9 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Base64;
-
-
 @Slf4j
 @Service
 public class GeminiAnalysisService {
@@ -24,22 +21,28 @@ public class GeminiAnalysisService {
     private final KopicReportRepository kopicReportRepository;
     private final KopicAggregationService kopicAggregationService;
     private final ObjectMapper objectMapper;
-    private final String apiKey;
-    private final String model;
-    private final String baseUrl;
+    private final String geminiApiKey;
+    private final String geminiModel;
+    private final String geminiBaseUrl;
+    private final String openaiApiUrl;
+    private final String openaiApiKey;
 
     public GeminiAnalysisService(
-            @Value("${gemini.api-key}") String apiKey,
-            @Value("${gemini.model}") String model,
-            @Value("${gemini.base-url}") String baseUrl,
+            @Value("${gemini.api-key}") String geminiApiKey,
+            @Value("${gemini.model}") String geminiModel,
+            @Value("${gemini.base-url}") String geminiBaseUrl,
+            @Value("${openai.api-url}") String openaiApiUrl,
+            @Value("${openai.api-key}") String openaiApiKey,
             KopicReportRepository kopicReportRepository,
             KopicAggregationService kopicAggregationService,
             ObjectMapper objectMapper
     ) {
         this.restTemplate = new RestTemplate();
-        this.apiKey = apiKey;
-        this.model = model;
-        this.baseUrl = baseUrl;
+        this.geminiApiKey = geminiApiKey;
+        this.geminiModel = geminiModel;
+        this.geminiBaseUrl = geminiBaseUrl;
+        this.openaiApiUrl = openaiApiUrl;
+        this.openaiApiKey = openaiApiKey;
         this.kopicReportRepository = kopicReportRepository;
         this.kopicAggregationService = kopicAggregationService;
         this.objectMapper = objectMapper;
@@ -83,11 +86,11 @@ public class GeminiAnalysisService {
                     }
                 }
             }
-            
+
             - original_sentence: STT로 변환된 텍스트를 그대로 기재한다.
             - target_sentence: 질문에 대한 의미적으로 적절한 답변 예시를 제시하되, 발음이나 말하기 방식과 관련된 표현은 포함하지 않는다.
             - missed_point / correction / tip: 모두 답변 내용의 부족함 또는 의미 전달 관점에서만 작성한다.
-            
+
             평가 불가 처리 (절대 규칙)
             - 어떤 경우에도 반드시 JSON만 반환한다. (설명/마크다운/코드블록 금지)
             - 평가 불가(무응답/소음/의미 불명/문맥 파악 불가)라도 반드시 아래 형식으로 반환한다.
@@ -111,7 +114,7 @@ public class GeminiAnalysisService {
 
     @Async("geminiAnalysisExecutor")
     @Transactional
-    public void analyze(Long kopicReportId, String textKo, byte[] audioData, Long kopicTotalReportId) {
+    public void analyze(Long kopicReportId, String textKo, String audioUrl, Long kopicTotalReportId) {
         KopicReport report = kopicReportRepository.findById(kopicReportId)
                 .orElse(null);
 
@@ -121,18 +124,21 @@ public class GeminiAnalysisService {
         }
 
         try {
+            log.debug("음성 분석 시작: reportId={}, audioUrl={}", kopicReportId, audioUrl.substring(0, Math.min(100, audioUrl.length())));
+
             String userMessage = String.format(
-                    "원문: \"%s\"\n\n위 음성을 분석하여 JSON 형식으로 응답하세요.",
+                    "질문: \"%s\"\n\n첨부된 음성 파일은 위 질문에 대한 사용자의 답변입니다. 음성을 듣고 분석하여 JSON 형식으로 응답하세요.",
                     textKo
             );
 
-            String base64Audio = Base64.getEncoder().encodeToString(audioData);
-            String requestBody = buildGeminiRequest(userMessage, base64Audio);
-            String url = String.format("%s/models/%s:generateContent", baseUrl, model);
+            String requestBody = buildGeminiRequestWithFileData(userMessage, audioUrl);
+            String url = String.format("%s/models/%s:generateContent", geminiBaseUrl, geminiModel);
+
+            log.debug("Gemini 요청: url={}, bodySize={}bytes", url, requestBody.length());
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("x-goog-api-key", apiKey);
+            headers.set("x-goog-api-key", geminiApiKey);
 
             HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
@@ -142,7 +148,6 @@ public class GeminiAnalysisService {
             JsonNode jsonNode = objectMapper.readTree(jsonResponse);
 
             int accuracy = jsonNode.get("accuracy").asInt();
-
             String detailedAnalysis = objectMapper.writeValueAsString(jsonNode.get("detailed_analysis"));
 
             report.updateAnalysisResult(accuracy, detailedAnalysis);
@@ -159,8 +164,7 @@ public class GeminiAnalysisService {
         }
     }
 
-
-    private String buildGeminiRequest(String userMessage, String base64Audio) {
+    private String buildGeminiRequestWithFileData(String userMessage, String audioUrl) {
         try {
             ObjectNode root = objectMapper.createObjectNode();
 
@@ -171,21 +175,58 @@ public class GeminiAnalysisService {
             systemInstruction.set("parts", objectMapper.createArrayNode().add(systemPart));
             root.set("system_instruction", systemInstruction);
 
-            // contents - text part + audio inlineData part
-            ObjectNode content = objectMapper.createObjectNode();
-            content.put("role", "user");
+            // contents - 텍스트 + fileData (S3 presigned URL)
+            ObjectNode contentNode = objectMapper.createObjectNode();
+            contentNode.put("role", "user");
 
+            com.fasterxml.jackson.databind.node.ArrayNode partsArray = objectMapper.createArrayNode();
+
+            // 텍스트 파트
             ObjectNode textPart = objectMapper.createObjectNode();
             textPart.put("text", userMessage);
+            partsArray.add(textPart);
 
+            // fileData 파트 (S3 presigned URL)
             ObjectNode audioPart = objectMapper.createObjectNode();
-            ObjectNode inlineData = objectMapper.createObjectNode();
-            inlineData.put("mimeType", "audio/webm");
-            inlineData.put("data", base64Audio);
-            audioPart.set("inlineData", inlineData);
+            ObjectNode fileData = objectMapper.createObjectNode();
+            fileData.put("mimeType", "audio/wav");
+            fileData.put("fileUri", audioUrl);
+            audioPart.set("fileData", fileData);
+            partsArray.add(audioPart);
 
-            content.set("parts", objectMapper.createArrayNode().add(textPart).add(audioPart));
-            root.set("contents", objectMapper.createArrayNode().add(content));
+            contentNode.set("parts", partsArray);
+            root.set("contents", objectMapper.createArrayNode().add(contentNode));
+
+            // generationConfig
+            ObjectNode generationConfig = objectMapper.createObjectNode();
+            generationConfig.put("temperature", 0.3);
+            generationConfig.put("responseMimeType", "application/json");
+            root.set("generationConfig", generationConfig);
+
+            return objectMapper.writeValueAsString(root);
+        } catch (Exception e) {
+            throw new RuntimeException("Gemini 요청 생성 실패", e);
+        }
+    }
+
+    private String buildGeminiRequest(String userMessage) {
+        try {
+            ObjectNode root = objectMapper.createObjectNode();
+
+            // system_instruction
+            ObjectNode systemInstruction = objectMapper.createObjectNode();
+            ObjectNode systemPart = objectMapper.createObjectNode();
+            systemPart.put("text", SYSTEM_PROMPT);
+            systemInstruction.set("parts", objectMapper.createArrayNode().add(systemPart));
+            root.set("system_instruction", systemInstruction);
+
+            // contents - 텍스트만
+            ObjectNode contentNode = objectMapper.createObjectNode();
+            contentNode.put("role", "user");
+            ObjectNode userPart = objectMapper.createObjectNode();
+            userPart.put("text", userMessage);
+            contentNode.set("parts", objectMapper.createArrayNode().add(userPart));
+            root.set("contents", objectMapper.createArrayNode().add(contentNode));
 
             // generationConfig
             ObjectNode generationConfig = objectMapper.createObjectNode();
@@ -209,7 +250,6 @@ public class GeminiAnalysisService {
                 .path("text")
                 .asText();
     }
-
 
     private String extractJson(String response) {
         String trimmed = response.trim();

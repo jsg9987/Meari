@@ -126,7 +126,7 @@ export default function ContentSelectModal({ themeId, onClose, onSelect }: Conte
                     {/* 오른쪽 하단: 영상 길이 */}
                     <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
                       <Clock size={12} />
-                      <span>{formatDuration(content.duration)}</span>
+                      <span>{formatDuration(content.total_duration)}</span>
                     </div>
                   </div>
                   <div className="p-4">

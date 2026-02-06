@@ -13,18 +13,12 @@ import java.util.List;
 @Repository
 public interface KopicTotalReportRepository extends JpaRepository<KopicTotalReport, Long> {
 
-    /**
-     * 최근 완료된 KOPIC 총합 리포트 조회 (활동 내역용, N+1 방지)
-     * @param memberId 회원 ID
-     * @param status 리포트 상태
-     * @param pageable 페이징 정보
-     * @return 최근 완료 리포트 리스트 (theme JOIN FETCH)
-     */
-    @Query("SELECT ktr FROM KopicTotalReport ktr " +
-           "JOIN FETCH ktr.theme " +
-           "WHERE ktr.member.memberId = :memberId " +
-           "AND ktr.status = :status " +
-           "ORDER BY ktr.createdAt DESC")
+    @Query("SELECT r FROM KopicTotalReport r " +
+           "JOIN FETCH r.member " +
+           "JOIN FETCH r.theme " +
+           "WHERE r.member.memberId = :memberId " +
+           "AND r.status = :status " +
+           "ORDER BY r.createdAt DESC")
     List<KopicTotalReport> findRecentCompletedReports(
         @Param("memberId") Long memberId,
         @Param("status") ReportStatus status,

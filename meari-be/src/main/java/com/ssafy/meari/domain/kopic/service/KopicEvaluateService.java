@@ -17,6 +17,7 @@ import com.ssafy.meari.domain.theme.entity.Theme;
 import com.ssafy.meari.domain.theme.repository.ThemeRepository;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
+import com.ssafy.meari.global.util.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class KopicEvaluateService {
     private final KopicTotalReportRepository kopicTotalReportRepository;
     private final ThemeRepository themeRepository;
     private final GeminiAnalysisService geminiAnalysisService;
+    private final S3Service s3Service;
 
     @Transactional
     public KopicTotalReportCreateResponse createTotalReport(Member member, Long themeId) {
@@ -55,7 +57,7 @@ public class KopicEvaluateService {
     }
 
     @Transactional
-    public KopicEvaluateResponse evaluate(Member member, KopicEvaluateRequest request, byte[] audioData) {
+    public KopicEvaluateResponse evaluate(Member member, KopicEvaluateRequest request, byte[] audioData, String contentType) {
         KopicTotalReport totalReport = kopicTotalReportRepository.findById(request.getKopicTotalReportId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_KOPIC_TOTAL_REPORT));
 
@@ -75,6 +77,13 @@ public class KopicEvaluateService {
         log.debug("코픽 분석 요청 생성: reportId={}, totalReportId={}, sentenceId={}",
                 report.getKopicReportId(), totalReport.getKopicTotalReportId(), sentence.getKopicSentenceId());
 
+        // S3에 음성 파일 업로드
+        String s3Key = s3Service.generateKopicKey(member.getMemberId(), sentence.getKopicSentenceId());
+        s3Service.uploadFile(s3Key, audioData, contentType != null ? contentType : "audio/wav");
+        String audioUrl = s3Service.generatePresignedUrlForDownload(s3Key);
+
+        log.debug("코픽 음성 S3 업로드 완료: s3Key={}", s3Key);
+
         Long reportId = report.getKopicReportId();
         String textKo = sentence.getTextKo();
         Long totalReportId = totalReport.getKopicTotalReportId();
@@ -82,7 +91,7 @@ public class KopicEvaluateService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                geminiAnalysisService.analyze(reportId, textKo, audioData, totalReportId);
+                geminiAnalysisService.analyze(reportId, textKo, audioUrl, totalReportId);
             }
         });
 
