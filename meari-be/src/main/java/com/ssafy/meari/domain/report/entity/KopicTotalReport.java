@@ -10,8 +10,7 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "kopic_total_report", indexes = {
-    @Index(name = "idx_kopic_total_report_member_id", columnList = "member_id"),
-    @Index(name = "idx_kopic_member_isread", columnList = "member_id, is_read")
+    @Index(name = "idx_kopic_total_report_member_id", columnList = "member_id")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -33,6 +32,9 @@ public class KopicTotalReport extends BaseEntity {
     @Column(name = "avg_accuracy")
     private Integer avgAccuracy;
 
+    @Column(name = "avg_intonation")
+    private Integer avgIntonation;
+
     @Column(name = "total_score")
     private Integer totalScore;
 
@@ -48,7 +50,7 @@ public class KopicTotalReport extends BaseEntity {
     private ReportStatus status;
 
     @Column(name = "is_read", nullable = false)
-    private Boolean isRead = false;
+    private Boolean isRead;
 
     @Builder
     public KopicTotalReport(Member member, Theme theme, ReportStatus status) {
@@ -58,7 +60,9 @@ public class KopicTotalReport extends BaseEntity {
         this.reportData = "[]";
         this.sentenceCount = 0;
         this.avgAccuracy = 0;
+        this.avgIntonation = 0;
         this.totalScore = 0;
+        this.isRead = false;
     }
 
     public void updateAggregation(Integer avgAccuracy, Integer totalScore,
@@ -68,10 +72,5 @@ public class KopicTotalReport extends BaseEntity {
         this.sentenceCount = sentenceCount;
         this.reportData = reportData;
         this.status = ReportStatus.COMPLETED;
-    }
-
-    // 도메인 메서드: 리포트 읽음 처리
-    public void markAsRead() {
-        this.isRead = true;
     }
 }
