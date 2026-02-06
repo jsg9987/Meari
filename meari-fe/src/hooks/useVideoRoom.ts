@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { OpenVidu, Publisher, Session, Subscriber, Connection } from "openvidu-browser";
 import { enterWebRTC } from "../api/rooms.api";
-import { createSession, createConnection, deleteSession } from "../api/webrtc.api";
+import { createSession, createConnection } from "../api/webrtc.api";
 import { useAuthStore } from "../store/auth.store";
 
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
@@ -70,12 +70,24 @@ export function useVideoRoom({
         if (clientData.includes('%/%')) {
           const parts = clientData.split('%/%');
           console.log('[useVideoRoom] Found %/% separator, parts:', parts);
-          // 첫 번째 부분(클라이언트 데이터)에서 먼저 파싱
-          const clientDataParsed = JSON.parse(parts[0]);
-          // 두 번째 부분(백엔드 데이터)에서 nickname과 member_id 추출
+
+          // 첫 번째 부분 파싱
+          const firstPart = JSON.parse(parts[0]);
+          console.log('[useVideoRoom] firstPart:', firstPart);
+
+          // clientData 필드가 있으면 중첩된 JSON을 한 번 더 파싱
+          const clientDataParsed = firstPart.clientData
+            ? JSON.parse(firstPart.clientData)
+            : firstPart;
+          console.log('[useVideoRoom] clientDataParsed:', clientDataParsed);
+
+          // 두 번째 부분(백엔드 데이터) 파싱
           const backendData = JSON.parse(parts[1]);
+          console.log('[useVideoRoom] backendData:', backendData);
+
           name = backendData.nickname || clientDataParsed.nickname || name;
-          memberIdFromData = backendData.member_id || clientDataParsed.member_id;
+          // backendData는 camelCase (memberId), clientData는 snake_case (member_id)
+          memberIdFromData = backendData.memberId || backendData.member_id || clientDataParsed.member_id;
           console.log('[useVideoRoom] Parsed with separator - name:', name, 'memberId:', memberIdFromData);
         } else {
           const parsed = JSON.parse(clientData);
@@ -100,12 +112,24 @@ export function useVideoRoom({
         if (clientData.includes('%/%')) {
           const parts = clientData.split('%/%');
           console.log('[useVideoRoom] Found %/% separator, parts:', parts);
-          // 첫 번째 부분(클라이언트 데이터)에서 먼저 파싱
-          const clientDataParsed = JSON.parse(parts[0]);
-          // 두 번째 부분(백엔드 데이터)에서 nickname과 member_id 추출
+
+          // 첫 번째 부분 파싱
+          const firstPart = JSON.parse(parts[0]);
+          console.log('[useVideoRoom] firstPart:', firstPart);
+
+          // clientData 필드가 있으면 중첩된 JSON을 한 번 더 파싱
+          const clientDataParsed = firstPart.clientData
+            ? JSON.parse(firstPart.clientData)
+            : firstPart;
+          console.log('[useVideoRoom] clientDataParsed:', clientDataParsed);
+
+          // 두 번째 부분(백엔드 데이터) 파싱
           const backendData = JSON.parse(parts[1]);
+          console.log('[useVideoRoom] backendData:', backendData);
+
           name = backendData.nickname || clientDataParsed.nickname || name;
-          memberIdFromData = backendData.member_id || clientDataParsed.member_id;
+          // backendData는 camelCase (memberId), clientData는 snake_case (member_id)
+          memberIdFromData = backendData.memberId || backendData.member_id || clientDataParsed.member_id;
           console.log('[useVideoRoom] Parsed with separator - name:', name, 'memberId:', memberIdFromData);
         } else {
           const parsed = JSON.parse(clientData);
@@ -329,11 +353,6 @@ export function useVideoRoom({
         } catch (error) {
           console.error('[useVideoRoom] Failed to disconnect session:', error);
         }
-      }
-
-      // 그 다음 백엔드 세션 삭제
-      if (backendSessionId) {
-        await deleteSession(backendSessionId);
       }
     } catch (error) {
       console.error('[useVideoRoom] Failed to leave WebRTC:', error);
