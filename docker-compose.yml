@@ -148,6 +148,7 @@ services:
       CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION: 900
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
+      ANALYSIS_FASTAPI_URL: http://fastapi:8000
     ports:
       - "8080:8080"
     networks:
@@ -159,6 +160,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      fastapi:
+        condition: service_started
     restart: unless-stopped
     deploy:
       resources:
