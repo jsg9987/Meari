@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { OpenVidu, Publisher, Session, Subscriber, Connection } from "openvidu-browser";
 import { enterWebRTC } from "../api/rooms.api";
-import { createSession, createConnection, deleteSession } from "../api/webrtc.api";
+import { createSession, createConnection } from "../api/webrtc.api";
 import { useAuthStore } from "../store/auth.store";
 
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
@@ -14,6 +14,7 @@ export interface VideoTileData {
   isSpeaker?: boolean;
   isReady?: boolean;
   isSettingUp?: boolean; // 세팅 중 (아직 publish 안 함)
+  memberId?: number; // 멤버 ID
 }
 
 interface UseVideoRoomOptions {
@@ -41,12 +42,12 @@ export function useVideoRoom({
   const [session, setSession] = useState<Session | null>(null);
   const [publisher, setPublisher] = useState<Publisher | null>(null);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
-  const [connections, setConnections] = useState<Connection[]>([]); // 아직 publish 안 한 연결들
+  const [connections, setConnections] = useState<Connection[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [backendSessionId, setBackendSessionId] = useState<string | null>(null); // 백엔드에서 받은 session_id
+  const [backendSessionId, setBackendSessionId] = useState<string | null>(null);
 
   const ovRef = useRef<OpenVidu | null>(null);
   const statusRef = useRef<ConnectionStatus>("idle");
@@ -55,53 +56,94 @@ export function useVideoRoom({
   const tiles = useMemo<VideoTileData[]>(() => {
     const arr: VideoTileData[] = [];
     if (publisher) {
-      arr.push({ id: "me", streamManager: publisher, muted: true, label: `${nickname} (나)` });
+      arr.push({ id: "me", streamManager: publisher, muted: true, label: `${nickname} (나)`, memberId });
     }
 
     // 실제 스트림이 있는 참가자들
     subscribers.forEach((s) => {
       const clientData = s.stream.connection.data;
       let name = "참여자";
+      let memberIdFromData: number | undefined;
       try {
         // %/% 구분자로 나눠진 경우 처리 (백엔드에서 추가 데이터를 넣은 경우)
         if (clientData.includes('%/%')) {
           const parts = clientData.split('%/%');
-          // 두 번째 부분(백엔드 데이터)에서 nickname 추출
+
+          // 첫 번째 부분 파싱
+          const firstPart = JSON.parse(parts[0]);
+          console.log('[useVideoRoom] firstPart:', firstPart);
+
+          // clientData 필드가 있으면 중첩된 JSON을 한 번 더 파싱
+          const clientDataParsed = firstPart.clientData
+            ? JSON.parse(firstPart.clientData)
+            : firstPart;
+          console.log('[useVideoRoom] clientDataParsed:', clientDataParsed);
+
+          // 두 번째 부분(백엔드 데이터) 파싱
           const backendData = JSON.parse(parts[1]);
-          name = backendData.nickname || name;
+          console.log('[useVideoRoom] backendData:', backendData);
+
+          name = backendData.nickname || clientDataParsed.nickname || name;
+          // backendData는 camelCase (memberId), clientData는 snake_case (member_id)
+          memberIdFromData = backendData.memberId || backendData.member_id || clientDataParsed.member_id;
+          console.log('[useVideoRoom] Parsed with separator - name:', name, 'memberId:', memberIdFromData);
         } else {
           const parsed = JSON.parse(clientData);
           name = parsed.clientData || parsed.nickname || name;
+          memberIdFromData = parsed.member_id;
+          console.log('[useVideoRoom] Parsed without separator - name:', name, 'memberId:', memberIdFromData);
         }
       } catch (error) {
         console.error('Failed to parse clientData:', clientData, error);
         name = "참여자";
       }
-      arr.push({ id: s.stream.streamId, streamManager: s, label: name });
+      arr.push({ id: s.stream.streamId, streamManager: s, label: name, memberId: memberIdFromData });
     });
 
     // 아직 publish 안 한 참가자들 (세팅 중)
     connections.forEach((conn) => {
       const clientData = conn.data;
       let name = "참여자";
+      let memberIdFromData: number | undefined;
+      console.log('[useVideoRoom] Parsing connection clientData:', clientData);
       try {
         if (clientData.includes('%/%')) {
           const parts = clientData.split('%/%');
+          console.log('[useVideoRoom] Found %/% separator, parts:', parts);
+
+          // 첫 번째 부분 파싱
+          const firstPart = JSON.parse(parts[0]);
+          console.log('[useVideoRoom] firstPart:', firstPart);
+
+          // clientData 필드가 있으면 중첩된 JSON을 한 번 더 파싱
+          const clientDataParsed = firstPart.clientData
+            ? JSON.parse(firstPart.clientData)
+            : firstPart;
+          console.log('[useVideoRoom] clientDataParsed:', clientDataParsed);
+
+          // 두 번째 부분(백엔드 데이터) 파싱
           const backendData = JSON.parse(parts[1]);
-          name = backendData.nickname || name;
+          console.log('[useVideoRoom] backendData:', backendData);
+
+          name = backendData.nickname || clientDataParsed.nickname || name;
+          // backendData는 camelCase (memberId), clientData는 snake_case (member_id)
+          memberIdFromData = backendData.memberId || backendData.member_id || clientDataParsed.member_id;
+          console.log('[useVideoRoom] Parsed with separator - name:', name, 'memberId:', memberIdFromData);
         } else {
           const parsed = JSON.parse(clientData);
           name = parsed.clientData || parsed.nickname || name;
+          memberIdFromData = parsed.member_id;
+          console.log('[useVideoRoom] Parsed without separator - name:', name, 'memberId:', memberIdFromData);
         }
       } catch (error) {
         console.error('Failed to parse clientData:', clientData, error);
         name = "참여자";
       }
-      arr.push({ id: conn.connectionId, label: name, isSettingUp: true });
+      arr.push({ id: conn.connectionId, label: name, isSettingUp: true, memberId: memberIdFromData });
     });
 
     return arr;
-  }, [publisher, subscribers, connections, nickname]);
+  }, [publisher, subscribers, connections, nickname, memberId]);
 
   const join = useCallback(async () => {
     if (statusRef.current === "connecting" || statusRef.current === "connected") {
@@ -193,7 +235,24 @@ export function useVideoRoom({
         token = webrtcResponse.data.data.token;
       }
 
-      await mySession.connect(token, { clientData: nickname });
+      // clientData에 nickname과 member_id를 JSON으로 전달
+      await mySession.connect(token, {
+        clientData: JSON.stringify({
+          nickname,
+          member_id: memberId
+        })
+      });
+
+      // 이미 세션에 있는 connections를 수동으로 추가 (늦게 들어온 경우 대비)
+      // stream이 없는 connection만 추가 (이미 publish한 connection은 streamCreated 이벤트로 처리)
+      const existingConnections = mySession.remoteConnections;
+      if (existingConnections) {
+        Object.values(existingConnections).forEach((conn) => {
+          if (conn.connectionId !== mySession.connection?.connectionId && !conn.stream) {
+            setConnections((prev) => [...prev, conn]);
+          }
+        });
+      }
 
       const pub = await OV.initPublisherAsync(undefined, {
         audioSource: undefined,
@@ -278,6 +337,7 @@ export function useVideoRoom({
     setPublisher(null);
     publisherRef.current = null;
     setSubscribers([]);
+    setConnections([]); // ⭐ connections 배열 초기화 추가
     statusRef.current = "idle";
     setStatus("idle");
     setError(null);
@@ -285,11 +345,14 @@ export function useVideoRoom({
     setIsVideoEnabled(true);
 
     try {
-      // 백엔드 세션 삭제 (모든 연결이 자동으로 끊어짐)
-      if (backendSessionId) {
-        await deleteSession(backendSessionId);
+      // 먼저 클라이언트 세션 정리 (이벤트 리스너 해제 및 연결 종료)
+      if (currentSession) {
+        try {
+          currentSession.disconnect();
+        } catch (error) {
+          console.error('[useVideoRoom] Failed to disconnect session:', error);
+        }
       }
-      // session.disconnect()는 호출 불필요 - 백엔드에서 세션 삭제 시 자동 처리됨
     } catch (error) {
       console.error('[useVideoRoom] Failed to leave WebRTC:', error);
     } finally {
