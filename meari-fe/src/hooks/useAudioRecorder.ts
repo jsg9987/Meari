@@ -36,9 +36,10 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        // 원본 MIME 타입 유지 (실제 녹음된 형식)
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
 
-        // WAV로 변환 (필요한 경우) TODO: 이거 그대로 가나요?
+        // 항상 WAV로 변환
         const wavBlob = await convertToWav(audioBlob);
         onRecordingComplete?.(wavBlob);
 
@@ -73,24 +74,24 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
   };
 }
 
-// WAV 변환 함수 (WebM에서 WAV로 변환)
+// WAV 변환 함수 (모든 형식을 WAV로 변환)
 async function convertToWav(blob: Blob): Promise<Blob> {
-  // 이미 WAV 형식이면 그대로 반환
-  if (blob.type === 'audio/wav') {
-    return blob;
+  try {
+    // AudioContext를 사용하여 디코딩 후 WAV로 변환
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioContext = new AudioContext();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    // WAV 파일 생성 (PCM 16bit)
+    const wavBlob = audioBufferToWav(audioBuffer);
+
+    await audioContext.close();
+
+    return wavBlob;
+  } catch (error) {
+    console.error('Failed to convert to WAV:', error);
+    throw error;
   }
-
-  // AudioContext를 사용하여 변환
-  const arrayBuffer = await blob.arrayBuffer();
-  const audioContext = new AudioContext();
-  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-  // WAV 파일 생성
-  const wavBlob = audioBufferToWav(audioBuffer);
-
-  await audioContext.close();
-
-  return wavBlob;
 }
 
 // AudioBuffer를 WAV Blob으로 변환
