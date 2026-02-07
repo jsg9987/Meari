@@ -39,6 +39,7 @@ import java.util.*;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,9 @@ public class RoomService {
     private final RoomSessionService roomSessionService;
     private final SimpMessagingTemplate messagingTemplate;
     private final AnalysisService analysisService;
+
+    @Value("${cloud.aws.s3.bucket}")
+    private String s3Bucket;
 
     /**
      * 방 생성
@@ -792,9 +796,11 @@ public class RoomService {
         // 문장 녹음 완료 마킹
         roomSessionService.markRecordingComplete(roomId, round, message.getMemberId(), message.getSentenceId());
 
-        // 오디오 URL 저장
+        // 오디오 URL 저장 (S3 URL 형식으로 변환)
         if (message.getAudioUrl() != null) {
-            roomSessionService.saveAudioUrl(roomId, round, message.getMemberId(), message.getSentenceId(), message.getAudioUrl());
+            String s3Url = convertToS3Url(message.getAudioUrl());
+            roomSessionService.saveAudioUrl(roomId, round, message.getMemberId(), message.getSentenceId(), s3Url);
+            log.debug("오디오 URL 변환: {} -> {}", message.getAudioUrl(), s3Url);
         }
 
         // 이 멤버의 모든 문장이 완료되었는지 체크
@@ -1093,5 +1099,27 @@ public class RoomService {
         }
 
         return false;
+    }
+
+    /**
+     * S3 URL 형식 변환
+     * - Key만 들어온 경우: s3://bucket/key 형식으로 변환
+     * - 이미 s3:// 또는 https:// 형식인 경우: 그대로 반환
+     *
+     * @param audioUrl 원본 URL 또는 S3 Key
+     * @return s3:// 형식의 URL
+     */
+    private String convertToS3Url(String audioUrl) {
+        if (audioUrl == null || audioUrl.isEmpty()) {
+            return audioUrl;
+        }
+
+        // 이미 s3:// 또는 https:// 형식이면 그대로 반환
+        if (audioUrl.startsWith("s3://") || audioUrl.startsWith("https://")) {
+            return audioUrl;
+        }
+
+        // Key만 있는 경우 s3:// 형식으로 변환
+        return "s3://" + s3Bucket + "/" + audioUrl;
     }
 }
