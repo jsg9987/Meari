@@ -2,8 +2,8 @@ import type { AxiosResponse } from 'axios'
 import type { ApiResponse } from './auth.api'
 import axiosInstance from './axiosInstance'
 
-// 환경 변수에 따라 목업 또는 실제 API 사용
-const USE_MOCK_MYPAGE = import.meta.env.VITE_USE_MOCK_MYPAGE === 'true'
+// 목업/실제 API 전환 플래그 (true: 목업, false: 실제 API)
+const USE_MOCK_MYPAGE = false
 
 export interface MyPageProfile {
   nickname: string
@@ -121,12 +121,8 @@ export interface ShadowingPracticeRecord {
   errorsCount: number // 오류 개수
 }
 
-export interface ShadowingPracticeHistoryData {
-  last5: ShadowingPracticeRecord[]
-}
-
 export type ShadowingPracticeHistoryResponse = AxiosResponse<
-  ApiResponse<ShadowingPracticeHistoryData>
+  ApiResponse<ShadowingPracticeRecord[]>
 >
 
 // 목업 데이터
@@ -138,7 +134,7 @@ const mockPracticeHistory: ShadowingPracticeRecord[] = [
   { idx: 5, date: '2026-01-29', accuracy: 72, intonation: 80, errorsCount: 5 }
 ]
 
-// 목업 API - 쉐도잉 연습 기록 조회 (최근 5개)
+// 목업 API - 쉐도잉 연습 기록 조회
 export const getShadowingPracticeHistoryMock = async (): Promise<
   ShadowingPracticeHistoryResponse
 > => {
@@ -147,9 +143,7 @@ export const getShadowingPracticeHistoryMock = async (): Promise<
       resolve({
         data: {
           success: true,
-          data: {
-            last5: mockPracticeHistory
-          },
+          data: mockPracticeHistory,
           error: null
         }
       } as ShadowingPracticeHistoryResponse)
@@ -157,90 +151,72 @@ export const getShadowingPracticeHistoryMock = async (): Promise<
   })
 }
 
-// 실제 API는 나중에 구현
-// export const getShadowingPracticeHistory = async (): Promise<ShadowingPracticeHistoryResponse> => {
-//   const response = await axiosInstance.get<ApiResponse<ShadowingPracticeHistoryData>>('/mypage/shadowing-practice-history')
-//   return response
-// }
-
-// 현재는 목업 사용
-export const getShadowingPracticeHistory = getShadowingPracticeHistoryMock
-
-// KOPIC 요약 데이터 타입
-export interface KopicQuestionScores {
-  q1: number
-  q2: number
-  q3: number
-  q4: number
-  q5: number
+// 실제 API - 쉐도잉 연습 기록 조회
+export const getShadowingPracticeHistoryAPI = async (): Promise<
+  ShadowingPracticeHistoryResponse
+> => {
+  const response = await axiosInstance.get<ApiResponse<ShadowingPracticeRecord[]>>(
+    '/dashboard/me/shadowing-practice-history'
+  )
+  return response
 }
 
-export interface KopicMaxScore {
-  exam_id: number
-  taken_at: string // YYYY-MM-DD 형식
-  total_average_score: number
-  question_scores: KopicQuestionScores
+// 목업/실제 API 전환
+export const getShadowingPracticeHistory = USE_MOCK_MYPAGE
+  ? getShadowingPracticeHistoryMock
+  : getShadowingPracticeHistoryAPI
+
+// KOPIC 요약 데이터 타입
+export interface KopicSentenceScore {
+  kopic_sentence_id: number
+  score: number
+}
+
+export interface KopicSentenceAvgScore {
+  kopic_sentence_id: number
+  avg_score: number
+}
+
+export interface KopicBestScore {
+  exam_date: string // YYYY-MM-DD 형식
+  total_avg_score: number
+  sentences: KopicSentenceScore[]
 }
 
 export interface KopicAverageScore {
-  total_average_score: number
-  question_average_scores: KopicQuestionScores
-}
-
-export interface KopicLatestScore {
-  exam_id: number
-  taken_at: string // YYYY-MM-DD 형식
-  total_average_score: number
-  question_scores: KopicQuestionScores
+  total_avg_score: number
+  sentences: KopicSentenceAvgScore[]
 }
 
 export interface KopicSummaryData {
-  copick_summary: {
-    max_score: KopicMaxScore
-    average_score: KopicAverageScore
-    latest_score: KopicLatestScore
-  }
+  best: KopicBestScore
+  average: KopicAverageScore
 }
 
 export type KopicSummaryResponse = AxiosResponse<ApiResponse<KopicSummaryData>>
 
 // 목업 데이터 - KOPIC 요약
 const mockKopicSummary: KopicSummaryData = {
-  copick_summary: {
-    max_score: {
-      exam_id: 3021,
-      taken_at: '2026-02-01',
-      total_average_score: 82,
-      question_scores: {
-        q1: 80,
-        q2: 85,
-        q3: 78,
-        q4: 88,
-        q5: 79
-      }
-    },
-    average_score: {
-      total_average_score: 75,
-      question_average_scores: {
-        q1: 72,
-        q2: 76,
-        q3: 74,
-        q4: 78,
-        q5: 75
-      }
-    },
-    latest_score: {
-      exam_id: 3050,
-      taken_at: '2026-02-02',
-      total_average_score: 79,
-      question_scores: {
-        q1: 75,
-        q2: 80,
-        q3: 77,
-        q4: 82,
-        q5: 81
-      }
-    }
+  best: {
+    exam_date: '2026-02-01',
+    total_avg_score: 82,
+    sentences: [
+      { kopic_sentence_id: 1, score: 80 },
+      { kopic_sentence_id: 2, score: 85 },
+      { kopic_sentence_id: 3, score: 78 },
+      { kopic_sentence_id: 4, score: 88 },
+      { kopic_sentence_id: 5, score: 79 }
+    ]
+  },
+  average: {
+    total_avg_score: 75,
+    sentences: [
+      { kopic_sentence_id: 1, avg_score: 72 },
+      { kopic_sentence_id: 2, avg_score: 76 },
+      { kopic_sentence_id: 3, avg_score: 74 },
+      { kopic_sentence_id: 4, avg_score: 77 },
+      { kopic_sentence_id: 5, avg_score: 76 }
+    ]
   }
 }
 
@@ -259,14 +235,16 @@ export const getKopicSummaryMock = async (): Promise<KopicSummaryResponse> => {
   })
 }
 
-// 실제 API는 나중에 구현
-// export const getKopicSummary = async (): Promise<KopicSummaryResponse> => {
-//   const response = await axiosInstance.get<ApiResponse<KopicSummaryData>>('/mypage/kopic-summary')
-//   return response
-// }
+// 실제 API - KOPIC 요약 데이터 조회
+export const getKopicSummaryAPI = async (): Promise<KopicSummaryResponse> => {
+  const response = await axiosInstance.get<ApiResponse<KopicSummaryData>>(
+    '/dashboard/me/kopic-summary'
+  )
+  return response
+}
 
-// 현재는 목업 사용
-export const getKopicSummary = getKopicSummaryMock
+// 목업/실제 API 전환
+export const getKopicSummary = USE_MOCK_MYPAGE ? getKopicSummaryMock : getKopicSummaryAPI
 
 // 일일 활동 타입
 export type DailyActivityStatus = 'NONE' | 'WORD' | 'SENTENCE' | 'BOTH'
@@ -339,6 +317,189 @@ export const getDailyActivityMock = async (): Promise<DailyActivityResponse> => 
 
 // 현재는 목업 사용
 export const getDailyActivity = getDailyActivityMock
+
+// 일일 활동 기록 (새 API) 타입
+export type DailyRecordPeriod = 'yearly' | 'weekly' | 'monthly'
+
+export interface DailyRecordActivity {
+  date: string // YYYY-MM-DD 형식
+  completed_count: number
+}
+
+export interface DailyRecordsData {
+  startDate: string // YYYY-MM-DD 형식
+  endDate: string // YYYY-MM-DD 형식
+  activities: DailyRecordActivity[]
+}
+
+export type DailyRecordsResponse = AxiosResponse<ApiResponse<DailyRecordsData>>
+
+// 목업 데이터 - 일일 활동 기록
+const generateMockDailyRecords = (period: DailyRecordPeriod): DailyRecordsData => {
+  const today = new Date()
+  let startDate: Date
+  let endDate: Date = new Date(today)
+
+  switch (period) {
+    case 'yearly':
+      startDate = new Date(today.getFullYear(), 0, 1)
+      endDate = new Date(today.getFullYear(), 11, 31)
+      break
+    case 'monthly':
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1)
+      endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+      break
+    case 'weekly': {
+      const dayOfWeek = today.getDay()
+      startDate = new Date(today)
+      startDate.setDate(today.getDate() - dayOfWeek)
+      endDate = new Date(startDate)
+      endDate.setDate(startDate.getDate() + 6)
+      break
+    }
+  }
+
+  const activities: DailyRecordActivity[] = []
+
+  // 랜덤으로 일부 날짜에 활동 추가
+  const currentDate = new Date(startDate)
+  while (currentDate <= endDate) {
+    const rand = Math.random()
+    if (rand > 0.3) { // 70% 확률로 활동 기록
+      activities.push({
+        date: currentDate.toISOString().split('T')[0],
+        completed_count: Math.floor(Math.random() * 5) + 1 // 1-5개
+      })
+    }
+    currentDate.setDate(currentDate.getDate() + 1)
+  }
+
+  return {
+    startDate: startDate.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0],
+    activities
+  }
+}
+
+// 목업 API - 일일 활동 기록 조회
+export const getDailyRecordsMock = async (
+  period: DailyRecordPeriod = 'yearly'
+): Promise<DailyRecordsResponse> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        data: {
+          success: true,
+          data: generateMockDailyRecords(period),
+          error: null
+        }
+      } as DailyRecordsResponse)
+    }, 300)
+  })
+}
+
+// 실제 API - 일일 활동 기록 조회
+export const getDailyRecordsAPI = async (
+  period: DailyRecordPeriod = 'yearly'
+): Promise<DailyRecordsResponse> => {
+  const response = await axiosInstance.get<ApiResponse<DailyRecordsData>>(
+    '/dashboard/me/daily-records',
+    { params: { period } }
+  )
+  return response
+}
+
+// 목업/실제 API 전환
+export const getDailyRecords = USE_MOCK_MYPAGE ? getDailyRecordsMock : getDailyRecordsAPI
+
+// 최근 활동 내역 타입
+export type RecentActivityType = 'DAILY' | 'SHADOWING' | 'KOPIC'
+export type RecentActivityStatus = 'COMPLETED' | 'PROCESSING'
+
+export interface RecentActivity {
+  activity_type: RecentActivityType
+  title: string
+  status: RecentActivityStatus
+  created_at: string // ISO 8601 형식
+  theme?: string // SHADOWING, KOPIC에만 존재
+  content?: string // SHADOWING에만 존재
+}
+
+export type RecentActivitiesResponse = AxiosResponse<ApiResponse<RecentActivity[]>>
+
+// 목업 데이터 - 최근 활동 내역
+const mockRecentActivities: RecentActivity[] = [
+  {
+    activity_type: 'DAILY',
+    title: '일일학습 완료했습니다!',
+    status: 'COMPLETED',
+    created_at: '2026-02-01T20:10:00'
+  },
+  {
+    activity_type: 'SHADOWING',
+    theme: '공공장소',
+    content: '카페에서 커피 주문하기',
+    title: '쉐도잉(공공장소) - 카페에서 커피 주문하기를 완료했습니다!',
+    status: 'COMPLETED',
+    created_at: '2026-02-01T19:40:00'
+  },
+  {
+    activity_type: 'KOPIC',
+    theme: '비즈니스',
+    title: 'KOPIC(비즈니스) 채점이 완료되었습니다!',
+    status: 'COMPLETED',
+    created_at: '2026-02-01T18:05:00'
+  },
+  {
+    activity_type: 'DAILY',
+    title: '일일학습 완료했습니다!',
+    status: 'COMPLETED',
+    created_at: '2026-01-31T15:30:00'
+  },
+  {
+    activity_type: 'SHADOWING',
+    theme: '비즈니스',
+    content: '협상 기초',
+    title: '쉐도잉(비즈니스) - 협상 기초를 완료했습니다!',
+    status: 'COMPLETED',
+    created_at: '2026-01-31T13:15:00'
+  },
+  {
+    activity_type: 'KOPIC',
+    theme: '일상생활',
+    title: 'KOPIC(일상생활) 채점이 완료되었습니다!',
+    status: 'COMPLETED',
+    created_at: '2026-01-30T18:20:00'
+  }
+]
+
+// 목업 API - 최근 활동 내역 조회
+export const getRecentActivitiesMock = async (): Promise<RecentActivitiesResponse> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        data: {
+          success: true,
+          data: mockRecentActivities,
+          error: null
+        }
+      } as RecentActivitiesResponse)
+    }, 300)
+  })
+}
+
+// 실제 API - 최근 활동 내역 조회
+export const getRecentActivitiesAPI = async (): Promise<RecentActivitiesResponse> => {
+  const response = await axiosInstance.get<ApiResponse<RecentActivity[]>>(
+    '/dashboard/me/activities'
+  )
+  return response
+}
+
+// 목업/실제 API 전환
+export const getRecentActivities = USE_MOCK_MYPAGE
+  ? getRecentActivitiesMock
+  : getRecentActivitiesAPI
 
 // 쉐도잉 리포트 타입
 export interface ShadowingReport {

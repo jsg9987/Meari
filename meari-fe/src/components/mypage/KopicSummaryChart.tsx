@@ -68,47 +68,30 @@ const KopicSummaryChart = () => {
     )
   }
 
-  const { max_score, average_score, latest_score } = data.copick_summary
+  const { best, average } = data
 
   // 문항별 점수 데이터 (막대 그래프용)
-  const questionData = [
-    {
-      question: '문항 1',
-      평균: average_score.question_average_scores.q1,
-      최고: max_score.question_scores.q1
-    },
-    {
-      question: '문항 2',
-      평균: average_score.question_average_scores.q2,
-      최고: max_score.question_scores.q2
-    },
-    {
-      question: '문항 3',
-      평균: average_score.question_average_scores.q3,
-      최고: max_score.question_scores.q3
-    },
-    {
-      question: '문항 4',
-      평균: average_score.question_average_scores.q4,
-      최고: max_score.question_scores.q4
-    },
-    {
-      question: '문항 5',
-      평균: average_score.question_average_scores.q5,
-      최고: max_score.question_scores.q5
+  const questionData = best.sentences.map((sentence, index) => {
+    const avgSentence = average.sentences.find(
+      (s) => s.kopic_sentence_id === sentence.kopic_sentence_id
+    )
+    return {
+      question: `문항 ${index + 1}`,
+      평균: avgSentence?.avg_score || 0,
+      최고: sentence.score
     }
-  ]
+  })
 
   // 토탈 점수 데이터 (원 그래프용)
   const totalScoreData = [
     {
       name: '평균',
-      value: average_score.total_average_score,
+      value: average.total_avg_score,
       fill: '#3b82f6'
     },
     {
       name: '최고',
-      value: max_score.total_average_score,
+      value: best.total_avg_score,
       fill: '#10b981'
     }
   ]
@@ -118,7 +101,7 @@ const KopicSummaryChart = () => {
       <div className='mb-4'>
         <h2 className='text-xl font-semibold text-gray-900'>KOPIC 시험 요약</h2>
         <p className='text-sm text-gray-500'>
-          최근 응시일: {latest_score.taken_at} | 최고 점수 기록일: {max_score.taken_at}
+          최고 점수 기록일: {best.exam_date}
         </p>
       </div>
 
