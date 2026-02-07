@@ -5,12 +5,14 @@ FastAPI 메인 애플리케이션
 import logging
 import signal
 import sys
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from app.config import settings
 from app.models.model_loader import load_models
 from app.services.analysis_service import AnalysisService
 from app.services.rabbitmq_consumer import RabbitMQConsumer
 from app.services.rabbitmq_producer import producer
+from app.schemas.request import AnalysisRequestMessage
+from app.schemas.response import AnalysisResultMessage
 
 # 로깅 설정
 logging.basicConfig(
@@ -26,8 +28,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 전역 Consumer
+# 전역 변수
 consumer = None
+analysis_service = None
 
 
 @app.on_event("startup")
@@ -44,7 +47,9 @@ async def startup_event():
         logger.info("ML 모델 로드 완료")
 
         # 2. Analysis Service 초기화
+        global analysis_service
         analysis_service = AnalysisService()
+        logger.info("Analysis Service 초기화 완료")
 
         # 3. RabbitMQ Consumer 시작 (별도 스레드)
         logger.info("RabbitMQ Consumer 시작 중...")
@@ -105,6 +110,35 @@ async def health_check():
         "rabbitmq": "connected",
         "models": "loaded"
     }
+
+
+@app.post("/analyze", response_model=AnalysisResultMessage)
+async def analyze_pronunciation(request: AnalysisRequestMessage):
+    """
+    직접 HTTP 호출용 발음 분석 엔드포인트
+    Spring Boot에서 직접 호출
+    """
+    logger.info(f"[HTTP] 분석 요청 수신: roomId={request.room_id}, round={request.round}, memberId={request.member_id}")
+
+    if not analysis_service:
+        logger.error("Analysis Service가 초기화되지 않음")
+        raise HTTPException(status_code=500, detail="Analysis Service not initialized")
+
+    try:
+        # 분석 수행 (동기 메서드를 별도 스레드에서 실행)
+        import asyncio
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            analysis_service.analyze_member,
+            request
+        )
+        logger.info(f"[HTTP] 분석 완료: roomId={request.room_id}, memberId={request.member_id}, accuracy={result.accuracy}")
+        return result
+
+    except Exception as e:
+        logger.error(f"[HTTP] 분석 실패: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"분석 실패: {str(e)}")
 
 
 def signal_handler(sig, frame):
