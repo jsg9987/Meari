@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2, UserCircle } from "lucide-react";
+import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2, UserCircle, Play } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
 import { useAuthStore } from "../store/auth.store";
@@ -13,7 +13,7 @@ import RoleSelectModal from "../components/webrtc/RoleSelectModal";
 import { useVideoRoom } from "../hooks/useVideoRoom";
 import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type ChatMessage } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
-import { selectRoomContent, getContentRoles, type ContentRole } from "../api/contents.api";
+import { selectRoomContent, getContentRoles, getThemes, type ContentRole } from "../api/contents.api";
 import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
 import { leaveWebRTC } from "../api/webrtc.api";
 import { useRoomStore } from "../store/room.store";
@@ -27,7 +27,7 @@ type LayoutMode = "narrow" | "grid" | "wide";
 // WebRTC 비활성화 플래그
 // true로 설정하면 WebRTC 없이 쉐도잉 기능만 테스트
 // ========================================
-const DISABLE_WEBRTC = false;
+const DISABLE_WEBRTC = true;
 
 // TODO: 헤더 변경, 비디오 타일 변경
 export default function ShadowingRoom() {
@@ -59,6 +59,7 @@ export default function ShadowingRoom() {
   const [isContentSelectOpen, setIsContentSelectOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [themeDescription, setThemeDescription] = useState<string>("");
   const [isReady, setIsReady] = useState(false); // 내 준비 상태
   const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false); // 역할 선택 모달 상태
   const [isConfirmingRoles, setIsConfirmingRoles] = useState(false); // 역할 확정 로딩 상태
@@ -940,17 +941,40 @@ export default function ShadowingRoom() {
     };
   }, []);
 
+  // 테마 설명 가져오기
+  useEffect(() => {
+    const fetchThemeDescription = async () => {
+      if (!roomData?.theme_id) return;
+
+      try {
+        const response = await getThemes();
+        if (response.data.success && response.data.data) {
+          const theme = response.data.data.find(t => t.theme_id === roomData.theme_id);
+          if (theme) {
+            setThemeDescription(theme.description);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch theme description:', error);
+      }
+    };
+
+    fetchThemeDescription();
+  }, [roomData?.theme_id]);
+
   // 방 정보 (store에서 가져오기)
   const roomInfo = roomData ? {
     isLocked: roomData.has_password,
     title: roomData.title,
     password: '',
-    themeId: roomData.theme_id
+    themeId: roomData.theme_id,
+    themeName: roomData.theme_name
   } : {
     isLocked: false,
     title: "Loading...",
     password: "",
-    themeId: 1
+    themeId: 1,
+    themeName: ""
   };
 
   const handleContentSelect = async (content: Content) => {
@@ -1765,6 +1789,7 @@ export default function ShadowingRoom() {
                     {/* 비디오 배경 (blur 처리) */}
                     {selectedContent && videoUrl && (
                       <div className="absolute inset-0 overflow-hidden">
+                        {/* 강한 블러 배경 (전체) */}
                         <video
                           src={videoUrl}
                           className="w-full h-full object-cover"
@@ -1772,7 +1797,34 @@ export default function ShadowingRoom() {
                           muted
                           playsInline
                         />
+                        {/* 약한 블러 가운데 (그라데이션 마스크 - 넷플릭스 스타일) */}
+                        <video
+                          src={videoUrl}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          style={{
+                            filter: 'blur(2px)',
+                            transform: 'scale(1.1)',
+                            maskImage:
+                              'linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%)',
+                            WebkitMaskImage:
+                              'linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%)',
+                          }}
+                          muted
+                          playsInline
+                        />
                         <div className="absolute inset-0 bg-black/40" />
+                      </div>
+                    )}
+
+                    {/* 컨텐츠 정보 - 왼쪽 중앙 살짝 아래 */}
+                    {selectedContent && (
+                      <div className="absolute left-8 top-[55%] -translate-y-1/2 z-20 max-w-2xl">
+                        {/* 테마 이름 */}
+                        <p className="text-gray-300 text-2xl font-medium mb-2">{roomInfo.themeName}</p>
+                        {/* 컨텐츠 제목 */}
+                        <h2 className="text-white text-5xl font-bold mb-3">{selectedContent.title}</h2>
+                        {/* 테마 설명 */}
+                        <p className="text-gray-200 text-base leading-relaxed">{themeDescription}</p>
                       </div>
                     )}
 
@@ -1785,109 +1837,113 @@ export default function ShadowingRoom() {
                         </p>
                       </div>
                     ) : (
-                      <div className="relative flex flex-col items-center gap-4 z-10">
+                      <>
                         {!selectedContent ? (
-                        <div className="text-center">
-                          <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
-                          {isOwner && (
-                            <p className="text-gray-400 text-xs">컨텐츠를 선택해주세요</p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-center">
-                          <p className="text-gray-200 font-medium mb-2">현재 컨텐츠</p>
-                          <p className="text-white text-lg font-semibold mb-4">{selectedContent.title}</p>
-
-                        <div className="flex flex-col items-center gap-3">
-                          {/* 게임 시작 전: 준비 완료 및 시작 버튼 */}
-                          {!isGameStarting && !isRoleAssigned && (
-                            <>
-                              {/* 준비 완료 버튼 (모든 참가자) */}
-                              <button
-                                onClick={handleToggleReady}
-                                disabled={isReadyLoading}
-                                className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                                  isReadyLoading
-                                    ? "bg-gray-400 cursor-not-allowed text-white"
-                                    : isReady
-                                    ? "bg-green-500 hover:bg-green-600 text-white"
-                                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                                }`}
-                              >
-                                {isReadyLoading && (
-                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                )}
-                                {isReadyLoading ? "처리 중..." : isReady ? "준비 완료" : "준비하기"}
-                              </button>
-
-                              {/* 시작 버튼 (방장만) */}
+                          <div className="relative flex flex-col items-center gap-4 z-10">
+                            <div className="text-center">
+                              <p className="text-gray-500 text-sm mb-2">쉐도잉 콘텐츠 영역</p>
                               {isOwner && (
-                                <div className="flex flex-col items-center gap-2 mt-2">
-                                  {totalParticipants > 0 && (
-                                    <div className="text-sm text-gray-600 mb-1">
-                                      준비 완료: {readyCount} / {totalParticipants}
-                                    </div>
-                                  )}
+                                <p className="text-gray-400 text-xs">컨텐츠를 선택해주세요</p>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {/* 로딩 스피너/완료 메시지와 입장 인원 - 중앙 상단-중앙 */}
+                            {!isGameStarting && !isRoleAssigned && (
+                              <div className="absolute left-1/2 -translate-x-1/2 top-1/3 z-20 flex flex-col items-center gap-4">
+                                {/* 입장 인원 */}
+                                {totalParticipants > 0 && (
+                                  <p className="text-white text-3xl font-bold">
+                                    {readyCount} / {totalParticipants}
+                                  </p>
+                                )}
+
+                                {/* 조건부 로딩 스피너 또는 완료 메시지 */}
+                                {!allParticipantsReady ? (
+                                  <>
+                                    <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                                    <p className="text-gray-400/80 text-base">참가자 대기 중..</p>
+                                  </>
+                                ) : (
+                                  <p className="text-green-300/90 text-lg font-semibold">준비 완료!</p>
+                                )}
+
+                                {/* 쉐도잉 시작 버튼 (방장만, 모든 참가자 준비 완료 시) */}
+                                {isOwner && allParticipantsReady && (
                                   <button
                                     onClick={handleStartShadowing}
-                                    disabled={!allParticipantsReady}
-                                    className={`px-8 py-3 rounded-lg font-semibold transition-all ${
-                                      allParticipantsReady
-                                        ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                    }`}
+                                    className="flex items-center gap-2 px-10 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-base transition-all shadow-lg mt-2"
                                   >
+                                    <Play size={20} fill="white" />
                                     쉐도잉 시작
                                   </button>
-                                  {!allParticipantsReady && (
-                                    <p className="text-xs text-gray-500">모든 참가자가 준비될 때까지 기다려주세요</p>
-                                  )}
-                                </div>
-                              )}
-                            </>
-                          )}
+                                )}
+                              </div>
+                            )}
 
-                          {/* 역할 선택 완료 후: Round 버튼 (방장만) */}
-                          {isRoleAssigned && isOwner && (
-                            <>
-                              {/* 라운드 시작 버튼 (Round 2까지만) */}
-                              {!isRoundInProgress && !isRoundStarting && currentRound < 2 && (
+                            {/* 준비 완료 버튼 - 중앙 하단 */}
+                            <div className="absolute left-1/2 -translate-x-1/2 bottom-8 z-20">
+                              {!isGameStarting && !isRoleAssigned && (
                                 <button
-                                  onClick={() => handleStartRound(currentRound + 1)}
-                                  disabled={isRoundStarting}
-                                  className={`px-8 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                                    isRoundStarting
+                                  onClick={handleToggleReady}
+                                  disabled={isReadyLoading}
+                                  className={`w-64 py-3 rounded-lg font-semibold text-base transition-all flex items-center justify-center gap-2 ${
+                                    isReadyLoading
                                       ? "bg-gray-400 cursor-not-allowed text-white"
-                                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                                      : isReady
+                                      ? "bg-gray-500 hover:bg-gray-600 text-white"
+                                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
                                   }`}
                                 >
-                                  {isRoundStarting && (
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  {isReadyLoading && (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                   )}
-                                  {isRoundStarting ? "시작 중..." : `Round ${currentRound + 1} 시작하기`}
+                                  {isReadyLoading ? "처리 중..." : isReady ? "준비 취소" : "준비하기"}
                                 </button>
                               )}
+                            </div>
 
-                              {/* Round 2 완료 후 메시지 및 버튼 */}
-                              {!isRoundInProgress && currentRound === 2 && (
-                                <div className="flex flex-col items-center gap-4">
-                                  <p className="text-gray-700 text-lg font-semibold">
-                                    모든 라운드가 완료되었습니다
-                                  </p>
+                            {/* 역할 선택 완료 후: Round 버튼 (방장만) - 중앙 하단 */}
+                            {isRoleAssigned && isOwner && (
+                              <div className="absolute left-1/2 -translate-x-1/2 bottom-8 z-20 flex flex-col items-center gap-4">
+                                {/* 라운드 시작 버튼 (Round 2까지만) */}
+                                {!isRoundInProgress && !isRoundStarting && currentRound < 2 && (
                                   <button
-                                    onClick={handleFinishRoom}
-                                    className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
+                                    onClick={() => handleStartRound(currentRound + 1)}
+                                    disabled={isRoundStarting}
+                                    className={`px-8 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                                      isRoundStarting
+                                        ? "bg-gray-400 cursor-not-allowed text-white"
+                                        : "bg-blue-600 hover:bg-blue-700 text-white"
+                                    }`}
                                   >
-                                    처음으로 돌아가기
+                                    {isRoundStarting && (
+                                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    )}
+                                    {isRoundStarting ? "시작 중..." : `Round ${currentRound + 1} 시작하기`}
                                   </button>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                        </div>
-                      )}
-                      </div>
+                                )}
+
+                                {/* Round 2 완료 후 메시지 및 버튼 */}
+                                {!isRoundInProgress && currentRound === 2 && (
+                                  <div className="flex flex-col items-center gap-4">
+                                    <p className="text-white text-lg font-semibold">
+                                      모든 라운드가 완료되었습니다
+                                    </p>
+                                    <button
+                                      onClick={handleFinishRoom}
+                                      className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
+                                    >
+                                      처음으로 돌아가기
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </>
                     )}
                   </>
                 )}
