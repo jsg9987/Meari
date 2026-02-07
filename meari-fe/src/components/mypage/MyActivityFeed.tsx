@@ -22,7 +22,7 @@ const getTypeLabel = (type: RecentActivityType) => {
 }
 
 const getDateTimeLabel = (activity: RecentActivity) => {
-  const date = new Date(activity.created_at)
+  const date = new Date(activity.createdAt)
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   const hours = String(date.getHours()).padStart(2, '0')
@@ -31,7 +31,7 @@ const getDateTimeLabel = (activity: RecentActivity) => {
 }
 
 const getActivitySummary = (activity: RecentActivity) => {
-  switch (activity.activity_type) {
+  switch (activity.activityType) {
     case 'DAILY':
       return activity.status === 'COMPLETED' ? '완료' : '진행 중'
     case 'SHADOWING':
@@ -68,7 +68,7 @@ const MyActivityFeed = () => {
   }, [])
 
   return (
-    <div className='rounded-2xl border border-gray-200 bg-white p-5 flex flex-col lg:h-full lg:max-h-225'>
+    <div className='rounded-2xl border border-gray-200 bg-white p-5 flex flex-col max-h-150'>
       <div className='mb-4 shrink-0'>
         <h2 className='text-xl font-semibold text-gray-900'>활동</h2>
         <p className='text-sm text-gray-500'>최근 학습 활동 내역입니다.</p>
@@ -100,16 +100,16 @@ const MyActivityFeed = () => {
           <div className='space-y-3 max-w-2xl'>
             {activities.map((activity, index) => (
               <div
-                key={`${activity.activity_type}-${activity.created_at}-${index}`}
+                key={`${activity.activityType}-${activity.createdAt}-${index}`}
                 className='border-l-4 border-[#2D9CDB] p-4 flex flex-col gap-3'
               >
                 <div className='flex items-center gap-3'>
                   <div
                     className={`px-2.5 py-1 rounded-full border text-xs font-semibold ${
-                      typeBadgeClass[activity.activity_type]
+                      typeBadgeClass[activity.activityType]
                     }`}
                   >
-                    {getTypeLabel(activity.activity_type)}
+                    {getTypeLabel(activity.activityType)}
                   </div>
                 </div>
                 <div>

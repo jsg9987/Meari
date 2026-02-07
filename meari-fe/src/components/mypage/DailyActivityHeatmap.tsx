@@ -12,8 +12,10 @@ const getColorByCount = (count: number): string => {
 }
 
 const getCountLabel = (count: number): string => {
-  if (count === 0) return '학습 없음'
-  return `${count}개 완료`
+  if (count === 0) return '학습 안함'
+  if (count === 1) return '단어 학습'
+  if (count === 2) return '문장 학습'
+  return '모두 학습'
 }
 
 interface DailyActivityHeatmapProps {
@@ -207,12 +209,17 @@ const DailyActivityHeatmap = ({ className }: DailyActivityHeatmapProps) => {
 
           {/* 범례 */}
           <div className='flex items-center justify-end gap-3 mt-4 text-xs text-gray-600'>
-            {[0, 1, 2, 3, 4].map((count) => (
+            {[
+              { count: 0, label: '학습 안함' },
+              { count: 1, label: '단어 학습' },
+              { count: 2, label: '문장 학습' },
+              { count: 3, label: '모두 학습' }
+            ].map(({ count, label }) => (
               <div key={count} className='flex items-center gap-1.5'>
                 <div
                   className={`w-5 h-5 rounded-sm ${getColorByCount(count)} border border-gray-200`}
                 />
-                <span>{count === 0 ? '없음' : count === 4 ? '4+' : count}</span>
+                <span>{label}</span>
               </div>
             ))}
           </div>

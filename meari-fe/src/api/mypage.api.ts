@@ -156,7 +156,7 @@ export const getShadowingPracticeHistoryAPI = async (): Promise<
   ShadowingPracticeHistoryResponse
 > => {
   const response = await axiosInstance.get<ApiResponse<ShadowingPracticeRecord[]>>(
-    '/dashboard/me/shadowing-practice-history'
+    '/dashboard/me/shadowing'
   )
   return response
 }
@@ -238,7 +238,7 @@ export const getKopicSummaryMock = async (): Promise<KopicSummaryResponse> => {
 // 실제 API - KOPIC 요약 데이터 조회
 export const getKopicSummaryAPI = async (): Promise<KopicSummaryResponse> => {
   const response = await axiosInstance.get<ApiResponse<KopicSummaryData>>(
-    '/dashboard/me/kopic-summary'
+    '/dashboard/me/kopic'
   )
   return response
 }
@@ -417,10 +417,10 @@ export type RecentActivityType = 'DAILY' | 'SHADOWING' | 'KOPIC'
 export type RecentActivityStatus = 'COMPLETED' | 'PROCESSING'
 
 export interface RecentActivity {
-  activity_type: RecentActivityType
+  activityType: RecentActivityType
   title: string
   status: RecentActivityStatus
-  created_at: string // ISO 8601 형식
+  createdAt: string // ISO 8601 형식
   theme?: string // SHADOWING, KOPIC에만 존재
   content?: string // SHADOWING에만 존재
 }
@@ -430,46 +430,46 @@ export type RecentActivitiesResponse = AxiosResponse<ApiResponse<RecentActivity[
 // 목업 데이터 - 최근 활동 내역
 const mockRecentActivities: RecentActivity[] = [
   {
-    activity_type: 'DAILY',
+    activityType: 'DAILY',
     title: '일일학습 완료했습니다!',
     status: 'COMPLETED',
-    created_at: '2026-02-01T20:10:00'
+    createdAt: '2026-02-01T20:10:00'
   },
   {
-    activity_type: 'SHADOWING',
+    activityType: 'SHADOWING',
     theme: '공공장소',
     content: '카페에서 커피 주문하기',
     title: '쉐도잉(공공장소) - 카페에서 커피 주문하기를 완료했습니다!',
     status: 'COMPLETED',
-    created_at: '2026-02-01T19:40:00'
+    createdAt: '2026-02-01T19:40:00'
   },
   {
-    activity_type: 'KOPIC',
+    activityType: 'KOPIC',
     theme: '비즈니스',
     title: 'KOPIC(비즈니스) 채점이 완료되었습니다!',
     status: 'COMPLETED',
-    created_at: '2026-02-01T18:05:00'
+    createdAt: '2026-02-01T18:05:00'
   },
   {
-    activity_type: 'DAILY',
+    activityType: 'DAILY',
     title: '일일학습 완료했습니다!',
     status: 'COMPLETED',
-    created_at: '2026-01-31T15:30:00'
+    createdAt: '2026-01-31T15:30:00'
   },
   {
-    activity_type: 'SHADOWING',
+    activityType: 'SHADOWING',
     theme: '비즈니스',
     content: '협상 기초',
     title: '쉐도잉(비즈니스) - 협상 기초를 완료했습니다!',
     status: 'COMPLETED',
-    created_at: '2026-01-31T13:15:00'
+    createdAt: '2026-01-31T13:15:00'
   },
   {
-    activity_type: 'KOPIC',
+    activityType: 'KOPIC',
     theme: '일상생활',
     title: 'KOPIC(일상생활) 채점이 완료되었습니다!',
     status: 'COMPLETED',
-    created_at: '2026-01-30T18:20:00'
+    createdAt: '2026-01-30T18:20:00'
   }
 ]
 
