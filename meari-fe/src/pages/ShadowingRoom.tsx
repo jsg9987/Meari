@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, MessageCircle, Lock, Unlock, Copy, Check, LayoutList, LayoutGrid, Maximize2, UserCircle, Play } from "lucide-react";
+import { Users, MessageCircle, Lock, Unlock, Copy, Check, X, LayoutList, LayoutGrid, Maximize2, UserCircle, Play, Film, Home } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
 import { useAuthStore } from "../store/auth.store";
@@ -1730,6 +1730,9 @@ export default function ShadowingRoom() {
                       }}
                     />
 
+                    {/* Gradient Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40 pointer-events-none" />
+
                     {/* 대본 표시 (WATCHING 및 Round 모드) */}
                     {isSubtitleEnabled && currentSubtitles.length > 0 && (
                       <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-5xl px-4">
@@ -1812,15 +1815,17 @@ export default function ShadowingRoom() {
                           muted
                           playsInline
                         />
-                        <div className="absolute inset-0 bg-black/40" />
+                        <div className="absolute inset-0 bg-black/65" />
                       </div>
                     )}
 
                     {/* 컨텐츠 정보 - 왼쪽 중앙 살짝 아래 */}
                     {selectedContent && (
-                      <div className="absolute left-8 top-[55%] -translate-y-1/2 z-20 max-w-2xl">
+                      <div className="absolute left-8 top-[45%] -translate-y-1/2 z-20 max-w-2xl">
                         {/* 테마 이름 */}
-                        <p className="text-gray-300 text-2xl font-medium mb-2">{roomInfo.themeName}</p>
+                        <span className="inline-block px-4 py-1.5 bg-gray-500/30 text-gray-300 text-sm font-medium rounded-full mb-3">
+                          {roomInfo.themeName}
+                        </span>
                         {/* 컨텐츠 제목 */}
                         <h2 className="text-white text-5xl font-bold mb-3">{selectedContent.title}</h2>
                         {/* 테마 설명 */}
@@ -1849,97 +1854,112 @@ export default function ShadowingRoom() {
                           </div>
                         ) : (
                           <>
-                            {/* 로딩 스피너/완료 메시지와 입장 인원 - 중앙 상단-중앙 */}
+                            {/* 입장 인원 - 우측 하단 */}
+                            {!isGameStarting && !isRoleAssigned && totalParticipants > 0 && (
+                              <div className="absolute right-8 bottom-8 z-20 flex items-center gap-4 px-7 py-3 bg-white/10 backdrop-blur-sm rounded-full min-w-[140px]">
+                                <Users size={24} className="text-white flex-shrink-0" />
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-white text-2xl font-semibold w-4 text-center">{readyCount}</span>
+                                  <span className="text-white/60 text-lg font-medium">/</span>
+                                  <span className="text-white/80 text-xl font-medium w-4 text-center">{totalParticipants}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 준비하기 + 시작하기 버튼 - 좌측 하단 */}
                             {!isGameStarting && !isRoleAssigned && (
-                              <div className="absolute left-1/2 -translate-x-1/2 top-1/3 z-20 flex flex-col items-center gap-4">
-                                {/* 입장 인원 */}
-                                {totalParticipants > 0 && (
-                                  <p className="text-white text-3xl font-bold">
-                                    {readyCount} / {totalParticipants}
-                                  </p>
-                                )}
+                              <div className="absolute left-8 bottom-8 z-20 flex gap-4">
+                                {/* 준비하기 버튼 */}
+                                <button
+                                  onClick={handleToggleReady}
+                                  disabled={isReadyLoading}
+                                  className={`w-40 py-3 rounded-full font-semibold text-lg transition-all flex items-center justify-center gap-2 text-white border-2 border-white/80 bg-transparent hover:bg-white/10 ${
+                                    isReadyLoading
+                                      ? "cursor-not-allowed opacity-60"
+                                      : ""
+                                  }`}
+                                >
+                                  {isReadyLoading ? (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  ) : isReady ? (
+                                    <X size={18} />
+                                  ) : (
+                                    <Check size={18} />
+                                  )}
+                                  {isReadyLoading ? "처리 중..." : isReady ? "준비 취소" : "준비 완료"}
+                                </button>
 
-                                {/* 조건부 로딩 스피너 또는 완료 메시지 */}
-                                {!allParticipantsReady ? (
-                                  <>
-                                    <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                                    <p className="text-gray-400/80 text-base">참가자 대기 중..</p>
-                                  </>
-                                ) : (
-                                  <p className="text-green-300/90 text-lg font-semibold">준비 완료!</p>
-                                )}
-
-                                {/* 쉐도잉 시작 버튼 (방장만, 모든 참가자 준비 완료 시) */}
+                                {/* 시작하기 버튼 (방장만, 모든 참가자 준비 완료 시) */}
                                 {isOwner && allParticipantsReady && (
                                   <button
                                     onClick={handleStartShadowing}
-                                    className="flex items-center gap-2 px-10 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-base transition-all shadow-lg mt-2"
+                                    className="flex items-center gap-2 px-8 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-full font-semibold text-lg transition-all shadow-lg animate-fadeInUp"
                                   >
-                                    <Play size={20} fill="white" />
-                                    쉐도잉 시작
+                                    <Play size={20} fill="currentColor" />
+                                    시작하기
                                   </button>
                                 )}
                               </div>
                             )}
 
-                            {/* 준비 완료 버튼 - 중앙 하단 */}
-                            <div className="absolute left-1/2 -translate-x-1/2 bottom-8 z-20">
-                              {!isGameStarting && !isRoleAssigned && (
-                                <button
-                                  onClick={handleToggleReady}
-                                  disabled={isReadyLoading}
-                                  className={`w-64 py-3 rounded-lg font-semibold text-base transition-all flex items-center justify-center gap-2 ${
-                                    isReadyLoading
-                                      ? "bg-gray-400 cursor-not-allowed text-white"
-                                      : isReady
-                                      ? "bg-gray-500 hover:bg-gray-600 text-white"
-                                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-                                  }`}
-                                >
-                                  {isReadyLoading && (
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                  )}
-                                  {isReadyLoading ? "처리 중..." : isReady ? "준비 취소" : "준비하기"}
-                                </button>
-                              )}
-                            </div>
-
-                            {/* 역할 선택 완료 후: Round 버튼 (방장만) - 중앙 하단 */}
-                            {isRoleAssigned && isOwner && (
-                              <div className="absolute left-1/2 -translate-x-1/2 bottom-8 z-20 flex flex-col items-center gap-4">
-                                {/* 라운드 시작 버튼 (Round 2까지만) */}
-                                {!isRoundInProgress && !isRoundStarting && currentRound < 2 && (
-                                  <button
-                                    onClick={() => handleStartRound(currentRound + 1)}
-                                    disabled={isRoundStarting}
-                                    className={`px-8 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                                      isRoundStarting
-                                        ? "bg-gray-400 cursor-not-allowed text-white"
-                                        : "bg-blue-600 hover:bg-blue-700 text-white"
-                                    }`}
-                                  >
-                                    {isRoundStarting && (
-                                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            {/* 역할 선택 완료 후 */}
+                            {isRoleAssigned && (
+                              <>
+                                {/* 방장: 라운드 시작 버튼 - 좌측 하단 */}
+                                {isOwner && (
+                                  <div className="absolute left-8 bottom-8 z-20 flex flex-col gap-4">
+                                    {/* 라운드 시작 버튼 (Round 2까지만) */}
+                                    {!isRoundInProgress && !isRoundStarting && currentRound < 2 && (
+                                      <button
+                                        onClick={() => handleStartRound(currentRound + 1)}
+                                        disabled={isRoundStarting}
+                                        className={`px-8 py-3 rounded-full font-semibold text-lg transition-all flex items-center gap-2 animate-fadeInUp ${
+                                          isRoundStarting
+                                            ? "bg-gray-400 cursor-not-allowed text-white"
+                                            : "bg-white hover:bg-gray-100 text-gray-900"
+                                        }`}
+                                      >
+                                        {isRoundStarting ? (
+                                          <div className="w-5 h-5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                          <Play size={20} fill="currentColor" />
+                                        )}
+                                        {isRoundStarting ? "시작 중..." : `Round ${currentRound + 1} 시작하기`}
+                                      </button>
                                     )}
-                                    {isRoundStarting ? "시작 중..." : `Round ${currentRound + 1} 시작하기`}
-                                  </button>
-                                )}
 
-                                {/* Round 2 완료 후 메시지 및 버튼 */}
-                                {!isRoundInProgress && currentRound === 2 && (
-                                  <div className="flex flex-col items-center gap-4">
-                                    <p className="text-white text-lg font-semibold">
-                                      모든 라운드가 완료되었습니다
-                                    </p>
-                                    <button
-                                      onClick={handleFinishRoom}
-                                      className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
-                                    >
-                                      처음으로 돌아가기
-                                    </button>
+                                    {/* Round 2 완료 후 버튼 */}
+                                    {!isRoundInProgress && currentRound === 2 && (
+                                      <button
+                                        onClick={handleFinishRoom}
+                                        className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-full font-semibold text-lg transition-all flex items-center gap-2"
+                                      >
+                                        <Home size={20} />
+                                        처음으로 돌아가기
+                                      </button>
+                                    )}
                                   </div>
                                 )}
-                              </div>
+
+                                {/* 방장이 아닌 사람: 대기 화면 */}
+                                {!isOwner && !isRoundInProgress && currentRound < 2 && (
+                                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-4">
+                                    <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <p className="text-white text-xl font-semibold">
+                                      라운드 시작을 기다리는 중입니다
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Round 2 완료 후 메시지 (방장이 아닌 사람) */}
+                                {!isOwner && !isRoundInProgress && currentRound === 2 && (
+                                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                                    <p className="text-white text-xl font-semibold">
+                                      모든 라운드가 완료되었습니다
+                                    </p>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </>
                         )}
@@ -1959,13 +1979,14 @@ export default function ShadowingRoom() {
               </button>
             )}
 
-            {/* 컨텐츠 변경 버튼 (방장만) - 게임 시작 전에만 표시 */}
+            {/* 컨텐츠 선택 버튼 (방장만) - 게임 시작 전에만 표시 */}
             {(DISABLE_WEBRTC || status === "connected") && isOwner && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && !isWaitingForRolePick && (
               <button
                 onClick={() => setIsContentSelectOpen(true)}
-                className="absolute top-4 right-4 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
+                className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
               >
-                컨텐츠 변경
+                <Film size={20} />
+                컨텐츠 선택
               </button>
             )}
 
