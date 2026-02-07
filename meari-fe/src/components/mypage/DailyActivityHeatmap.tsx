@@ -15,7 +15,11 @@ const statusLabels: Record<DailyActivityStatus, string> = {
   BOTH: '단어+문장 학습'
 }
 
-const DailyActivityHeatmap = () => {
+interface DailyActivityHeatmapProps {
+  className?: string
+}
+
+const DailyActivityHeatmap = ({ className }: DailyActivityHeatmapProps) => {
   const [activities, setActivities] = useState<DailyActivity[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
@@ -39,7 +43,7 @@ const DailyActivityHeatmap = () => {
 
   if (isLoading) {
     return (
-      <div className='rounded-2xl border border-gray-200 bg-white py-8 px-5 hidden lg:block w-fit'>
+      <div className={`rounded-2xl border border-gray-200 bg-white py-8 px-5 ${className || 'hidden lg:block w-fit'}`}>
         <div className='mb-4'>
           <div className='h-7 w-40 bg-gray-200 rounded animate-pulse mb-2' />
           <div className='h-5 w-32 bg-gray-200 rounded animate-pulse' />
@@ -116,16 +120,16 @@ const DailyActivityHeatmap = () => {
 
   // 잔디 뷰 렌더링
   const renderGrassView = () => {
-    // 각 주(week)의 너비 계산: 셀 너비(12px) + 셀 간 간격(2px)
-    const cellSize = 12; // w-3 (12px)
-    const gap = 2; // gap-0.5 (2px)
-    const weekWidth = cellSize + gap; // 14px
+    // 각 주(week)의 너비 계산: 셀 너비(20px) + 셀 간 간격(4px)
+    const cellSize = 20; // w-5 (20px)
+    const gap = 4; // gap-1 (4px)
+    const weekWidth = cellSize + gap; // 24px
 
     return (
-      <div className='overflow-x-auto'>
-        <div className='inline-block min-w-full'>
+      <div className='flex flex-col items-center overflow-x-auto pt-2'>
+        <div className='inline-block'>
           {/* 월 레이블 */}
-          <div className='flex mb-4 relative'>
+          <div className='flex mb-10 relative'>
             <div className='w-8' />
             <div className='relative pr-10' style={{ width: `${weeks.length * weekWidth + 40}px` }}>
               {monthLabels.map((label, index) => (
@@ -143,34 +147,37 @@ const DailyActivityHeatmap = () => {
           </div>
 
           {/* 히트맵 그리드 */}
-          <div className='flex gap-0.5'>
+          <div className='flex gap-1'>
             {/* 요일 레이블 */}
-            <div className='flex flex-col gap-0.5'>
+            <div className='flex flex-col gap-1'>
               {dayLabels.map((label, index) => (
-                <div key={index} className='w-8 h-3 flex items-center justify-start text-xs text-gray-500'>
+                <div key={index} className='w-8 h-5 flex items-center justify-start text-xs text-gray-500'>
                   {index % 2 === 1 ? label : ''}
                 </div>
               ))}
             </div>
 
             {/* 날짜 그리드 */}
-            <div className='flex gap-0.5'>
+            <div className='flex gap-1'>
               {weeks.map((week, weekIndex) => (
-                <div key={weekIndex} className='flex flex-col gap-0.5'>
+                <div key={weekIndex} className='flex flex-col gap-1'>
                   {week.map((day, dayIndex) => {
                     if (day.date === '') {
-                      return <div key={dayIndex} className='w-3 h-3 rounded-sm bg-transparent' />
+                      return <div key={dayIndex} className='w-5 h-5 rounded-sm bg-transparent' />
                     }
 
                     const date = new Date(day.date)
                     const dateString = `${date.getMonth() + 1}/${date.getDate()}`
 
                     return (
-                      <div
-                        key={dayIndex}
-                        className={`w-3 h-3 rounded-sm ${statusColors[day.status]} border border-gray-200 hover:ring-2 hover:ring-gray-400 transition-all cursor-pointer`}
-                        title={`${dateString} - ${statusLabels[day.status]}`}
-                      />
+                      <div key={dayIndex} className='relative group'>
+                        <div
+                          className={`w-5 h-5 rounded-sm ${statusColors[day.status]} border border-gray-200 hover:ring-2 hover:ring-gray-400 transition-all cursor-pointer`}
+                        />
+                        <div className='absolute hidden group-hover:block bg-gray-900/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap -top-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none'>
+                          {dateString} - {statusLabels[day.status]}
+                        </div>
+                      </div>
                     )
                   })}
                 </div>
@@ -179,11 +186,11 @@ const DailyActivityHeatmap = () => {
           </div>
 
           {/* 범례 */}
-          <div className='flex items-center gap-3 mt-4 text-xs text-gray-600'>
+          <div className='flex items-center justify-end gap-3 mt-4 text-xs text-gray-600'>
             {(['NONE', 'WORD', 'SENTENCE', 'BOTH'] as DailyActivityStatus[]).map((status) => (
               <div key={status} className='flex items-center gap-1.5'>
                 <div
-                  className={`w-3 h-3 rounded-sm ${statusColors[status]} border border-gray-200`}
+                  className={`w-5 h-5 rounded-sm ${statusColors[status]} border border-gray-200`}
                 />
                 <span>{statusLabels[status]}</span>
               </div>
@@ -195,7 +202,7 @@ const DailyActivityHeatmap = () => {
   }
 
   return (
-    <div className='rounded-2xl border border-gray-200 bg-white py-8 px-5 hidden lg:block w-fit'>
+    <div className={`rounded-2xl border border-gray-200 bg-white py-8 px-5 ${className || 'hidden lg:block w-fit'}`}>
       <div className='mb-4'>
         <h2 className='text-xl font-semibold text-gray-900'>일일 학습 활동</h2>
         <p className='text-sm text-gray-500'>최근 1년간의 학습 기록</p>
