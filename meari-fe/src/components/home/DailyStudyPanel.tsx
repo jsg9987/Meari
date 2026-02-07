@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import illustratorCard from '../../assets/images/daily/Illustrator-card.svg'
 import illustratorCard1 from '../../assets/images/daily/Illustrator-card-1.svg'
-import DailyActivityHeatmap from '../mypage/DailyActivityHeatmap'
+import DailyActivityHeatmap from '../mypage/DailyActivityHeatMap'
 
 const CARDS = [
   {
