@@ -143,9 +143,6 @@ pipeline {
                 ]) {
                     script {
                         sh '''
-                            # 배포 경로로 이동
-                            cd /home/ubuntu
-
                             # .env 파일 생성
                             echo "DB_PASSWORD=${DB_PW}" > .env
                             echo "JWT_SECRET_KEY=${JWT_KEY}" >> .env
@@ -170,10 +167,7 @@ pipeline {
                             echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
 
                             # docker-compose로 배포 (최신 yml 파일 사용)
-                            cp ${WORKSPACE}/docker-compose.yml /home/ubuntu/docker-compose.yml
-
-                            # 기존 컨테이너 모두 제거 후 전체 재시작 (컨테이너 충돌 방지)
-                            docker-compose up -d --remove-orphans spring-api frontend fastapi
+                            docker-compose -f docker-compose.yml up -d --remove-orphans spring-api frontend fastapi
                         '''
                         sh 'docker image prune -f'
                     }
