@@ -5,6 +5,14 @@ pipeline {
         pollSCM('H/5 * * * *')  // 5분마다 Git 변경사항 체크 (CPU 부하 감소)
     }
 
+    parameters {
+        booleanParam(
+            name: 'NO_CACHE_BUILD',
+            defaultValue: true,
+            description: 'Force docker build --no-cache (use ONLY once after dockerignore change)'
+        )
+    }
+
     stages {
         // 코드 내려받기
         stage('Checkout') {
@@ -93,8 +101,13 @@ pipeline {
             steps {
                 dir('meari-ai') {
                     script {
-                        // 캐시 활용으로 6.4GB pip install 재사용 (빌드 시간 대폭 단축)
-                        sh 'docker build --cache-from meari-fastapi:latest -t meari-fastapi:latest .'
+                        if (params.NO_CACHE_BUILD) {
+                            echo '🚨 NO CACHE FastAPI build'
+                            sh 'docker build --no-cache -t meari-fastapi:latest .'
+                        } else {
+                            echo '♻️ Cached FastAPI build'
+                            sh 'docker build --cache-from meari-fastapi:latest -t meari-fastapi:latest .'
+                        }
                     }
                 }
             }
