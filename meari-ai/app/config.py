@@ -11,11 +11,14 @@ load_dotenv()
 class Settings:
     """애플리케이션 설정"""
 
-    # RabbitMQ 설정
+    # 모드 설정 (HTTP 모드일 때는 RabbitMQ 불필요)
+    ENABLE_RABBITMQ: bool = os.getenv("ENABLE_RABBITMQ", "false").lower() == "true"
+
+    # RabbitMQ 설정 (ENABLE_RABBITMQ=true일 때만 필요)
     RABBITMQ_HOST: str = os.getenv("RABBITMQ_HOST", "localhost")
     RABBITMQ_PORT: int = int(os.getenv("RABBITMQ_PORT", "5672"))
-    RABBITMQ_USERNAME: str = os.getenv("RABBITMQ_USERNAME")  # 환경변수 필수
-    RABBITMQ_PASSWORD: str = os.getenv("RABBITMQ_PASSWORD")  # 환경변수 필수
+    RABBITMQ_USERNAME: str = os.getenv("RABBITMQ_USERNAME", "")
+    RABBITMQ_PASSWORD: str = os.getenv("RABBITMQ_PASSWORD", "")
     RABBITMQ_VIRTUAL_HOST: str = os.getenv("RABBITMQ_VIRTUAL_HOST", "/")
 
     # Queue 설정
@@ -46,10 +49,14 @@ class Settings:
         """필수 환경변수 검증"""
         missing = []
 
-        if not self.RABBITMQ_USERNAME:
-            missing.append("RABBITMQ_USERNAME")
-        if not self.RABBITMQ_PASSWORD:
-            missing.append("RABBITMQ_PASSWORD")
+        # RabbitMQ 설정 검증 (ENABLE_RABBITMQ=true일 때만)
+        if self.ENABLE_RABBITMQ:
+            if not self.RABBITMQ_USERNAME:
+                missing.append("RABBITMQ_USERNAME")
+            if not self.RABBITMQ_PASSWORD:
+                missing.append("RABBITMQ_PASSWORD")
+
+        # AWS 설정 검증 (항상 필요)
         if not self.AWS_ACCESS_KEY:
             missing.append("AWS_ACCESS_KEY")
         if not self.AWS_SECRET_KEY:
