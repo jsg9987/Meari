@@ -11,6 +11,7 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const isRecordingRef = useRef(false);
+  const mimeTypeRef = useRef<string>('');
 
   const startRecording = useCallback(async () => {
     try {
@@ -25,6 +26,7 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
         ? 'audio/webm'
         : 'audio/ogg';
 
+      mimeTypeRef.current = mimeType;
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -36,9 +38,9 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current });
 
-        // WAV로 변환 (필요한 경우) TODO: 이거 그대로 가나요?
+        // WAV로 변환
         const wavBlob = await convertToWav(audioBlob);
         onRecordingComplete?.(wavBlob);
 
