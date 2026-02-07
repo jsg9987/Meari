@@ -9,10 +9,13 @@ from fastapi import FastAPI, HTTPException
 from app.config import settings
 from app.models.model_loader import load_models
 from app.services.analysis_service import AnalysisService
-from app.services.rabbitmq_consumer import RabbitMQConsumer
-from app.services.rabbitmq_producer import producer
 from app.schemas.request import AnalysisRequestMessage
 from app.schemas.response import AnalysisResultMessage
+
+# RabbitMQ는 선택적으로 import (ENABLE_RABBITMQ=true일 때만)
+if settings.ENABLE_RABBITMQ:
+    from app.services.rabbitmq_consumer import RabbitMQConsumer
+    from app.services.rabbitmq_producer import producer
 
 # 로깅 설정
 logging.basicConfig(
@@ -38,6 +41,7 @@ async def startup_event():
     """서버 시작 시 실행"""
     logger.info("=" * 50)
     logger.info("Meari 발음 분석 서비스 시작")
+    logger.info(f"모드: {'RabbitMQ' if settings.ENABLE_RABBITMQ else 'HTTP'}")
     logger.info("=" * 50)
 
     try:
@@ -51,19 +55,22 @@ async def startup_event():
         analysis_service = AnalysisService()
         logger.info("Analysis Service 초기화 완료")
 
-        # 3. RabbitMQ Consumer 시작 (별도 스레드)
-        logger.info("RabbitMQ Consumer 시작 중...")
-        global consumer
-        consumer = RabbitMQConsumer(analysis_service)
+        # 3. RabbitMQ Consumer 시작 (ENABLE_RABBITMQ=true일 때만)
+        if settings.ENABLE_RABBITMQ:
+            logger.info("RabbitMQ Consumer 시작 중...")
+            global consumer
+            consumer = RabbitMQConsumer(analysis_service)
 
-        # Consumer를 별도 스레드에서 실행
-        import threading
-        consumer_thread = threading.Thread(
-            target=consumer.start_consuming,
-            daemon=True
-        )
-        consumer_thread.start()
-        logger.info("RabbitMQ Consumer 시작 완료")
+            # Consumer를 별도 스레드에서 실행
+            import threading
+            consumer_thread = threading.Thread(
+                target=consumer.start_consuming,
+                daemon=True
+            )
+            consumer_thread.start()
+            logger.info("RabbitMQ Consumer 시작 완료")
+        else:
+            logger.info("RabbitMQ 비활성화 (HTTP 모드)")
 
         logger.info("=" * 50)
         logger.info("서비스 준비 완료 - 분석 요청 대기 중")
@@ -80,12 +87,11 @@ async def shutdown_event():
     logger.info("서버 종료 중...")
 
     try:
-        # Consumer 종료
-        if consumer:
-            consumer.stop_consuming()
-
-        # Producer 종료
-        producer.close()
+        # RabbitMQ 종료 (활성화된 경우만)
+        if settings.ENABLE_RABBITMQ:
+            if consumer:
+                consumer.stop_consuming()
+            producer.close()
 
         logger.info("서버 종료 완료")
     except Exception as e:
@@ -144,9 +150,10 @@ async def analyze_pronunciation(request: AnalysisRequestMessage):
 def signal_handler(sig, frame):
     """시그널 핸들러 (Ctrl+C)"""
     logger.info("\n시그널 수신 - 서버 종료 중...")
-    if consumer:
-        consumer.stop_consuming()
-    producer.close()
+    if settings.ENABLE_RABBITMQ:
+        if consumer:
+            consumer.stop_consuming()
+        producer.close()
     sys.exit(0)
 
 
