@@ -139,7 +139,10 @@ pipeline {
                     string(credentialsId: 'GEMINI_API_KEY', variable: 'GEMINI_KEY'),
                     string(credentialsId: 'AWS_ACCESS_KEY', variable: 'AWS_KEY'),
                     string(credentialsId: 'AWS_SECRET_KEY', variable: 'AWS_SECRET'),
-                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET')
+                    string(credentialsId: 'AWS_S3_BUCKET', variable: 'S3_BUCKET'),
+                    string(credentialsId: 'CLOUDINARY_CLOUD_NAME', variable: 'CLOUDINARY_CLOUD_NAME'),
+                    string(credentialsId: 'CLOUDINARY_API_KEY', variable: 'CLOUDINARY_API_KEY'),
+                    string(credentialsId: 'CLOUDINARY_API_SECRET', variable: 'CLOUDINARY_API_SECRET')
                 ]) {
                     script {
                         sh '''
@@ -165,6 +168,9 @@ pipeline {
                             echo "AWS_REGION=ap-northeast-2" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_VIDEO_EXPIRATION=3600" >> .env
                             echo "CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION=900" >> .env
+                            echo "CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}" >> .env
+                            echo "CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}" >> .env
+                            echo "CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}" >> .env
 
                             # docker-compose로 배포 (최신 yml 파일 사용)
                             docker-compose -f docker-compose.yml up -d --remove-orphans spring-api frontend fastapi
