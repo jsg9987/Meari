@@ -24,4 +24,18 @@ public interface KopicTotalReportRepository extends JpaRepository<KopicTotalRepo
         @Param("status") ReportStatus status,
         Pageable pageable
     );
+
+    @Query("SELECT r FROM KopicTotalReport r " +
+           "WHERE r.member.memberId = :memberId " +
+           "AND r.status = 'COMPLETED' " +
+           "ORDER BY r.totalScore DESC")
+    List<KopicTotalReport> findTopByMemberIdOrderByTotalScoreDesc(
+        @Param("memberId") Long memberId,
+        Pageable pageable
+    );
+
+    @Query("SELECT r FROM KopicTotalReport r " +
+           "WHERE r.member.memberId = :memberId " +
+           "AND r.status = 'COMPLETED'")
+    List<KopicTotalReport> findAllCompletedByMemberId(@Param("memberId") Long memberId);
 }
