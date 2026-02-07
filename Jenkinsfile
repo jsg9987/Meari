@@ -8,7 +8,7 @@ pipeline {
     parameters {
         booleanParam(
             name: 'NO_CACHE_BUILD',
-            defaultValue: true,
+            defaultValue: false,
             description: 'Force docker build --no-cache (use ONLY once after dockerignore change)'
         )
     }
