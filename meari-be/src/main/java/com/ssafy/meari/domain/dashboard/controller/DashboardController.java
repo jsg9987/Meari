@@ -126,4 +126,31 @@ public class DashboardController {
         log.info("최근 5회 쉐도잉 연습 이력 조회 완료: 반환 개수={}", response.size());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
+    @GetMapping("/me/kopic")
+    @Operation(summary = "코픽 점수 요약 조회",
+        description = "5문제 총 평균이 가장 높았을 때와 평균 점수를 비교하여 조회합니다. 대시보드에서 사용됩니다.")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "인증되지 않은 사용자"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "회원을 찾을 수 없음")
+    })
+    public ResponseEntity<ApiResponse<com.ssafy.meari.domain.dashboard.dto.response.KopicDashboardResponse>> getKopicDashboard(
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        Long memberId = userDetails.getMember().getMemberId();
+        log.info("코픽 대시보드 조회 요청: memberId={}", memberId);
+
+        com.ssafy.meari.domain.dashboard.dto.response.KopicDashboardResponse response =
+            dashboardService.getKopicDashboard(memberId);
+
+        log.info("코픽 대시보드 조회 완료: memberId={}", memberId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }
