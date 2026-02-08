@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, MessageCircle, Lock, Unlock, Copy, Check, X, LayoutList, LayoutGrid, Maximize2, UserCircle, Play, Film, Home, Clock } from "lucide-react";
+import { Users, MessageCircle, Lock, Unlock, Copy, Check, X, LayoutList, LayoutGrid, Maximize2, UserCircle, Play, Home, Clock } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
 import { useAuthStore } from "../store/auth.store";
@@ -1061,6 +1061,30 @@ export default function ShadowingRoom() {
     }
   };
 
+  const handleCancelContentSelection = () => {
+    if (!selectedContent) return;
+
+    // 선택된 컨텐츠를 availableContents에서 찾아서 mainContentIndex로 설정
+    const contentIndex = availableContents.findIndex(
+      (content) => content.content_id === selectedContent.content_id
+    );
+
+    if (contentIndex !== -1) {
+      setMainContentIndex(contentIndex);
+      // 캐러셀 순서 업데이트
+      const newCarouselOrder = availableContents
+        .map((_, index) => index)
+        .filter(index => index !== contentIndex);
+      setCarouselOrder(newCarouselOrder);
+    }
+
+    // 상태 초기화
+    setSelectedContent(null);
+    setVideoUrl(null);
+    setIsReady(false);
+    setParticipantsReady({});
+  };
+
   const handleToggleReady = () => {
     if (isReadyLoading) return; // 이미 처리 중이면 무시
 
@@ -1880,9 +1904,9 @@ export default function ShadowingRoom() {
                       </div>
                     )}
 
-                    {/* 컨텐츠 정보 - 왼쪽 중앙 살짝 아래 */}
+                    {/* 컨텐츠 정보 - 왼쪽 중앙 */}
                     {selectedContent && (
-                      <div className="absolute left-8 top-[45%] -translate-y-1/2 z-20 max-w-2xl">
+                      <div className="absolute left-8 top-[35%] z-20 max-w-2xl">
                         {/* 테마 이름 */}
                         <span className="inline-block px-4 py-1.5 bg-gray-500/30 text-gray-300 text-sm font-medium rounded-full mb-3">
                           {roomInfo.themeName}
@@ -1890,7 +1914,17 @@ export default function ShadowingRoom() {
                         {/* 컨텐츠 제목 */}
                         <h2 className="text-white text-5xl font-bold mb-3">{selectedContent.title}</h2>
                         {/* 테마 설명 */}
-                        <p className="text-gray-200 text-base leading-relaxed">{themeDescription}</p>
+                        <p className="text-gray-200 text-base leading-relaxed mb-4">{themeDescription}</p>
+                        {/* 컨텐츠 선택 취소 버튼 (방장만) */}
+                        {isOwner && !isPlaying && !isGameStarting && !isRoleAssigned && !isWaitingForRolePick && (
+                          <button
+                            onClick={handleCancelContentSelection}
+                            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-lg transition-colors border border-white/30"
+                          >
+                            <X size={18} />
+                            컨텐츠 선택 취소
+                          </button>
+                        )}
                       </div>
                     )}
 
@@ -1944,48 +1978,46 @@ export default function ShadowingRoom() {
                                   <div className="absolute bottom-0 left-0 right-0 h-2/3 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none z-10" />
 
                                   {/* 컨텐츠 정보 */}
-                                  <div className="absolute inset-0 flex flex-col justify-center z-20 -mt-24 px-12">
-                                    <div className="transition-all duration-700 ease-in-out">
-                                      {/* 테마 이름 */}
-                                      <span className="inline-block self-start px-4 py-1.5 bg-white/20 backdrop-blur-sm text-white text-sm font-medium rounded-full mb-4">
-                                        {roomInfo.themeName}
-                                      </span>
+                                  <div className="absolute left-8 top-[35%] z-20 max-w-2xl transition-all duration-700 ease-in-out">
+                                    {/* 테마 이름 */}
+                                    <span className="inline-block px-4 py-1.5 bg-gray-500/30 text-gray-300 text-sm font-medium rounded-full mb-3">
+                                      {roomInfo.themeName}
+                                    </span>
 
-                                      {/* 제목 */}
-                                      <h2 className="text-white text-5xl font-bold mb-4">{availableContents[mainContentIndex].title}</h2>
+                                    {/* 제목 */}
+                                    <h2 className="text-white text-5xl font-bold mb-3">{availableContents[mainContentIndex].title}</h2>
 
-                                      {/* 설명 */}
-                                      <p className="text-gray-200 text-lg mb-6 line-clamp-2 max-w-3xl">{availableContents[mainContentIndex].description}</p>
+                                    {/* 설명 */}
+                                    <p className="text-gray-200 text-base leading-relaxed line-clamp-2 mb-4">{availableContents[mainContentIndex].description}</p>
 
-                                      {/* 하단 정보 및 버튼 */}
-                                      <div className="flex items-center gap-8">
-                                        {/* 인원수 */}
-                                        {availableContents[mainContentIndex].max_people && (
-                                          <div className="flex items-center gap-2 text-white">
-                                            <Users size={24} />
-                                            <span className="text-lg font-medium">{availableContents[mainContentIndex].max_people}명</span>
-                                          </div>
-                                        )}
-                                        {/* 영상 길이 */}
+                                    {/* 하단 정보 및 버튼 */}
+                                    <div className="flex items-center gap-6">
+                                      {/* 인원수 */}
+                                      {availableContents[mainContentIndex].max_people && (
                                         <div className="flex items-center gap-2 text-white">
-                                          <Clock size={24} />
-                                          <span className="text-lg font-medium">{Math.floor(availableContents[mainContentIndex].total_duration / 60)}:{Math.floor(availableContents[mainContentIndex].total_duration % 60).toString().padStart(2, '0')}</span>
+                                          <Users size={20} />
+                                          <span className="text-base font-medium">{availableContents[mainContentIndex].max_people}명</span>
                                         </div>
-
-                                        {/* 선택 버튼 */}
-                                        <button
-                                          onClick={() => handleContentSelect(availableContents[mainContentIndex])}
-                                          className="ml-4 px-8 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-full font-semibold text-lg transition-all shadow-xl"
-                                        >
-                                          이 컨텐츠로 시작하기
-                                        </button>
+                                      )}
+                                      {/* 영상 길이 */}
+                                      <div className="flex items-center gap-2 text-white">
+                                        <Clock size={20} />
+                                        <span className="text-base font-medium">{Math.floor(availableContents[mainContentIndex].total_duration / 60)}:{Math.floor(availableContents[mainContentIndex].total_duration % 60).toString().padStart(2, '0')}</span>
                                       </div>
+
+                                      {/* 선택 버튼 */}
+                                      <button
+                                        onClick={() => handleContentSelect(availableContents[mainContentIndex])}
+                                        className="ml-2 px-8 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-full font-semibold text-lg transition-all shadow-xl"
+                                      >
+                                        이 컨텐츠로 시작하기
+                                      </button>
                                     </div>
                                   </div>
 
                                   {/* 하단 캐러셀 - 다른 컨텐츠들 (현재 메인 컨텐츠 제외) */}
                                   <div
-                                    className={`absolute bottom-0 left-0 right-0 z-30 px-12 pb-8 transition-all duration-700 ${
+                                    className={`absolute bottom-0 left-0 right-0 z-30 px-8 min-[1920px]:pb-8 transition-all duration-700 ${
                                       isTransitioning && selectedContent ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'
                                     }`}
                                   >
@@ -1997,9 +2029,9 @@ export default function ShadowingRoom() {
                                           <button
                                             key={content.content_id}
                                             onClick={() => handleMainContentChange(contentIndex)}
-                                            className="shrink-0 w-80 border border-white/20 hover:border-white/40 hover:shadow-lg bg-white/5 rounded-lg overflow-hidden transition-all duration-500 text-left group animate-slide-in-right"
+                                            className="shrink-0 w-64 min-[1920px]:w-80 border border-white/20 hover:border-white/40 hover:shadow-lg bg-white/5 rounded-lg overflow-hidden transition-all duration-500 text-left group animate-slide-in-right"
                                           >
-                                          <div className="relative w-full h-44 overflow-hidden">
+                                          <div className="relative w-full h-44 min-[1920px]:h-52 overflow-hidden">
                                             <img
                                               src={content.thumbnail_url}
                                               alt={content.title}
@@ -2166,17 +2198,6 @@ export default function ShadowingRoom() {
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 참여하기
-              </button>
-            )}
-
-            {/* 컨텐츠 선택 버튼 - 컨텐츠가 선택된 경우에만 표시 (변경 가능하도록) */}
-            {(DISABLE_WEBRTC || status === "connected") && isOwner && selectedContent && !isPlaying && !isGameStarting && !isRoleAssigned && countdown === null && !isWaitingForRolePick && (
-              <button
-                onClick={() => setIsContentSelectOpen(true)}
-                className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-lg transition-colors font-medium"
-              >
-                <Film size={20} />
-                컨텐츠 변경
               </button>
             )}
 
