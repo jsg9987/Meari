@@ -318,6 +318,7 @@ const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
                 maxPeople={room.max_people}
                 status={room.status}
                 hasPassword={room.has_password}
+                thumbnail={room.thumbnail}
                 onClick={() => handleRoomClick(room)}
               />
             ))}
