@@ -14,7 +14,7 @@ import { useVideoRoom } from "../hooks/useVideoRoom";
 import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type ChatMessage } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
 import { selectRoomContent, getContentRoles, getThemes, getThemeContents, type ContentRole } from "../api/contents.api";
-import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
+import { getRoomDetail, enterRoom, leaveRoom, startGame, finishWatching, confirmRoles, startRound, finishRound, finishRoom, getContentVideoUrl, getPresignedUrl, uploadRecordingToS3 } from "../api/rooms.api";
 import { leaveWebRTC } from "../api/webrtc.api";
 import { useRoomStore } from "../store/room.store";
 import { useRoleStore } from "../store/role.store";
@@ -71,6 +71,7 @@ export default function ShadowingRoom() {
   const [isRoleAssigned, setIsRoleAssigned] = useState(false); // 역할 선택 완료 여부
   const [isGameStarting, setIsGameStarting] = useState(false); // 게임 시작 중 여부
   const [isRoundStarting, setIsRoundStarting] = useState(false); // 라운드 시작 중 여부
+  const [isFinishingRound, setIsFinishingRound] = useState(false); // 라운드 종료 API 호출 중
   const [currentRound, setCurrentRound] = useState(0); // 현재 라운드 (0: 시작 전)
   const [isRoundInProgress, setIsRoundInProgress] = useState(false); // 라운드 진행 중 여부
   const [isReadyLoading, setIsReadyLoading] = useState(false); // 준비 완료 로딩 상태
@@ -1203,6 +1204,7 @@ export default function ShadowingRoom() {
     setIsRoundInProgress(false);
     setIsGameStarting(false);
     setIsRoundStarting(false);
+    setIsFinishingRound(false);
     setIsReady(false);
     setSelectedContent(null);
     setVideoUrl(null);
@@ -1751,6 +1753,16 @@ export default function ShadowingRoom() {
                   </div>
                 )}
 
+                {/* 라운드 종료 처리 중 오버레이 */}
+                {isFinishingRound && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm z-30 rounded-lg">
+                    <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                    <p className="text-white text-xl font-semibold mt-4">
+                      라운드 종료 처리 중...
+                    </p>
+                  </div>
+                )}
+
                 {/* Round 시작 대기 오버레이 */}
                 {timeUntilStart !== null && timeUntilStart > 0 && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 rounded-lg">
@@ -1795,6 +1807,25 @@ export default function ShadowingRoom() {
                         if (currentRound >= 1 && isRoundInProgress) {
                           setIsRoundInProgress(false);
                           setToastMessage(`Round ${currentRound} 완료`);
+
+                          // 방장만 2초 후 finishRound API 호출
+                          if (isOwner && roomId) {
+                            setIsFinishingRound(true);
+                            setTimeout(async () => {
+                              try {
+                                const response = await finishRound(Number(roomId), currentRound);
+                                if (!response.data.success) {
+                                  console.error('Failed to finish round:', response.data.error?.message);
+                                  setToastMessage('라운드 종료에 실패했어요');
+                                }
+                              } catch (error) {
+                                console.error('Failed to finish round:', error);
+                                setToastMessage('라운드 종료에 실패했어요');
+                              } finally {
+                                setIsFinishingRound(false);
+                              }
+                            }, 2000);
+                          }
                         } else if (roomId && isOwner && contentId) {
                           // 첫 번째 시청 완료 시 finishWatching API 호출 (방장만)
                           setIsWaitingForRolePick(true); // 역할 선택 대기 시작
@@ -1916,7 +1947,7 @@ export default function ShadowingRoom() {
                         {/* 테마 설명 */}
                         <p className="text-gray-200 text-base leading-relaxed mb-4">{themeDescription}</p>
                         {/* 컨텐츠 선택 취소 버튼 (방장만) */}
-                        {isOwner && !isPlaying && !isGameStarting && !isRoleAssigned && !isWaitingForRolePick && (
+                        {isOwner && !isPlaying && !isGameStarting && !isRoleAssigned && !isWaitingForRolePick && !isRoleSelectOpen && (
                           <button
                             onClick={handleCancelContentSelection}
                             className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-lg transition-colors border border-white/30"
@@ -2077,7 +2108,7 @@ export default function ShadowingRoom() {
                         ) : (
                           <>
                             {/* 입장 인원 - 우측 하단 (컨텐츠 선택 단계에서만) */}
-                            {!isGameStarting && !isRoleAssigned && !isPlaying && !isWaitingForRolePick && totalParticipants > 0 && (
+                            {!isGameStarting && !isRoleAssigned && !isPlaying && !isWaitingForRolePick && !isRoleSelectOpen && totalParticipants > 0 && (
                               <div className="absolute right-8 bottom-8 z-20 flex items-center gap-4 px-7 py-3 bg-white/10 backdrop-blur-sm rounded-full min-w-[140px] animate-slide-up">
                                 <Users size={24} className="text-white flex-shrink-0" />
                                 <div className="flex items-baseline gap-2">
@@ -2089,7 +2120,7 @@ export default function ShadowingRoom() {
                             )}
 
                             {/* 준비하기 + 시작하기 버튼 - 좌측 하단 (컨텐츠 선택 단계에서만) */}
-                            {!isGameStarting && !isRoleAssigned && !isPlaying && !isWaitingForRolePick && (
+                            {!isGameStarting && !isRoleAssigned && !isPlaying && !isWaitingForRolePick && !isRoleSelectOpen && (
                               <div className="absolute left-8 bottom-8 z-20 flex gap-4 animate-slide-up">
                                 {/* 준비하기 버튼 */}
                                 <button
@@ -2131,7 +2162,7 @@ export default function ShadowingRoom() {
                                 {isOwner && (
                                   <div className="absolute left-8 bottom-8 z-20 flex flex-col gap-4">
                                     {/* 라운드 시작 버튼 (Round 2까지만) */}
-                                    {!isRoundInProgress && !isRoundStarting && currentRound < 2 && (
+                                    {!isFinishingRound && !isRoundInProgress && !isRoundStarting && currentRound < 2 && (
                                       <button
                                         onClick={() => handleStartRound(currentRound + 1)}
                                         disabled={isRoundStarting}
@@ -2151,7 +2182,7 @@ export default function ShadowingRoom() {
                                     )}
 
                                     {/* Round 2 완료 후 버튼 */}
-                                    {!isRoundInProgress && currentRound === 2 && (
+                                    {!isFinishingRound && !isRoundInProgress && currentRound === 2 && (
                                       <button
                                         onClick={handleFinishRoom}
                                         className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-full font-semibold text-lg transition-all flex items-center gap-2"
@@ -2168,7 +2199,7 @@ export default function ShadowingRoom() {
                                   <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-4">
                                     <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
                                     <p className="text-white text-xl font-semibold">
-                                      라운드 시작을 기다리는 중입니다
+                                      {isFinishingRound ? '라운드 종료 처리 중...' : '라운드 시작을 기다리는 중입니다'}
                                     </p>
                                   </div>
                                 )}
