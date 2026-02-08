@@ -62,7 +62,7 @@ const ShadowingProgressChart = () => {
         const response = await getShadowingPracticeHistory()
         if (response.data.success && response.data.data) {
           // 날짜순으로 정렬 (오래된 순)
-          const sortedData = [...response.data.data.last5].sort(
+          const sortedData = [...response.data.data].sort(
             (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
           )
           setData(sortedData)

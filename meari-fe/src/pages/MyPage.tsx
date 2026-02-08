@@ -594,7 +594,7 @@ const MyPage = () => {
         onLogout={handleLogout}
       />
 
-      <main className='flex-1 bg-white ml-64'>
+      <main className='flex-1 bg-white ml-64 min-w-0'>
         {renderContent()}
       </main>
     </div>
