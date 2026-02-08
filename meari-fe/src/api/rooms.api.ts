@@ -360,6 +360,23 @@ export const startRound = async (
   return response;
 };
 
+// --- Finish Round (라운드 종료) ---
+export interface FinishRoundData {
+  message: string;
+}
+
+export type FinishRoundResponse = AxiosResponse<ApiResponse<FinishRoundData>>;
+
+export const finishRound = async (
+  roomId: number,
+  round: number
+): Promise<FinishRoundResponse> => {
+  const response = await axiosInstance.post<ApiResponse<FinishRoundData>>(
+    `/rooms/${roomId}/rounds/${round}/finish`
+  );
+  return response;
+};
+
 // --- Finish Room (방 종료 - 처음으로 돌아가기) ---
 export interface FinishRoomData {
   message: string;

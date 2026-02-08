@@ -10,7 +10,8 @@
       "Bash(pnpm build:*)",
       "Bash(pnpm exec tsc:*)",
       "Bash(git checkout:*)",
-      "mcp__sequential-thinking__sequentialthinking"
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(git add:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
