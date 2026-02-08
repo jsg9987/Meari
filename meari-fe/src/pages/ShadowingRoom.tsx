@@ -471,6 +471,11 @@ export default function ShadowingRoom() {
         setCurrentRound(message.round);
         setIsRoundInProgress(true);
         setIsRoundStarting(false);
+
+        // Round 2에서는 한국어 자막만 허용
+        if (message.round >= 2) {
+          setSelectedNationality("KR");
+        }
       }
 
       // server_time까지 대기
@@ -2219,6 +2224,7 @@ export default function ShadowingRoom() {
             onNationalityChange={setSelectedNationality}
             isSubtitleEnabled={isSubtitleEnabled}
             onToggleSubtitle={toggleSubtitle}
+            isNationalityLocked={currentRound >= 2}
           />
         </div>
       </div>
