@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
  * ⚠️ 개발/테스트 환경에서만 사용
  */
 @Slf4j
-@Tag(name = "Analysis Test", description = "분석 테스트 API (개발용)")
+@Tag(name = "🛠️ Development", description = "개발/테스트 전용 API")
 @RestController
 @RequestMapping("/api/v1/analysis/test")
 @RequiredArgsConstructor

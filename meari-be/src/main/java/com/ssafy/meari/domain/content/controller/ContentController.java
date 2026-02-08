@@ -29,7 +29,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/contents")
 @RequiredArgsConstructor
-@Tag(name = "Content", description = "콘텐츠 조회 API")
+@Tag(name = "1. Content", description = "콘텐츠 조회 API")
 public class ContentController {
 
     private final ContentService contentService;

@@ -19,7 +19,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
-@Tag(name = "Report", description = "쉐도잉 분석 리포트 API")
+@Tag(name = "6. Report", description = "쉐도잉 분석 리포트 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/reports")
