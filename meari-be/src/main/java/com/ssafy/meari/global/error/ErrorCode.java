@@ -64,6 +64,7 @@ public enum ErrorCode {
     NOT_FOUND_ROOM(HttpStatus.NOT_FOUND, "존재하지 않는 방입니다."),
     NOT_FOUND_THEME(HttpStatus.NOT_FOUND, "존재하지 않는 테마입니다."),
     NOT_FOUND_CONTENT(HttpStatus.NOT_FOUND, "존재하지 않는 콘텐츠입니다."),
+    NO_CONTENT_IN_THEME(HttpStatus.NOT_FOUND, "해당 테마에 콘텐츠가 존재하지 않습니다."),
     NOT_FOUND_ROLE(HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."),
     NOT_FOUND_SENTENCE(HttpStatus.NOT_FOUND, "존재하지 않는 문장입니다."),
     NOT_FOUND_MEMBER_ROOM(HttpStatus.NOT_FOUND, "방에 참여하지 않은 사용자입니다."),

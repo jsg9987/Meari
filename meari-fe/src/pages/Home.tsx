@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Header, { type HomeTab } from '../components/common/Header'
 import ShadowingPanel from '../components/home/ShadowingPanel'
-import CopikPanel from '../components/home/KopicPanel'
+import KopicPanel from '../components/home/KopicPanel'
 import DailyStudyPanel from '../components/home/DailyStudyPanel'
 import ThemeSidebar from '../components/home/ThemeSidebar'
 import { getThemes, type Theme } from '../api/contents.api'
@@ -31,7 +31,7 @@ const Home = () => {
       return <ShadowingPanel selectedTheme={selectedTheme} />
     }
     if (activeTab === 'copik') {
-      return <CopikPanel />
+      return <KopicPanel />
     }
     return <DailyStudyPanel />
   }

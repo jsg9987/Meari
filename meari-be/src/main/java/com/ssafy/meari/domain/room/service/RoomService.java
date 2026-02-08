@@ -36,6 +36,7 @@ import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -105,6 +106,62 @@ public class RoomService {
         // Redis에 참여자 추가 및 멤버→방 매핑
         roomSessionService.addMember(room.getRoomId(), memberId);
         roomSessionService.setMemberRoom(memberId, room.getRoomId());
+
+        return RoomResponse.from(room, 1);
+    }
+
+    /**
+     * 빠른 방 생성 (테마 배너 클릭)
+     * 테마 ID만 받아 랜덤 콘텐츠를 선택하고 자동으로 방을 생성합니다.
+     */
+    @Transactional
+    public RoomResponse createQuickRoom(Long themeId, Long memberId) {
+        log.info("빠른 방 생성 시작: memberId={}, themeId={}", memberId, themeId);
+
+        // 회원 조회
+        Member owner = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+
+        // 테마 조회
+        Theme theme = themeRepository.findById(themeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_THEME));
+
+        // 해당 테마의 콘텐츠 목록 조회 및 랜덤 선택
+        List<Content> contents = contentRepository.findByTheme_ThemeId(themeId);
+        if (contents.isEmpty()) {
+            throw new BusinessException(ErrorCode.NO_CONTENT_IN_THEME);
+        }
+        int randomIndex = ThreadLocalRandom.current().nextInt(contents.size());
+        Content selectedContent = contents.get(randomIndex);
+
+        // 자동 제목 생성
+        String title = theme.getName() + " 테마 같이 공부해요~";
+
+        // 방 생성 (비밀번호 없음, maxPeople은 콘텐츠 기준)
+        Room room = Room.builder()
+                .owner(owner)
+                .theme(theme)
+                .title(title)
+                .maxPeople(selectedContent.getMaxPeople())
+                .password(null)
+                .build();
+
+        room = roomRepository.save(room);
+        log.info("빠른 방 생성 완료: roomId={}, contentId={}", room.getRoomId(), selectedContent.getContentId());
+
+        // 방장 자동 입장 (MemberRoom)
+        MemberRoom memberRoom = MemberRoom.builder()
+                .room(room)
+                .member(owner)
+                .build();
+        memberRoomRepository.save(memberRoom);
+
+        // Redis에 참여자 추가 및 멤버→방 매핑
+        roomSessionService.addMember(room.getRoomId(), memberId);
+        roomSessionService.setMemberRoom(memberId, room.getRoomId());
+
+        // Redis에 콘텐츠 설정 (방 생성 즉시)
+        roomSessionService.setContent(room.getRoomId(), selectedContent.getContentId());
 
         return RoomResponse.from(room, 1);
     }

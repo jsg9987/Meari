@@ -7,27 +7,30 @@ type RoomCardProps = {
     status: string
     hasPassword: boolean
     contentTitle?: string
+    thumbnail?: string
     onClick: () => void
 }
 
-const RoomCard = ({ title, themeName, currentPeople, maxPeople, status, hasPassword, onClick }: RoomCardProps) => {
+const RoomCard = ({ title, themeName, currentPeople, maxPeople, status, hasPassword, thumbnail, onClick }: RoomCardProps) => {
     return (
         <div
             className='rounded-lg overflow-hidden bg-white cursor-pointer shadow-lg hover:shadow-xl hover:scale-[1.02] hover:ring-2 hover:ring-[#2D9CDB] transition-all duration-300'
             onClick={onClick}
         >
-            {/* 썸네일 영역 - 빈 플레이스홀더 */}
+            {/* 썸네일 영역 */}
             <div className='relative aspect-5/4 bg-[#1e3a5f]'>
+                {thumbnail && (
+                    <img
+                        src={thumbnail}
+                        alt={title}
+                        className='w-full h-full object-cover'
+                    />
+                )}
                 {/* 상단 라벨 영역 */}
                 <div className='absolute top-[13px] left-[13px] right-[13px]'>
                     <div className='inline-block bg-[#2D9CDB] text-white text-[13px] px-[9px] py-[4px] rounded'>
                         {themeName}
                     </div>
-                </div>
-
-                {/* 플레이스홀더 이미지 영역 */}
-                <div className='absolute bottom-0 right-0 w-[106px] h-[106px] opacity-30'>
-                    {/* 이미지 플레이스홀더 - 추후 테마 썸네일로 대체 */}
                 </div>
             </div>
 

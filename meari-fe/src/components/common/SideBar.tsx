@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LayoutDashboard, User, FileText, Settings, LogOut } from 'lucide-react'
-import logoWhite from '../../assets/images/common/logo-white.svg'
+import logoWhite from '../../assets/images/common/logo-white-2.svg'
 
 export type SideBarMenu = 'dashboard' | 'profile' | 'report' | 'settings'
 
