@@ -598,7 +598,7 @@ export const getShadowingReportsAPI = async (
   params.append('size', size.toString())
 
   const response = await axiosInstance.get<ApiResponse<ShadowingReportListData>>(
-    `/api/v1/shadowing/reports?${params.toString()}`
+    `/reports/shadowing?${params.toString()}`
   )
   return response
 }
@@ -694,7 +694,7 @@ export const getKopicReportsAPI = async (
   params.append('size', size.toString())
 
   const response = await axiosInstance.get<ApiResponse<KopicReportListData>>(
-    `/api/v1/kopic/reports?${params.toString()}`
+    `/kopic/reports?${params.toString()}`
   )
   return response
 }
@@ -901,7 +901,7 @@ export const getShadowingReportDetailAPI = async (
   reportId: number
 ): Promise<ShadowingReportDetailResponse> => {
   const response = await axiosInstance.get<ApiResponse<ShadowingReportDetail>>(
-    `/api/v1/reports/shadowing/${reportId}`
+    `/reports/shadowing/${reportId}`
   )
   return response
 }
