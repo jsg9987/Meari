@@ -40,7 +40,10 @@ public class RoomListResponse {
     @Schema(description = "생성 시간")
     private LocalDateTime createdAt;
 
-    public static RoomListResponse from(Room room, int currentPeople) {
+    @Schema(description = "썸네일 URL (대기중: 테마 썸네일, 진행중: 컨텐츠 썸네일)")
+    private String thumbnail;
+
+    public static RoomListResponse from(Room room, int currentPeople, String thumbnail) {
         return RoomListResponse.builder()
                 .roomId(room.getRoomId())
                 .title(room.getTitle())
@@ -50,6 +53,7 @@ public class RoomListResponse {
                 .status(room.getStatus())
                 .hasPassword(room.hasPassword())
                 .createdAt(room.getCreatedAt())
+                .thumbnail(thumbnail)
                 .build();
     }
 }
