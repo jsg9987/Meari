@@ -440,6 +440,32 @@ export function useRoomWebSocket({
     }
   }, [roomId, memberId, onError]);
 
+  // 녹음 완료 알림 전송
+  const sendRecordingComplete = useCallback((sentenceId: number, audioUrl: string) => {
+    if (!clientRef.current?.connected) {
+      console.warn('[WebSocket] Not connected, cannot send recording complete');
+      return;
+    }
+
+    try {
+      const payload = {
+        member_id: memberId,
+        sentence_id: sentenceId,
+        audio_url: audioUrl,
+      };
+
+      clientRef.current.publish({
+        destination: `/app/room/${roomId}/recording/complete`,
+        body: JSON.stringify(payload),
+      });
+
+      console.log(`[WebSocket] Recording complete sent for sentence ${sentenceId}`);
+    } catch (error) {
+      console.error('[WebSocket] Failed to send recording complete:', error);
+      onError?.(error as Error);
+    }
+  }, [roomId, memberId, onError]);
+
   // 컴포넌트 마운트 시 연결, 언마운트 시 해제
   useEffect(() => {
     connect();
@@ -459,5 +485,6 @@ export function useRoomWebSocket({
     assignRole,
     releaseRole,
     sendChatMessage,
+    sendRecordingComplete,
   };
 }

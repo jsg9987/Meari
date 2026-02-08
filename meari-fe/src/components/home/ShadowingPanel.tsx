@@ -8,12 +8,14 @@ import { getThemes, type Theme } from '../../api/contents.api'
 
 // 테마 목록은 API를 통해 가져옵니다.
 
+type ShadowingPanelProps = {
+  selectedTheme: string
+}
+
 // TODO: useEffect 4번 호출 버그 수정
-const ShadowingPanel = () => {
+const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
   const navigate = useNavigate()
-  const [themes, setThemes] = useState<string[]>(['전체'])
   const [themeData, setThemeData] = useState<Theme[]>([])
-  const [selectedTheme, setSelectedTheme] = useState<string>('전체')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState('')
   const [rooms, setRooms] = useState<RoomItem[]>([])
@@ -88,9 +90,7 @@ const ShadowingPanel = () => {
       try {
         const response = await getThemes()
         if (response.data.success && response.data.data) {
-          const fetchedThemes = response.data.data
-          setThemeData(fetchedThemes)
-          setThemes(['전체', ...fetchedThemes.map(t => t.name)])
+          setThemeData(response.data.data)
         }
       } catch (error) {
         console.error('Failed to load themes:', error)
@@ -113,6 +113,7 @@ const ShadowingPanel = () => {
     setNextCursor(null)
     setHasNext(true)
     fetchRooms(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTheme, debouncedSearchKeyword])
 
   // 무한 스크롤 Observer 설정
@@ -163,104 +164,169 @@ const ShadowingPanel = () => {
     }
   }
 
-  return (
-    <section>
-      {/* 타이틀 및 방 생성 버튼 */}
-      <div className='flex items-end justify-between mb-10'>
-        <div>
-          <h1 className='text-[1.65rem] font-bold text-gray-900 mb-2'>
-            쉐도잉 (Shadowing)
-          </h1>
-          <p className='text-[16px] text-gray-600'>
-            한국인의 음성을 실시간으로 따라하며 발음 정확도를 교정 받으세요.
-          </p>
-        </div>
-        <CreateRoomButton />
-      </div>
+    // 추천 콘텐츠 목업 데이터
+  const featuredContents = [
+    {
+      id: 1,
+      title: '그래서 쪼끔은 후회해?',
+      description: '한국어 일상 대화 쉐도잉 연습',
+      thumbnail: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800',
+      duration: '2:47',
+      themeName: '일상회화',
+    },
+    {
+      id: 2,
+      title: '식당에서 예약하기',
+      description: '전화로 식당 예약하는 대화 연습',
+      thumbnail: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
+      duration: '4:00',
+      themeName: '일상회화',
+    },
+    {
+      id: 3,
+      title: '메뉴 추천 받기',
+      description: '식당에서 직원에게 메뉴 추천을 받는 상황',
+      thumbnail: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800',
+      duration: '3:20',
+      themeName: '여행',
+    },
+  ]
 
-      {/* 필터 및 검색 */}
-      <div className='flex items-center justify-between mb-4'>
-        {/* 테마 필터 */}
-        <div className='flex items-center gap-[8px]'>
-          {themes.map((theme) => (
-            <button
-              key={theme}
-              type='button'
-              onClick={() => setSelectedTheme(theme)}
-              className={`px-[18px] py-[7px] rounded-full text-[13px] font-medium transition-colors ${selectedTheme === theme
-                ? 'border-2 border-[#2D9CDB] text-[#2D9CDB] bg-white'
-                : 'border border-gray-300 text-gray-600 bg-white hover:border-[#2D9CDB] hover:text-[#2D9CDB]'
-                }`}
+  return (
+    <section className='px-8 py-6'>
+        {/* 추천 콘텐츠 섹션 */}
+        <div className='mb-8'>
+          <div className='flex items-center justify-between mb-4'>
+            <h2 className='text-xl font-bold text-gray-900'>쉐도잉 콘텐츠</h2>
+            <CreateRoomButton />
+          </div>
+          <div className='flex gap-4 h-100'>
+            {/* 왼쪽 큰 사진 */}
+            <div
+              className='flex-1 relative rounded-xl overflow-hidden shadow-lg cursor-pointer group'
+              onClick={() => console.log('Selected:', featuredContents[0].id)}
             >
-              {theme}
-            </button>
-          ))}
+              <img
+                src={featuredContents[0].thumbnail}
+                alt={featuredContents[0].title}
+                className='w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
+              />
+              <div className='absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-black/50'></div>
+              <div className='absolute bottom-0 left-0 right-0 p-6 text-white'>
+                <div className='flex items-center gap-3 mb-3'>
+                  <span className='px-4 py-1.5 bg-[oklch(0.63_0.12_232)] rounded-full text-sm font-bold'>
+                    {featuredContents[0].themeName}
+                  </span>
+                  <span className='px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium'>
+                    {featuredContents[0].duration}
+                  </span>
+                </div>
+                <h3 className='text-3xl font-extrabold mb-2'>{featuredContents[0].title}</h3>
+                <p className='text-lg text-gray-100'>{featuredContents[0].description}</p>
+              </div>
+            </div>
+
+            {/* 오른쪽 세로 두 개 */}
+            <div className='flex flex-col gap-4 w-95'>
+              {featuredContents.slice(1, 3).map((content) => (
+                <div
+                  key={content.id}
+                  className='flex-1 relative rounded-xl overflow-hidden shadow-lg cursor-pointer group'
+                  onClick={() => console.log('Selected:', content.id)}
+                >
+                  <img
+                    src={content.thumbnail}
+                    alt={content.title}
+                    className='w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
+                  />
+                  <div className='absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-black/50'></div>
+                  <div className='absolute bottom-0 left-0 right-0 p-4 text-white'>
+                    <div className='flex items-center gap-2 mb-2'>
+                      <span className='px-3 py-1 bg-[oklch(0.63_0.12_232)] rounded-full text-xs font-bold'>
+                        {content.themeName}
+                      </span>
+                      <span className='px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full text-xs font-medium'>
+                        {content.duration}
+                      </span>
+                    </div>
+                    <h3 className='text-lg font-bold mb-1'>{content.title}</h3>
+                    <p className='text-sm text-gray-200 line-clamp-1'>{content.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 검색창 */}
-        <div className='relative'>
-          <input
-            type='text'
-            value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            placeholder='search'
-            className='w-[250px] px-[18px] py-[7px] pr-11 border border-gray-300 rounded-full text-[13px] focus:outline-none focus:ring-2 focus:ring-[#2D9CDB] focus:border-transparent'
-          />
-          <svg
-            className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400'
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </div>
-      </div>
-
-      {/* 방 목록 그리드 */}
-      {isInitialLoading ? (
-        <div className='grid grid-cols-4 gap-x-[18px] gap-y-[24px]'>
-          {[...Array(4)].map((_, index) => (
-            <div key={index} className='bg-white rounded-lg overflow-hidden shadow-md border border-gray-100'>
-              {/* 썸네일 스켈레톤 */}
-              <div className='aspect-video animate-shimmer' />
-              {/* 정보 스켈레톤 */}
-              <div className='p-4 space-y-3'>
-                <div className='h-5 animate-shimmer rounded' />
-                <div className='h-4 animate-shimmer rounded w-4/5' />
-                <div className='flex items-center justify-between pt-2'>
-                  <div className='h-4 animate-shimmer rounded w-16' />
-                  <div className='h-4 animate-shimmer rounded w-12' />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : rooms.length === 0 ? (
-        <div className='text-center py-20 text-gray-500'>방이 없습니다.</div>
-      ) : (
-        <div className='grid grid-cols-4 gap-x-[18px] gap-y-[24px]'>
-          {rooms.map((room, index) => (
-            <RoomCard
-              key={`${room.room_id}-${index}`}
-              roomId={room.room_id}
-              title={room.title}
-              contentTitle={room.content_title}
-              currentPeople={room.current_people}
-              hasPassword={room.has_password}
-              onClick={() => handleRoomClick(room)}
+        <div className='flex items-center justify-between mb-6'>
+          <h2 className='text-xl font-bold text-gray-900'>쉐도잉 방 목록</h2>
+          <div className='relative'>
+            <input
+              type='text'
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              placeholder='search'
+              className='w-[250px] px-[18px] py-[7px] pr-11 border border-gray-300 rounded-full text-[13px] focus:outline-none focus:ring-2 focus:ring-[#2D9CDB] focus:border-transparent'
             />
-          ))}
-          {/* 무한 스크롤 타겟 및 하단 로딩 표시 */}
-          <div ref={observerTarget} className="h-10 w-full col-span-4 flex items-center justify-center">
-            {isFetchingNextPage && <div className="text-gray-400 text-sm">추가 방 불러오는 중...</div>}
+            <svg
+              className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400'
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
           </div>
         </div>
-      )}
+
+        {/* 방 목록 그리드 */}
+        {isInitialLoading ? (
+          <div className='grid grid-cols-4 gap-x-[18px] gap-y-[24px]'>
+            {[...Array(4)].map((_, index) => (
+              <div key={index} className='bg-white rounded-lg overflow-hidden shadow-md border border-gray-100'>
+                {/* 썸네일 스켈레톤 */}
+                <div className='aspect-video animate-shimmer' />
+                {/* 정보 스켈레톤 */}
+                <div className='p-4 space-y-3'>
+                  <div className='h-5 animate-shimmer rounded' />
+                  <div className='h-4 animate-shimmer rounded w-4/5' />
+                  <div className='flex items-center justify-between pt-2'>
+                    <div className='h-4 animate-shimmer rounded w-16' />
+                    <div className='h-4 animate-shimmer rounded w-12' />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : rooms.length === 0 ? (
+          <div className='text-center py-20 text-gray-500'>방이 없습니다.</div>
+        ) : (
+          <div className='grid grid-cols-4 gap-x-[18px] gap-y-[24px]'>
+            {rooms.map((room, index) => (
+              <RoomCard
+                key={`${room.room_id}-${index}`}
+                roomId={room.room_id}
+                title={room.title}
+                themeName={room.theme_name}
+                contentTitle={room.content_title}
+                currentPeople={room.current_people}
+                maxPeople={room.max_people}
+                status={room.status}
+                hasPassword={room.has_password}
+                onClick={() => handleRoomClick(room)}
+              />
+            ))}
+            {/* 무한 스크롤 타겟 및 하단 로딩 표시 */}
+            <div ref={observerTarget} className="h-10 w-full col-span-4 flex items-center justify-center">
+              {isFetchingNextPage && <div className="text-gray-400 text-sm">추가 방 불러오는 중...</div>}
+            </div>
+          </div>
+        )}
 
       {/* 비밀번호 모달 */}
       {isPasswordModalOpen && (

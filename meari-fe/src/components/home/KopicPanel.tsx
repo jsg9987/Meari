@@ -109,7 +109,7 @@ const KopicPanel = () => {
   const currentThemeName = themes.find(t => t.theme_id === selectedTheme)?.name || ''
 
   return (
-    <section>
+    <section className='px-8 py-6'>
       {/* 타이틀 및 시작 버튼 */}
       <div className='flex items-end justify-between mb-10'>
         <div>
@@ -134,7 +134,7 @@ const KopicPanel = () => {
         {stepCards.map((card) => (
           <div
             key={card.id}
-            className='bg-white rounded-lg p-[9px] shadow-sm border border-gray-100 relative overflow-hidden h-48'
+            className='bg-white rounded-lg p-2.25 shadow-sm border border-gray-100 relative overflow-hidden h-48'
           >
             {/* 배지 (시안 스타일: 어두운 배경 + 전구 아이콘) */}
             <div className='inline-flex items-center gap-1.5 mb-3 px-[9px] py-[4px] rounded bg-[#001C27] relative z-10'>

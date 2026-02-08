@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import illustratorCard from '../../assets/images/daily/Illustrator-card.svg'
 import illustratorCard1 from '../../assets/images/daily/Illustrator-card-1.svg'
+import DailyActivityHeatmap from '../mypage/DailyActivityHeatmap'
 
 const CARDS = [
   {
@@ -36,8 +37,6 @@ const CARDS = [
   }
 ]
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
 const DailyStudyPanel = () => {
   const navigate = useNavigate()
   const [activeCard, setActiveCard] = useState<number>(0)
@@ -68,7 +67,7 @@ const DailyStudyPanel = () => {
   }
 
   return (
-    <section>
+    <section className='px-8 py-6'>
       <div className="flex items-end justify-between mb-10">
         <div>
           <h1 className="text-[1.65rem] font-bold text-gray-900 mb-2">일일 학습 (Daily)</h1>
@@ -78,49 +77,13 @@ const DailyStudyPanel = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg p-2 mb-4.5 border border-gray-100 shadow-sm">
-        <div className="flex mb-2 pl-8">
-          {MONTHS.map((month) => (
-            <div key={month} className="flex-1 text-xs text-gray-400 font-medium">
-              {month}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-1 mb-2">
-          <div className="flex flex-col justify-around text-[10px] text-gray-400 pr-2">
-            <span>M</span>
-            <span>W</span>
-            <span>F</span>
-            <span>S</span>
-          </div>
-
-          <div className="flex-1 h-[150px] bg-gray-50 rounded-lg border border-dashed border-gray-200 flex items-center justify-center">
-            <span className="text-gray-300 text-sm">캘린더 영역</span>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center px-2 pl-6">
-          <div className="flex gap-2">
-            <button className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">month</button>
-            <button className="px-2 py-1 text-xs rounded-full text-gray-400">date</button>
-          </div>
-          <div className="flex items-center gap-1 text-[10px] text-gray-400">
-            <span>less</span>
-            <div className="size-3 rounded-sm bg-[#E8F4FD]"></div>
-            <div className="size-3 rounded-sm bg-[#B3D9F7]"></div>
-            <div className="size-3 rounded-sm bg-[#6BB8F0]"></div>
-            <div className="size-3 rounded-sm bg-[#2F80ED]"></div>
-            <span>more</span>
-          </div>
-        </div>
-      </div>
+      <DailyActivityHeatmap className="w-full mb-4.5" />
 
       <div>
         <h2 className="text-xl font-bold text-gray-900 mb-3">콘텐츠 선택</h2>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-4">
         {CARDS.map((card, index) => {
           const isActive = activeCard === index
           return (
@@ -131,7 +94,7 @@ const DailyStudyPanel = () => {
                 relative rounded-2xl overflow-hidden cursor-pointer
                 transition-all duration-500 ease-out min-h-[300px]
                 ${getCardStyle(card, isActive)}
-                ${isActive ? 'flex-2' : 'flex-1'}
+                ${isActive ? 'flex-[2.5]' : 'flex-1'}
               `}
             >
               {isActive ? (
@@ -196,7 +159,7 @@ const DailyStudyPanel = () => {
                   <img
                     src={card.image}
                     alt="illustration"
-                    className="absolute right-4 bottom-4 w-[100px] pointer-events-none opacity-90"
+                    className="absolute right-4 bottom-4 w-25 pointer-events-none opacity-90"
                   />
                 </div>
               )}
