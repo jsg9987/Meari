@@ -30,6 +30,7 @@ public enum ErrorCode {
     CSV_INVALID_HEADER(HttpStatus.BAD_REQUEST, "CSV 헤더가 올바르지 않습니다."),
     CSV_INVALID_DATA_TYPE(HttpStatus.BAD_REQUEST, "CSV 데이터 타입이 올바르지 않습니다."),
     CSV_EMPTY_FILE(HttpStatus.BAD_REQUEST, "빈 CSV 파일입니다."),
+    INVALID_ROLE_FOR_CONTENT(HttpStatus.BAD_REQUEST, "해당 콘텐츠에 속하지 않는 역할입니다."),
 
     // Unauthorized Error: 401
     UNAUTHORIZED_MEMBER(HttpStatus.UNAUTHORIZED, "인증되지 않은 사용자입니다."),
