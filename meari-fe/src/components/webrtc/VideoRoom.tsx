@@ -29,7 +29,7 @@ export default function VideoRoom({ sessionName, nickname, autoJoin = true }: Vi
       <div className="flex flex-col items-center justify-center min-h-100 gap-4">
         <p className="text-gray-400">세션에 참여하려면 버튼을 클릭하세요</p>
         <button
-          onClick={join}
+          onClick={() => join()}
           className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           참여하기
@@ -55,7 +55,7 @@ export default function VideoRoom({ sessionName, nickname, autoJoin = true }: Vi
           <p className="text-sm mt-1">{error}</p>
         </div>
         <button
-          onClick={join}
+          onClick={() => join()}
           className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           다시 시도

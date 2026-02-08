@@ -1,7 +1,9 @@
 package com.ssafy.meari.domain.report.controller;
 
+import com.ssafy.meari.domain.report.dto.response.KopicTotalReportListItemResponse;
 import com.ssafy.meari.domain.report.dto.response.ShadowingReportDetailResponse;
 import com.ssafy.meari.domain.report.dto.response.ShadowingReportListItemResponse;
+import com.ssafy.meari.domain.report.service.KopicReportService;
 import com.ssafy.meari.domain.report.service.ShadowingReportService;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
 import com.ssafy.meari.global.common.ApiResponse;
@@ -27,6 +29,7 @@ import java.time.ZoneId;
 public class ReportController {
 
     private final ShadowingReportService shadowingReportService;
+    private final KopicReportService kopicReportService;
 
     @Operation(summary = "쉐도잉 리포트 목록 조회", description = "커서 기반 페이징으로 쉐도잉 리포트 목록을 조회합니다.")
     @GetMapping("/shadowing")
@@ -63,6 +66,31 @@ public class ReportController {
         log.info("쉐도잉 리포트 상세 조회 요청: reportId={}, memberId={}", reportId, memberId);
 
         ShadowingReportDetailResponse response = shadowingReportService.getShadowingReportDetail(reportId, memberId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "코픽 통합 리포트 목록 조회", description = "커서 기반 페이징으로 코픽 통합 리포트 목록을 조회합니다.")
+    @GetMapping("/kopic")
+    public ResponseEntity<ApiResponse<CursorPageResponse<KopicTotalReportListItemResponse>>> getKopicTotalReportListWithPagination(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @Parameter(description = "커서 (이전 페이지 마지막 created_at의 ms 변환값)")
+            @RequestParam(required = false) Long cursor,
+            @Parameter(description = "페이지 크기 (기본값: 10)")
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Long memberId = userDetails.getMember().getMemberId();
+        log.info("코픽 통합 리포트 목록 조회 요청: memberId={}, cursor={}, size={}", memberId, cursor, size);
+
+        // cursor (timestamp ms) → LocalDateTime 변환
+        LocalDateTime cursorDateTime = cursor != null
+                ? LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(cursor),
+                ZoneId.systemDefault())
+                : null;
+
+        CursorPageResponse<KopicTotalReportListItemResponse> response =
+                kopicReportService.getKopicTotalReportList(memberId, cursorDateTime, size);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

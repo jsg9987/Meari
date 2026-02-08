@@ -145,7 +145,12 @@ export function useVideoRoom({
     return arr;
   }, [publisher, subscribers, connections, nickname, memberId]);
 
-  const join = useCallback(async () => {
+  const join = useCallback(async (initialSettings?: {
+    audioEnabled?: boolean;
+    videoEnabled?: boolean;
+    audioDeviceId?: string;
+    videoDeviceId?: string;
+  }) => {
     if (statusRef.current === "connecting" || statusRef.current === "connected") {
       console.log("Already connecting or connected, skipping join");
       return;
@@ -255,10 +260,10 @@ export function useVideoRoom({
       }
 
       const pub = await OV.initPublisherAsync(undefined, {
-        audioSource: undefined,
-        videoSource: undefined,
-        publishAudio: true,
-        publishVideo: true,
+        audioSource: initialSettings?.audioDeviceId || undefined,
+        videoSource: initialSettings?.videoDeviceId || undefined,
+        publishAudio: initialSettings?.audioEnabled ?? true,
+        publishVideo: initialSettings?.videoEnabled ?? true,
         resolution: "640x480",
         frameRate: 30,
         insertMode: "APPEND",
@@ -267,6 +272,8 @@ export function useVideoRoom({
       setSession(mySession);
       setPublisher(pub);
       publisherRef.current = pub;
+      setIsAudioEnabled(initialSettings?.audioEnabled ?? true);
+      setIsVideoEnabled(initialSettings?.videoEnabled ?? true);
 
       // autoPublish가 true면 즉시 publish
       if (autoPublish) {

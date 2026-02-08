@@ -26,6 +26,7 @@ type VideoControlsProps = {
   onVideoDeviceChange?: (deviceId: string) => void;
   isSubtitleEnabled?: boolean;
   onToggleSubtitle?: () => void;
+  isNationalityLocked?: boolean;
 };
 
 export default function VideoControls({
@@ -45,6 +46,7 @@ export default function VideoControls({
   onVideoDeviceChange,
   isSubtitleEnabled = true,
   onToggleSubtitle,
+  isNationalityLocked = false,
 }: VideoControlsProps) {
   const [isNationalityOpen, setIsNationalityOpen] = useState(false);
   const [isAudioDeviceOpen, setIsAudioDeviceOpen] = useState(false);
@@ -285,12 +287,12 @@ export default function VideoControls({
         <button
           onClick={onToggleSubtitle}
           disabled={!isRoomConnected}
-          className={`flex items-center gap-2 p-3 rounded-lg border border-gray-300 transition-colors ${
+          className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
             !isRoomConnected
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300"
               : isSubtitleEnabled
-              ? "bg-gray-100 hover:bg-gray-200 text-gray-800"
-              : "bg-red-50 hover:bg-red-100 text-red-600 border-red-300"
+              ? "bg-red-50 hover:bg-red-100 text-red-600 border-red-300"
+              : "bg-gray-100 hover:bg-gray-200 text-gray-500 border-gray-300"
           }`}
           title={isSubtitleEnabled ? "자막 끄기" : "자막 켜기"}
         >
@@ -300,25 +302,25 @@ export default function VideoControls({
         {/* Nationality Selector */}
         <div className="relative" ref={nationalityRef}>
           <button
-            onClick={() => setIsNationalityOpen(!isNationalityOpen)}
-            disabled={!isRoomConnected}
+            onClick={() => !isNationalityLocked && setIsNationalityOpen(!isNationalityOpen)}
+            disabled={!isRoomConnected || isNationalityLocked}
             className={`flex items-center gap-2 p-3 rounded-lg border border-gray-300 transition-colors ${
-              !isRoomConnected
+              !isRoomConnected || isNationalityLocked
                 ? "bg-gray-100 cursor-not-allowed opacity-50"
                 : "bg-gray-100 hover:bg-gray-200"
             }`}
-            title="국적 선택"
+            title={isNationalityLocked ? "이 라운드에서는 변경할 수 없습니다" : "자막 언어 선택"}
           >
             <img
               src={getFlagImage(selectedNationality)}
               alt={getNationalityLabel(selectedNationality)}
-              className="w-6 h-6 rounded-full object-cover"
+              className={`w-6 h-6 rounded-full object-cover ${isNationalityLocked ? "grayscale" : ""}`}
             />
             <ChevronUp size={16} className="text-gray-400"/>
           </button>
 
           {/* Dropdown (opens upward) */}
-          {isNationalityOpen && (
+          {isNationalityOpen && !isNationalityLocked && (
             <div className="absolute bottom-full mb-2 left-0 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden z-10 min-w-32">
               <button
                 onClick={() => handleNationalitySelect("KR")}

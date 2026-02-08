@@ -89,12 +89,15 @@ export default function ShadowingRoom() {
   const [volume, setVolume] = useState(100);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
+  const mediaSettingsRef = useRef<{
+    audioEnabled: boolean;
+    videoEnabled: boolean;
+    audioDeviceId?: string;
+    videoDeviceId?: string;
+  } | null>(null);
   const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(true);
   const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false); // 비밀번호 입력 모달 상태
-  const [password, setPassword] = useState(""); // 입력한 비밀번호
-  const [passwordError, setPasswordError] = useState(""); // 비밀번호 에러 메시지
 
   // 영상 재생 관련 상태
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -468,6 +471,11 @@ export default function ShadowingRoom() {
         setCurrentRound(message.round);
         setIsRoundInProgress(true);
         setIsRoundStarting(false);
+
+        // Round 2에서는 한국어 자막만 허용
+        if (message.round >= 2) {
+          setSelectedNationality("KR");
+        }
       }
 
       // server_time까지 대기
@@ -695,44 +703,52 @@ export default function ShadowingRoom() {
           }
         }
 
-        // 방장이면 enterRoom API 호출 없이 바로 입장
-        if (userInfo?.memberId === response.data.data.owner_id) {
+        // 이미 멤버 목록에 있으면 (방장이거나, Home에서 joinRoom으로 이미 입장한 경우) 바로 입장
+        const isAlreadyMember = response.data.data.members.some(
+          m => m.member_id === userInfo?.memberId
+        );
+
+        if (isAlreadyMember) {
+          // 멤버 목록 및 준비 상태 동기화
+          previousMembersRef.current = response.data.data.members.map(m => ({
+            member_id: m.member_id,
+            nickname: m.nickname,
+          }));
+          const initialReadyState: Record<number, boolean> = {};
+          response.data.data.members.forEach(m => {
+            initialReadyState[m.member_id] = m.is_ready;
+          });
+          setParticipantsReady(initialReadyState);
           setIsEntered(true);
         } else {
-          // 방장이 아니면 비밀번호 확인
-          if (response.data.data.has_password) {
-            // 비밀번호가 있는 방이면 모달 표시
-            setIsPasswordModalOpen(true);
-          } else {
-            // 비밀번호가 없는 방이면 바로 입장
-            try {
-              await enterRoom(Number(roomId), {});
+          // 아직 입장하지 않은 경우 enterRoom API 호출
+          try {
+            await enterRoom(Number(roomId), {});
 
-              // 입장 후 최신 방 정보 다시 가져오기 (members 업데이트)
-              const updatedResponse = await getRoomDetail(Number(roomId));
-              if (updatedResponse.data.success && updatedResponse.data.data) {
-                setRoomData(updatedResponse.data.data);
+            // 입장 후 최신 방 정보 다시 가져오기 (members 업데이트)
+            const updatedResponse = await getRoomDetail(Number(roomId));
+            if (updatedResponse.data.success && updatedResponse.data.data) {
+              setRoomData(updatedResponse.data.data);
 
-                // 업데이트된 멤버 목록 저장 및 준비 상태 동기화
-                previousMembersRef.current = updatedResponse.data.data.members.map(m => ({
-                  member_id: m.member_id,
-                  nickname: m.nickname,
-                }));
+              // 업데이트된 멤버 목록 저장 및 준비 상태 동기화
+              previousMembersRef.current = updatedResponse.data.data.members.map(m => ({
+                member_id: m.member_id,
+                nickname: m.nickname,
+              }));
 
-                // 멤버들의 준비 상태를 participantsReady에 반영
-                const initialReadyState: Record<number, boolean> = {};
-                updatedResponse.data.data.members.forEach(m => {
-                  initialReadyState[m.member_id] = m.is_ready;
-                });
-                setParticipantsReady(initialReadyState);
-              }
-
-              setIsEntered(true);
-            } catch (error) {
-              console.error('Failed to enter room:', error);
-              alert('방 입장에 실패했습니다.');
-              navigate('/');
+              // 멤버들의 준비 상태를 participantsReady에 반영
+              const initialReadyState: Record<number, boolean> = {};
+              updatedResponse.data.data.members.forEach(m => {
+                initialReadyState[m.member_id] = m.is_ready;
+              });
+              setParticipantsReady(initialReadyState);
             }
+
+            setIsEntered(true);
+          } catch (error) {
+            console.error('Failed to enter room:', error);
+            alert('방 입장에 실패했습니다.');
+            navigate('/');
           }
         }
       } catch (error) {
@@ -1420,46 +1436,6 @@ export default function ShadowingRoom() {
     };
   }, [videoReady, isPlaying, currentRound, roleSegments, mySelectedRoleId, roomId, memberId, publisher, isAudioEnabled]);
 
-  // 비밀번호 입력 후 방 입장
-  const handlePasswordSubmit = async () => {
-    if (!roomId || !password.trim()) {
-      setPasswordError('비밀번호를 입력해주세요');
-      return;
-    }
-
-    try {
-      setPasswordError('');
-      await enterRoom(Number(roomId), { password });
-
-      // 입장 후 최신 방 정보 다시 가져오기 (members 업데이트)
-      const updatedResponse = await getRoomDetail(Number(roomId));
-      if (updatedResponse.data.success && updatedResponse.data.data) {
-        setRoomData(updatedResponse.data.data);
-
-        // 업데이트된 멤버 목록 저장 및 준비 상태 동기화
-        previousMembersRef.current = updatedResponse.data.data.members.map(m => ({
-          member_id: m.member_id,
-          nickname: m.nickname,
-        }));
-
-        // 멤버들의 준비 상태를 participantsReady에 반영
-        const initialReadyState: Record<number, boolean> = {};
-        updatedResponse.data.data.members.forEach(m => {
-          initialReadyState[m.member_id] = m.is_ready;
-        });
-        setParticipantsReady(initialReadyState);
-      }
-
-      setIsEntered(true);
-      setIsPasswordModalOpen(false);
-      setPassword('');
-    } catch (error) {
-      console.error('Failed to enter room:', error);
-      const errorMessage = (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || '방 입장에 실패했습니다.';
-      setPasswordError(errorMessage);
-    }
-  };
-
   // 모든 참가자가 준비 완료되었는지 확인
   // getRoomDetail의 members 배열 기반으로 인원 수 계산 (WebRTC와 분리)
   const totalParticipants = roomData?.members.length || 0;
@@ -1484,7 +1460,7 @@ export default function ShadowingRoom() {
     if (DISABLE_WEBRTC) return;
 
     if (isEntered && roomId && status === 'idle' && isMediaChecked) {
-      join();
+      join(mediaSettingsRef.current || undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEntered, roomId, status, isMediaChecked]);
@@ -1634,28 +1610,14 @@ export default function ShadowingRoom() {
     audioDeviceId?: string,
     videoDeviceId?: string
   ) => {
-    setIsMediaChecked(true);
+    // 미디어 설정을 ref에 저장 → join() 호출 시 전달됨
+    mediaSettingsRef.current = { audioEnabled, videoEnabled, audioDeviceId, videoDeviceId };
 
     // 선택된 장치 정보 저장
     setSelectedAudioDevice(audioDeviceId);
     setSelectedVideoDevice(videoDeviceId);
 
-    // 오디오/비디오 설정 반영
-    if (publisher) {
-      publisher.publishAudio(audioEnabled);
-      publisher.publishVideo(videoEnabled);
-    }
-
-    // useVideoRoom 상태 동기화 (VideoControls 반영용)
-    // 초기값이 true이므로 false인 경우만 토글
-    if (!audioEnabled && isAudioEnabled) {
-      toggleAudio();
-    }
-    if (!videoEnabled && isVideoEnabled) {
-      toggleVideo();
-    }
-
-    // publishStream() 호출 제거 - useEffect에서 status === 'connected'일 때 자동 호출됨
+    setIsMediaChecked(true);
   };
 
   // 방 정보 로딩 중
@@ -1735,7 +1697,7 @@ export default function ShadowingRoom() {
               <div className="flex flex-col items-center gap-3">
                 <p className="text-red-500">{error}</p>
                 <button
-                  onClick={join}
+                  onClick={() => join()}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   다시 시도
@@ -2225,7 +2187,7 @@ export default function ShadowingRoom() {
             {/* WebRTC 비활성화 시 참여하기 버튼 숨김 */}
             {!DISABLE_WEBRTC && status === "idle" && (
               <button
-                onClick={join}
+                onClick={() => join()}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 참여하기
@@ -2262,6 +2224,7 @@ export default function ShadowingRoom() {
             onNationalityChange={setSelectedNationality}
             isSubtitleEnabled={isSubtitleEnabled}
             onToggleSubtitle={toggleSubtitle}
+            isNationalityLocked={currentRound >= 2}
           />
         </div>
       </div>
@@ -2399,57 +2362,6 @@ export default function ShadowingRoom() {
           )}
         </div>
       </div>
-
-      {/* 비밀번호 입력 모달 */}
-      {isPasswordModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">비밀번호 입력</h2>
-            <p className="text-sm text-gray-600 mb-4">이 방은 비밀번호로 보호되어 있습니다.</p>
-
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setPasswordError('');
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handlePasswordSubmit();
-                }
-              }}
-              placeholder="비밀번호를 입력하세요"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-              autoFocus
-            />
-
-            {passwordError && (
-              <p className="text-sm text-red-600 mb-4">{passwordError}</p>
-            )}
-
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setIsPasswordModalOpen(false);
-                  setPassword('');
-                  setPasswordError('');
-                  navigate('/');
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={handlePasswordSubmit}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                입장하기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 컨텐츠 선택 모달 */}
       {isContentSelectOpen && (

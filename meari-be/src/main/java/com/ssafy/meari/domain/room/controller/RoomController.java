@@ -4,6 +4,7 @@ import com.ssafy.meari.domain.room.dto.request.ContentSelectRequest;
 import com.ssafy.meari.domain.room.dto.request.GameStartRequest;
 import com.ssafy.meari.domain.room.dto.request.RoleConfirmRequest;
 import com.ssafy.meari.domain.room.dto.request.RoundStartRequest;
+import com.ssafy.meari.domain.room.dto.request.QuickRoomCreateRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomCreateRequest;
 import com.ssafy.meari.domain.room.dto.request.RoomEnterRequest;
 import com.ssafy.meari.domain.room.dto.response.RoomDetailResponse;
@@ -41,6 +42,17 @@ public class RoomController {
     ) {
         Long memberId = userDetails.getMember().getMemberId();
         RoomResponse response = roomService.createRoom(request, memberId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "빠른 방 생성", description = "테마 배너 클릭 시 빠른 방 생성. 랜덤 콘텐츠가 자동 선택되고 방이 즉시 생성됩니다.")
+    @PostMapping("/quick")
+    public ResponseEntity<ApiResponse<RoomResponse>> createQuickRoom(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @Valid @RequestBody QuickRoomCreateRequest request
+    ) {
+        Long memberId = userDetails.getMember().getMemberId();
+        RoomResponse response = roomService.createQuickRoom(request.getThemeId(), memberId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 

@@ -211,6 +211,94 @@ class RoomServiceTest {
     }
 
     @Nested
+    @DisplayName("빠른 방 생성")
+    class CreateQuickRoom {
+
+        @Test
+        @DisplayName("성공 - 테마의 랜덤 콘텐츠로 방 생성")
+        void createQuickRoom_Success() {
+            // Given
+            Content content = Content.builder()
+                    .theme(testTheme)
+                    .title("테스트 콘텐츠")
+                    .videoUrl("https://example.com/video.mp4")
+                    .thumbnailUrl("https://example.com/thumb.jpg")
+                    .maxPeople(3)
+                    .totalDuration(new java.math.BigDecimal("120.000"))
+                    .build();
+            ReflectionTestUtils.setField(content, "contentId", 10L);
+
+            Room quickRoom = Room.builder()
+                    .owner(testMember)
+                    .theme(testTheme)
+                    .title("일상 회화 테마 같이 공부해요~")
+                    .maxPeople(3)
+                    .password(null)
+                    .build();
+            ReflectionTestUtils.setField(quickRoom, "roomId", 100L);
+
+            given(memberRepository.findById(1L)).willReturn(Optional.of(testMember));
+            given(themeRepository.findById(1L)).willReturn(Optional.of(testTheme));
+            given(contentRepository.findByTheme_ThemeId(1L)).willReturn(List.of(content));
+            given(roomRepository.save(any(Room.class))).willReturn(quickRoom);
+
+            // When
+            RoomResponse response = roomService.createQuickRoom(1L, 1L);
+
+            // Then
+            assertThat(response).isNotNull();
+            assertThat(response.getRoomId()).isEqualTo(100L);
+            assertThat(response.getTitle()).isEqualTo("일상 회화 테마 같이 공부해요~");
+            assertThat(response.getMaxPeople()).isEqualTo(3);
+            assertThat(response.getHasPassword()).isFalse();
+            assertThat(response.getStatus()).isEqualTo(RoomStatus.WAITING);
+            verify(memberRoomRepository).save(any(MemberRoom.class));
+            verify(roomSessionService).addMember(100L, 1L);
+            verify(roomSessionService).setMemberRoom(1L, 100L);
+            verify(roomSessionService).setContent(100L, 10L);
+        }
+
+        @Test
+        @DisplayName("실패 - 존재하지 않는 회원")
+        void createQuickRoom_Fail_MemberNotFound() {
+            // Given
+            given(memberRepository.findById(999L)).willReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.createQuickRoom(1L, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_MEMBER);
+        }
+
+        @Test
+        @DisplayName("실패 - 존재하지 않는 테마")
+        void createQuickRoom_Fail_ThemeNotFound() {
+            // Given
+            given(memberRepository.findById(1L)).willReturn(Optional.of(testMember));
+            given(themeRepository.findById(999L)).willReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.createQuickRoom(999L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_THEME);
+        }
+
+        @Test
+        @DisplayName("실패 - 테마에 콘텐츠가 없음")
+        void createQuickRoom_Fail_NoContentInTheme() {
+            // Given
+            given(memberRepository.findById(1L)).willReturn(Optional.of(testMember));
+            given(themeRepository.findById(1L)).willReturn(Optional.of(testTheme));
+            given(contentRepository.findByTheme_ThemeId(1L)).willReturn(Collections.emptyList());
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.createQuickRoom(1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NO_CONTENT_IN_THEME);
+        }
+    }
+
+    @Nested
     @DisplayName("방 목록 조회")
     class GetRoomList {
 

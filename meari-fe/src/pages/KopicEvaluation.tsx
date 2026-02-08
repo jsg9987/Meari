@@ -71,7 +71,7 @@ export default function KopicEvaluation() {
     const audioChunksRef = useRef<Blob[]>([])
 
     // 타이머 상태
-    const [timeRemaining, setTimeRemaining] = useState(60)
+    const [timeRemaining, setTimeRemaining] = useState(30)
     const [isTimerRunning, setIsTimerRunning] = useState(false)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -225,7 +225,7 @@ export default function KopicEvaluation() {
 
                 setIsRecording(false)
                 setIsTimerRunning(false)
-                setTimeRemaining(60)
+                setTimeRemaining(30)
 
                 const isLastQuestion = currentIndex >= totalSentences - 1
                 if (isLastQuestion) {
@@ -278,7 +278,7 @@ export default function KopicEvaluation() {
     }
 
     // 타이머 진행률 계산
-    const timerProgress = (timeRemaining / 60) * 100
+    const timerProgress = (timeRemaining / 30) * 100
 
     if (isLoading) {
         return (
@@ -439,7 +439,7 @@ export default function KopicEvaluation() {
                 <div className="text-center pt-2">
                     {!isRecording ? (
                         <p className="text-sm text-gray-400">
-                            "녹음 시작하기"를 누르면 60초 타이머가 시작됩니다.
+                            "녹음 시작하기"를 누르면 30초 타이머가 시작됩니다.
                         </p>
                     ) : (
                         <p className="text-sm text-gray-400">
