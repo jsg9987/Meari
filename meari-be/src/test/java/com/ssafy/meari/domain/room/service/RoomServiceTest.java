@@ -82,6 +82,9 @@ class RoomServiceTest {
     @Mock
     private com.ssafy.meari.domain.report.repository.ShadowingReportRepository shadowingReportRepository;
 
+    @Mock
+    private com.ssafy.meari.domain.analysis.service.AnalysisService analysisService;
+
     private Member testMember;
     private Theme testTheme;
     private Room testRoom;

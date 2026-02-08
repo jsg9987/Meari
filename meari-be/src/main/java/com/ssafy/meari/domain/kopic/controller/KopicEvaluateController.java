@@ -23,7 +23,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-@Tag(name = "Kopic Evaluate", description = "코픽 발화 분석 API")
+@Tag(name = "4. Kopic", description = "코픽 문장 및 평가 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/kopic")

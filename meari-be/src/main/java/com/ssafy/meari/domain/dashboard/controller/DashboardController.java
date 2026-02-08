@@ -25,7 +25,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/dashboard")
 @RequiredArgsConstructor
-@Tag(name = "Dashboard", description = "대시보드 API")
+@Tag(name = "5. Dashboard", description = "대시보드 API")
 @Slf4j
 public class DashboardController {
 
