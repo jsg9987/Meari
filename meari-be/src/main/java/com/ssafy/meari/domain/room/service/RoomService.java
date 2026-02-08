@@ -130,11 +130,32 @@ public class RoomService {
             rooms = rooms.subList(0, size);
         }
 
-        // 각 방의 현재 인원 수 조회
+        // 각 방의 현재 인원 수 및 썸네일 조회
         List<RoomListResponse> contents = rooms.stream()
                 .map(room -> {
                     int currentPeople = (int) memberRoomRepository.countByRoom_RoomId(room.getRoomId());
-                    return RoomListResponse.from(room, currentPeople);
+
+                    // 상태에 따라 썸네일 결정
+                    String thumbnail;
+                    if (room.getStatus() == RoomStatus.WAITING) {
+                        // 대기중: 테마 썸네일
+                        thumbnail = room.getTheme().getThemeUrl();
+                    } else if (room.getStatus() == RoomStatus.IN_PROGRESS) {
+                        // 진행중: 컨텐츠 썸네일 (없으면 테마 썸네일로 fallback)
+                        Long contentId = roomSessionService.getContentId(room.getRoomId());
+                        if (contentId != null) {
+                            thumbnail = contentRepository.findById(contentId)
+                                    .map(Content::getThumbnailUrl)
+                                    .orElse(room.getTheme().getThemeUrl());
+                        } else {
+                            thumbnail = room.getTheme().getThemeUrl();
+                        }
+                    } else {
+                        // COMPLETED 등 기타 상태: 테마 썸네일
+                        thumbnail = room.getTheme().getThemeUrl();
+                    }
+
+                    return RoomListResponse.from(room, currentPeople, thumbnail);
                 })
                 .collect(Collectors.toList());
 
