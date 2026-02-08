@@ -14,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "WebRTC Room", description = "WebRTC 화상통화 방 관리 API")
+@Tag(name = "8. WebRTC", description = "화상통화 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/rooms")

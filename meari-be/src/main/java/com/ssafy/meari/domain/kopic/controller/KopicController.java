@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@Tag(name = "Kopic", description = "코픽 문장 API")
+@Tag(name = "4. Kopic", description = "코픽 문장 및 평가 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/contents")

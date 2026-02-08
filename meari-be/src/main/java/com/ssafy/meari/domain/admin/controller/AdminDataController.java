@@ -23,7 +23,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-@Tag(name = "Admin", description = "관리자 데이터 관리 API")
+@Tag(name = "9. Admin", description = "관리자 전용 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/admin")

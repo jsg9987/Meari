@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Content Preprocess", description = "Content 전처리 API (관리자용)")
+@Tag(name = "9. Admin", description = "관리자 전용 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/admin/content")

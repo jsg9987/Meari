@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "SoloPractice", description = "혼자연습 API")
+@Tag(name = "3. Solo Practice", description = "혼자연습 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/solo-practice")
