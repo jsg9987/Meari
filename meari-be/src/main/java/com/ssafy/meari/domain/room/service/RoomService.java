@@ -130,10 +130,18 @@ public class RoomService {
             rooms = rooms.subList(0, size);
         }
 
-        // 각 방의 현재 인원 수 및 썸네일 조회
+        // 각 방의 현재 Redis 기준 인원 수 및 썸네일 조회
         List<RoomListResponse> contents = rooms.stream()
                 .map(room -> {
-                    int currentPeople = (int) memberRoomRepository.countByRoom_RoomId(room.getRoomId());
+                    Set<String> members = roomSessionService.getMembers(room.getRoomId());
+                    int currentPeople = (members != null) ? members.size() : 0;
+
+                    // Redis에 아무도 없는데 방이 아직 열려있으면 → 좀비방 정리
+                    if (currentPeople == 0 && room.getStatus() != RoomStatus.COMPLETED) {
+                        room.updateStatus(RoomStatus.COMPLETED);
+                        memberRoomRepository.deleteAllByRoom_RoomId(room.getRoomId());
+                        log.info("좀비방 정리: roomId={}", room.getRoomId());
+                    }
 
                     // 상태에 따라 썸네일 결정
                     String thumbnail;
