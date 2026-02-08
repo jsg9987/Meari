@@ -60,18 +60,13 @@ export const changeMyPagePassword = async (
 }
 
 export interface UploadProfileImagePayload {
-  fileName: string
-  contentType: string
-  fileSize: number
-  width: number
-  height: number
+  file_extension: string
 }
 
 export interface UploadProfileImageData {
-  uploadUrl: string
-  s3Key: string
-  profileUrl: string
-  expiresIn: number
+  upload_url: string
+  s3_key: string
+  expires_in: number
 }
 
 export type UploadProfileImageResponse = AxiosResponse<ApiResponse<UploadProfileImageData>>
@@ -80,14 +75,14 @@ export const requestProfileImageUploadUrl = async (
   payload: UploadProfileImagePayload
 ): Promise<UploadProfileImageResponse> => {
   const response = await axiosInstance.post<ApiResponse<UploadProfileImageData>>(
-    '/member/profile-image/upload-url',
+    '/s3/profile-image/presigned-url',
     payload
   )
   return response
 }
 
 export interface ConfirmProfileImagePayload {
-  profileUrl: string
+  profile_url: string
 }
 
 export type ConfirmProfileImageResponse = AxiosResponse<ApiResponse<null>>
@@ -95,7 +90,7 @@ export type ConfirmProfileImageResponse = AxiosResponse<ApiResponse<null>>
 export const confirmProfileImage = async (
   payload: ConfirmProfileImagePayload
 ): Promise<ConfirmProfileImageResponse> => {
-  const response = await axiosInstance.post<ApiResponse<null>>('/member/profile-image', payload)
+  const response = await axiosInstance.patch<ApiResponse<null>>('/mypage/profile-image', payload)
   return response
 }
 
