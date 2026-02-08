@@ -1101,36 +1101,10 @@ public class RoomService {
         }
 
         // 4. 부분 완료 멤버 분석 요청
-        Set<String> members = roomSessionService.getMembers(roomId);
-        if (members != null) {
-            int requestCount = 0;
-            for (String memberIdStr : members) {
-                Long targetMemberId = Long.parseLong(memberIdStr);
-
-                // 이미 모든 문장 완료한 경우는 건너뛰기 (이미 분석 요청됨)
-                if (roomSessionService.isMemberRecordingsComplete(roomId, round, targetMemberId)) {
-                    continue;
-                }
-
-                // 1개 이상 녹음했으면 분석 요청
-                Long recordedCount = roomSessionService.getRecordedCount(roomId, round, targetMemberId);
-                if (recordedCount != null && recordedCount > 0) {
-                    log.info("라운드 종료: 부분 완료 멤버 분석 요청 - memberId={}, recordedCount={}",
-                            targetMemberId, recordedCount);
-                    analysisService.requestMemberAnalysis(roomId, round, targetMemberId);
-                    requestCount++;
-                } else {
-                    log.warn("라운드 종료: 녹음 없음 - memberId={}", targetMemberId);
-                }
-            }
-            log.info("부분 완료 멤버 분석 요청 완료: roomId={}, round={}, 요청 수={}",
-                    roomId, round, requestCount);
-        }
+        requestPartialCompletionAnalysis(roomId, round);
 
         // 5. 완료 플래그 설정 및 브로드캐스트
-        roomSessionService.markRoundCompleted(roomId, round);
-        RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+        broadcastRoundComplete(roomId, round, currentPhase);
 
         log.info("라운드 종료 처리 완료: roomId={}, round={}", roomId, round);
     }
@@ -1177,6 +1151,7 @@ public class RoomService {
 
     /**
      * 녹음 완료 타임아웃 체크
+     * 타임아웃 시 강제 종료 (브로드캐스트만 수행)
      * @return true: 타임아웃 처리됨, false: 타임아웃 아님
      */
     private boolean checkAndHandleRecordingTimeout(Long roomId, Integer round, GamePhase currentPhase) {
@@ -1192,41 +1167,59 @@ public class RoomService {
 
         long currentTime = System.currentTimeMillis();
         if (currentTime > timeoutMillis) {
-            log.warn("녹음 완료 타임아웃: roomId={}, round={}, 경과시간={}ms",
-                    roomId, round, currentTime - (timeoutMillis - 40000));
+            log.warn("녹음 완료 타임아웃: roomId={}, round={}, 강제 종료 처리", roomId, round);
 
-            // 부분 완료 멤버도 분석 요청
-            Set<String> members = roomSessionService.getMembers(roomId);
-            if (members != null) {
-                for (String memberIdStr : members) {
-                    Long memberId = Long.parseLong(memberIdStr);
-
-                    // 이미 모든 문장 완료한 경우는 건너뛰기 (이미 분석 요청됨)
-                    if (roomSessionService.isMemberRecordingsComplete(roomId, round, memberId)) {
-                        continue;
-                    }
-
-                    // 1개 이상 녹음했으면 분석 요청
-                    Long recordedCount = roomSessionService.getRecordedCount(roomId, round, memberId);
-                    if (recordedCount != null && recordedCount > 0) {
-                        log.info("타임아웃: 부분 완료 멤버 분석 요청 - memberId={}, recordedCount={}",
-                                memberId, recordedCount);
-                        analysisService.requestMemberAnalysis(roomId, round, memberId);
-                    }
-                }
-            }
-
-            // 완료 플래그 설정 (중복 처리 방지)
-            roomSessionService.markRoundCompleted(roomId, round);
-
-            // 강제로 완료 처리
-            RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
-            messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+            // 타임아웃 시에는 브로드캐스트만 수행 (부분 완료 처리는 finishRound에서만)
+            broadcastRoundComplete(roomId, round, currentPhase);
 
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * 부분 완료 멤버 분석 요청
+     * finishRound()에서만 호출됨
+     */
+    private void requestPartialCompletionAnalysis(Long roomId, Integer round) {
+        Set<String> members = roomSessionService.getMembers(roomId);
+        if (members == null) {
+            return;
+        }
+
+        int requestCount = 0;
+        for (String memberIdStr : members) {
+            Long targetMemberId = Long.parseLong(memberIdStr);
+
+            // 이미 모든 문장 완료한 경우는 건너뛰기 (이미 분석 요청됨)
+            if (roomSessionService.isMemberRecordingsComplete(roomId, round, targetMemberId)) {
+                continue;
+            }
+
+            // 1개 이상 녹음했으면 분석 요청
+            Long recordedCount = roomSessionService.getRecordedCount(roomId, round, targetMemberId);
+            if (recordedCount != null && recordedCount > 0) {
+                log.info("부분 완료 멤버 분석 요청 - memberId={}, recordedCount={}",
+                        targetMemberId, recordedCount);
+                analysisService.requestMemberAnalysis(roomId, round, targetMemberId);
+                requestCount++;
+            } else {
+                log.warn("녹음 없음 - memberId={}", targetMemberId);
+            }
+        }
+        log.info("부분 완료 멤버 분석 요청 완료: roomId={}, round={}, 요청 수={}", roomId, round, requestCount);
+    }
+
+    /**
+     * 라운드 완료 브로드캐스트
+     * finishRound() 및 타임아웃 처리에서 공통으로 호출
+     */
+    private void broadcastRoundComplete(Long roomId, Integer round, GamePhase currentPhase) {
+        roomSessionService.markRoundCompleted(roomId, round);
+        RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+        log.debug("라운드 완료 브로드캐스트: roomId={}, round={}", roomId, round);
     }
 
     /**
