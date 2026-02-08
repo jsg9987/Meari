@@ -93,6 +93,17 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
+    @Operation(summary = "멤버 강퇴", description = "방장이 특정 멤버를 강퇴합니다. WAITING 상태에서만 가능합니다.")
+    @DeleteMapping("/{roomId}/members/{memberId}")
+    public ResponseEntity<ApiResponse<Void>> kickMember(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @Parameter(description = "강퇴 대상 멤버 ID") @PathVariable Long memberId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        roomService.kickMember(roomId, memberId, userDetails.getMember().getMemberId());
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
     @Operation(summary = "동영상 선택", description = "학습할 동영상을 선택합니다. 방장만 가능하며, WAITING 단계에서만 가능합니다.")
     @PostMapping("/{roomId}/content")
     public ResponseEntity<ApiResponse<Void>> selectContent(
@@ -144,6 +155,17 @@ public class RoomController {
             @Valid @RequestBody RoundStartRequest request
     ) {
         roomService.startRound(roomId, request.getRound(), userDetails.getMember().getMemberId());
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
+    @Operation(summary = "라운드 종료", description = "방장이 라운드를 강제 종료하고 부분 완료 멤버도 분석 요청합니다.")
+    @PostMapping("/{roomId}/rounds/{round}/finish")
+    public ResponseEntity<ApiResponse<Void>> finishRound(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @Parameter(description = "라운드 번호 (1 또는 2)") @PathVariable Integer round,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        roomService.finishRound(roomId, round, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 

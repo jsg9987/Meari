@@ -14,6 +14,9 @@ import com.ssafy.meari.domain.room.entity.Room;
 import com.ssafy.meari.domain.room.entity.RoomStatus;
 import com.ssafy.meari.domain.room.repository.MemberRoomRepository;
 import com.ssafy.meari.domain.room.repository.RoomRepository;
+import com.ssafy.meari.domain.content.entity.Content;
+import com.ssafy.meari.domain.content.entity.Role;
+import com.ssafy.meari.domain.content.entity.Sentence;
 import com.ssafy.meari.domain.theme.entity.Theme;
 import com.ssafy.meari.domain.theme.repository.ThemeRepository;
 import com.ssafy.meari.global.error.ErrorCode;
@@ -209,12 +212,12 @@ class RoomServiceTest {
     class GetRoomList {
 
         @Test
-        @DisplayName("성공 - 전체 방 목록 조회")
+        @DisplayName("성공 - 전체 방 목록 조회 (Redis 기준 인원 수)")
         void getRoomList_Success_AllRooms() {
             // Given
             given(roomRepository.findAllRoomsWithCursor(any(), any(), any()))
                     .willReturn(List.of(testRoom));
-            given(memberRoomRepository.countByRoom_RoomId(1L)).willReturn(2L);
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1", "2"));
 
             // When
             CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 10);
@@ -231,7 +234,7 @@ class RoomServiceTest {
             // Given
             given(roomRepository.findRoomsWithCursor(eq(1L), any(), any(), any()))
                     .willReturn(List.of(testRoom));
-            given(memberRoomRepository.countByRoom_RoomId(1L)).willReturn(1L);
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));
 
             // When
             CursorPageResponse<RoomListResponse> response = roomService.getRoomList(1L, null, 10);
@@ -239,6 +242,7 @@ class RoomServiceTest {
             // Then
             assertThat(response).isNotNull();
             assertThat(response.getContents()).hasSize(1);
+            assertThat(response.getContents().get(0).getCurrentPeople()).isEqualTo(1);
         }
 
         @Test
@@ -255,7 +259,7 @@ class RoomServiceTest {
 
             given(roomRepository.findAllRoomsWithCursor(any(), any(), any()))
                     .willReturn(List.of(testRoom, room2));
-            given(memberRoomRepository.countByRoom_RoomId(anyLong())).willReturn(1L);
+            given(roomSessionService.getMembers(anyLong())).willReturn(java.util.Set.of("1"));
 
             // When
             CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 1);
@@ -264,6 +268,59 @@ class RoomServiceTest {
             assertThat(response.isHasNext()).isTrue();
             assertThat(response.getNextCursor()).isEqualTo(1L);
             assertThat(response.getContents()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("성공 - Redis 인원 0명인 WAITING 방은 좀비방으로 정리")
+        void getRoomList_Success_CleanupZombieRoom() {
+            // Given
+            Room zombieRoom = Room.builder()
+                    .owner(testMember)
+                    .theme(testTheme)
+                    .title("좀비 방")
+                    .maxPeople(4)
+                    .build();
+            ReflectionTestUtils.setField(zombieRoom, "roomId", 2L);
+            // 상태가 WAITING (기본값)
+
+            given(roomRepository.findAllRoomsWithCursor(any(), any(), any()))
+                    .willReturn(List.of(zombieRoom));
+            given(roomSessionService.getMembers(2L)).willReturn(java.util.Collections.emptySet());
+
+            // When
+            CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 10);
+
+            // Then
+            assertThat(response.getContents()).hasSize(1);
+            assertThat(response.getContents().get(0).getCurrentPeople()).isEqualTo(0);
+            assertThat(zombieRoom.getStatus()).isEqualTo(RoomStatus.COMPLETED);
+            verify(memberRoomRepository).deleteAllByRoom_RoomId(2L);
+        }
+
+        @Test
+        @DisplayName("성공 - 이미 COMPLETED인 방은 중복 정리하지 않음")
+        void getRoomList_Success_SkipAlreadyCompletedRoom() {
+            // Given
+            Room completedRoom = Room.builder()
+                    .owner(testMember)
+                    .theme(testTheme)
+                    .title("완료된 방")
+                    .maxPeople(4)
+                    .build();
+            ReflectionTestUtils.setField(completedRoom, "roomId", 3L);
+            completedRoom.updateStatus(RoomStatus.COMPLETED);
+
+            given(roomRepository.findAllRoomsWithCursor(any(), any(), any()))
+                    .willReturn(List.of(completedRoom));
+            given(roomSessionService.getMembers(3L)).willReturn(null);
+
+            // When
+            CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 10);
+
+            // Then
+            assertThat(response.getContents()).hasSize(1);
+            assertThat(response.getContents().get(0).getCurrentPeople()).isEqualTo(0);
+            verify(memberRoomRepository, never()).deleteAllByRoom_RoomId(3L);
         }
     }
 
@@ -922,17 +979,19 @@ class RoomServiceTest {
         }
 
         @Test
-        @DisplayName("실패 - 참여하지 않은 방")
-        void leaveRoom_Fail_NotMember() {
+        @DisplayName("성공 - 이미 퇴장된 멤버는 예외 없이 정상 종료")
+        void leaveRoom_Success_AlreadyLeft() {
             // Given
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(1L, 999L))
                     .willReturn(Optional.empty());
 
-            // When & Then
-            assertThatThrownBy(() -> roomService.leaveRoom(1L, 999L))
-                    .isInstanceOf(BusinessException.class)
-                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_MEMBER_ROOM);
+            // When
+            roomService.leaveRoom(1L, 999L);
+
+            // Then - 예외 없이 return, DB/Redis 정리 호출 안 됨
+            verify(memberRoomRepository, never()).delete(any());
+            verify(roomSessionService, never()).removeMember(anyLong(), anyLong());
         }
     }
 
@@ -1637,6 +1696,128 @@ class RoomServiceTest {
             assertThatThrownBy(() -> roomService.startRound(1L, 1, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROLES_NOT_CONFIRMED);
+        }
+    }
+
+    @Nested
+    @DisplayName("멤버 강퇴")
+    class KickMember {
+
+        private Member targetMember;
+
+        @BeforeEach
+        void setUp() {
+            targetMember = Member.builder()
+                    .email("target@test.com")
+                    .password("password")
+                    .nickname("강퇴대상")
+                    .build();
+            ReflectionTestUtils.setField(targetMember, "memberId", 2L);
+        }
+
+        @Test
+        @DisplayName("성공 - 방장이 멤버를 강퇴")
+        void kickMember_Success() {
+            // Given
+            MemberRoom targetMemberRoom = MemberRoom.builder()
+                    .room(testRoom)
+                    .member(targetMember)
+                    .build();
+
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(1L, 2L))
+                    .willReturn(Optional.of(targetMemberRoom));
+
+            // When
+            roomService.kickMember(1L, 2L, 1L);
+
+            // Then
+            verify(memberRoomRepository).delete(targetMemberRoom);
+            verify(roomSessionService).removeMember(1L, 2L);
+            verify(roomSessionService).clearMemberRoom(2L);
+            verify(roomSessionService).clearDisconnected(1L, 2L);
+
+            org.mockito.ArgumentCaptor<com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage> captor =
+                    org.mockito.ArgumentCaptor.forClass(com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage.class);
+            verify(messagingTemplate).convertAndSend(eq("/topic/room/1/state"), captor.capture());
+
+            com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage sentMessage = captor.getValue();
+            assertThat(sentMessage.getType()).isEqualTo("MEMBER_KICKED");
+            assertThat(sentMessage.getMemberId()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("실패 - 존재하지 않는 방")
+        void kickMember_Fail_RoomNotFound() {
+            // Given
+            given(roomRepository.findById(999L)).willReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.kickMember(999L, 2L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_ROOM);
+
+            verify(memberRoomRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("실패 - WAITING 상태가 아닌 방에서 강퇴 시도")
+        void kickMember_Fail_RoomNotWaiting() {
+            // Given
+            testRoom.updateStatus(RoomStatus.IN_PROGRESS);
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.kickMember(1L, 2L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_WAITING);
+
+            verify(memberRoomRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("실패 - 방장이 아닌 유저가 강퇴 시도")
+        void kickMember_Fail_NotRoomOwner() {
+            // Given
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.kickMember(1L, 2L, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
+
+            verify(memberRoomRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("실패 - 방장이 자기 자신을 강퇴 시도")
+        void kickMember_Fail_CannotKickSelf() {
+            // Given
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.kickMember(1L, 1L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CANNOT_KICK_SELF);
+
+            verify(memberRoomRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("실패 - 방에 없는 유저를 강퇴 시도")
+        void kickMember_Fail_MemberNotInRoom() {
+            // Given
+            given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
+            given(memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(1L, 2L))
+                    .willReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> roomService.kickMember(1L, 2L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_MEMBER_ROOM);
+
+            verify(memberRoomRepository, never()).delete(any());
+            verify(roomSessionService, never()).removeMember(anyLong(), anyLong());
         }
     }
 

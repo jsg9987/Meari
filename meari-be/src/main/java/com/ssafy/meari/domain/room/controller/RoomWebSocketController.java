@@ -1,8 +1,5 @@
 package com.ssafy.meari.domain.room.controller;
 
-import java.time.LocalDateTime;
-import java.util.List;
-
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -19,8 +16,7 @@ import com.ssafy.meari.domain.room.dto.websocket.RoleReleaseMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoleSelectMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
 import com.ssafy.meari.domain.room.dto.websocket.WatchingCompleteMessage;
-import com.ssafy.meari.domain.room.entity.Chat;
-import com.ssafy.meari.domain.room.repository.ChatRepository;
+import com.ssafy.meari.domain.room.service.ChatService;
 import com.ssafy.meari.domain.room.service.RoomService;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
 
@@ -41,11 +37,10 @@ public class RoomWebSocketController {
     private final SimpMessagingTemplate messagingTemplate;
     private final RoomSessionService roomSessionService;
     private final RoomService roomService;
-    private final ChatRepository chatRepository;
+    private final ChatService chatService;
 
     private static final String TOPIC_STATE = "/topic/room/%d/state";
     private static final String TOPIC_CHAT = "/topic/room/%d/chat";
-    private static final int MAX_CHAT_COUNT = 100;
 
     /**
      * 준비 상태 토글
@@ -143,18 +138,8 @@ public class RoomWebSocketController {
         clearDisconnectedIfNeeded(roomId, message.getSenderId());
 
         try {
-            // Redis에 채팅 메시지 저장
-            Chat chat = Chat.builder()
-                    .roomId(roomId)
-                    .senderId(message.getSenderId())
-                    .nickname(message.getNickname())
-                    .message(message.getMessage())
-                    .timestamp(LocalDateTime.now())
-                    .build();
-            chatRepository.save(chat);
-
-            // 100개 초과 시 오래된 메시지 삭제
-            trimOldMessages(roomId);
+            // 채팅 메시지 저장 (Redis)
+            chatService.saveChat(roomId, message);
 
             // 전체 참여자에게 브로드캐스트
             broadcast(roomId, TOPIC_CHAT, message);
@@ -163,7 +148,6 @@ public class RoomWebSocketController {
 
         } catch (Exception e) {
             log.error("채팅 메시지 저장/브로드캐스트 실패: roomId={}, senderId={}", roomId, message.getSenderId(), e);
-            // 추후 채팅 전송 실패 시 에러 메시지를 발신자에게만 전송하는 기능 추가를 고려할 수 있다.
         }
     }
 
@@ -228,20 +212,6 @@ public class RoomWebSocketController {
         String destination = String.format(topicPattern, roomId);
         messagingTemplate.convertAndSend(destination, message);
         log.debug("브로드캐스트: destination={}", destination);
-    }
-
-    /**
-     * 방의 채팅 메시지가 MAX_CHAT_COUNT를 초과하면 오래된 순으로 삭제
-     */
-    private void trimOldMessages(Long roomId) {
-        List<Chat> chats = chatRepository.findByRoomIdOrderByTimestampAsc(roomId);
-
-        if (chats.size() > MAX_CHAT_COUNT) {
-            int deleteCount = chats.size() - MAX_CHAT_COUNT;
-            List<Chat> oldChats = chats.subList(0, deleteCount);
-            chatRepository.deleteAll(oldChats);
-            log.debug("오래된 채팅 메시지 삭제: roomId={}, 삭제 개수={}", roomId, deleteCount);
-        }
     }
 
     /**

@@ -38,7 +38,7 @@ const Home = () => {
 
   return (
     <div className='min-h-screen w-full bg-gray-50'>
-      <header className='w-full relative z-60'>
+      <header className='sticky top-0 w-full z-60'>
         <Header />
       </header>
 

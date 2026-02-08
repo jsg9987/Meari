@@ -30,6 +30,7 @@ public enum ErrorCode {
     CSV_INVALID_HEADER(HttpStatus.BAD_REQUEST, "CSV 헤더가 올바르지 않습니다."),
     CSV_INVALID_DATA_TYPE(HttpStatus.BAD_REQUEST, "CSV 데이터 타입이 올바르지 않습니다."),
     CSV_EMPTY_FILE(HttpStatus.BAD_REQUEST, "빈 CSV 파일입니다."),
+    INVALID_ROLE_FOR_CONTENT(HttpStatus.BAD_REQUEST, "해당 콘텐츠에 속하지 않는 역할입니다."),
 
     // Unauthorized Error: 401
     UNAUTHORIZED_MEMBER(HttpStatus.UNAUTHORIZED, "인증되지 않은 사용자입니다."),
@@ -52,6 +53,7 @@ public enum ErrorCode {
     NOT_ROOM_OWNER(HttpStatus.FORBIDDEN, "방장 권한이 필요합니다."),
     NOT_ROOM_MEMBER(HttpStatus.FORBIDDEN, "방 참여자가 아닙니다."),
     OWNER_CANNOT_READY(HttpStatus.BAD_REQUEST, "방장은 준비 상태를 변경할 수 없습니다."),
+    CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 강퇴할 수 없습니다."),
 
     // Not Found Error: 404
     NOT_FOUND(HttpStatus.NOT_FOUND, "Not Found "),
@@ -90,6 +92,7 @@ public enum ErrorCode {
     CONTENT_NOT_SELECTED(HttpStatus.CONFLICT, "동영상이 선택되지 않았습니다."),
     CONTENT_MISMATCH(HttpStatus.CONFLICT, "선택된 동영상과 일치하지 않습니다."),
     CONTENT_SELECT_ONLY_WAITING(HttpStatus.CONFLICT, "동영상은 대기 중일 때만 선택할 수 있습니다."),
+    CONTENT_MAX_PEOPLE_EXCEEDED(HttpStatus.CONFLICT, "현재 참여자 수가 해당 콘텐츠의 최대 인원을 초과합니다."),
     ROOM_ALREADY_STARTED(HttpStatus.CONFLICT, "이미 학습이 시작된 방입니다."),
     ROOM_ALREADY_CLOSED(HttpStatus.CONFLICT, "이미 종료된 방입니다."),
     ROLE_NOT_SELECTED(HttpStatus.CONFLICT, "모든 참여자가 역할을 선택하지 않았습니다."),
