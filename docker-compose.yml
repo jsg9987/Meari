@@ -148,6 +148,9 @@ services:
       CLOUD_AWS_PRESIGNED_URL_UPLOAD_EXPIRATION: 900
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       ANALYSIS_FASTAPI_URL: http://fastapi:8000
     ports:
       - "8080:8080"
@@ -192,6 +195,7 @@ services:
     volumes:
       # HuggingFace 모델 캐시 영구 저장 (첫 다운로드 후 재사용)
       - huggingface_cache:/root/.cache/huggingface
+      - ./logs/fastapi:/app/logs # 로그 저장
     networks:
       - meari-network
     depends_on:
