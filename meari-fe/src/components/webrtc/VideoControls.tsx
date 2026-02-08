@@ -43,7 +43,7 @@ export default function VideoControls({
   selectedVideoDevice,
   onAudioDeviceChange,
   onVideoDeviceChange,
-  isSubtitleEnabled = false,
+  isSubtitleEnabled = true,
   onToggleSubtitle,
 }: VideoControlsProps) {
   const [isNationalityOpen, setIsNationalityOpen] = useState(false);
