@@ -1,6 +1,6 @@
 package com.ssafy.meari.domain.room.service;
 
-import com.ssafy.meari.domain.analysis.service.AnalysisProducer;
+import com.ssafy.meari.domain.analysis.service.AnalysisService;
 import com.ssafy.meari.domain.content.entity.Content;
 import com.ssafy.meari.domain.content.entity.Role;
 import com.ssafy.meari.domain.content.entity.Sentence;
@@ -39,6 +39,7 @@ import java.util.*;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -62,7 +63,10 @@ public class RoomService {
     private final ShadowingReportRepository shadowingReportRepository;
     private final RoomSessionService roomSessionService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final AnalysisProducer analysisProducer;
+    private final AnalysisService analysisService;
+
+    @Value("${cloud.aws.s3.bucket}")
+    private String s3Bucket;
 
     /**
      * 방 생성
@@ -126,11 +130,32 @@ public class RoomService {
             rooms = rooms.subList(0, size);
         }
 
-        // 각 방의 현재 인원 수 조회
+        // 각 방의 현재 인원 수 및 썸네일 조회
         List<RoomListResponse> contents = rooms.stream()
                 .map(room -> {
                     int currentPeople = (int) memberRoomRepository.countByRoom_RoomId(room.getRoomId());
-                    return RoomListResponse.from(room, currentPeople);
+
+                    // 상태에 따라 썸네일 결정
+                    String thumbnail;
+                    if (room.getStatus() == RoomStatus.WAITING) {
+                        // 대기중: 테마 썸네일
+                        thumbnail = room.getTheme().getThemeUrl();
+                    } else if (room.getStatus() == RoomStatus.IN_PROGRESS) {
+                        // 진행중: 컨텐츠 썸네일 (없으면 테마 썸네일로 fallback)
+                        Long contentId = roomSessionService.getContentId(room.getRoomId());
+                        if (contentId != null) {
+                            thumbnail = contentRepository.findById(contentId)
+                                    .map(Content::getThumbnailUrl)
+                                    .orElse(room.getTheme().getThemeUrl());
+                        } else {
+                            thumbnail = room.getTheme().getThemeUrl();
+                        }
+                    } else {
+                        // COMPLETED 등 기타 상태: 테마 썸네일
+                        thumbnail = room.getTheme().getThemeUrl();
+                    }
+
+                    return RoomListResponse.from(room, currentPeople, thumbnail);
                 })
                 .collect(Collectors.toList());
 
@@ -296,6 +321,50 @@ public class RoomService {
         }
 
         log.info("방 퇴장 완료: roomId={}, memberId={}", roomId, memberId);
+    }
+
+    /**
+     * 멤버 강퇴 (방장 전용, WAITING 상태에서만)
+     */
+    @Transactional
+    public void kickMember(Long roomId, Long targetMemberId, Long requestMemberId) {
+        log.info("멤버 강퇴 요청: roomId={}, targetMemberId={}, requestMemberId={}", roomId, targetMemberId, requestMemberId);
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
+
+        // WAITING 상태 확인
+        if (room.getStatus() != RoomStatus.WAITING) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_WAITING);
+        }
+
+        // 방장 권한 확인
+        if (!room.getOwner().getMemberId().equals(requestMemberId)) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        // 자기 자신 강퇴 방지
+        if (requestMemberId.equals(targetMemberId)) {
+            throw new BusinessException(ErrorCode.CANNOT_KICK_SELF);
+        }
+
+        // 대상 멤버가 방에 참여 중인지 확인
+        MemberRoom memberRoom = memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(roomId, targetMemberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER_ROOM));
+
+        // MemberRoom DB 삭제
+        memberRoomRepository.delete(memberRoom);
+
+        // Redis 정리 (멤버/준비상태/역할 제거 + 멤버→방 매핑 제거 + Grace Period 마킹 제거)
+        roomSessionService.removeMember(roomId, targetMemberId);
+        roomSessionService.clearMemberRoom(targetMemberId);
+        roomSessionService.clearDisconnected(roomId, targetMemberId);
+
+        // 강퇴 알림 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.memberKicked(targetMemberId);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
+        log.info("멤버 강퇴 완료: roomId={}, targetMemberId={}", roomId, targetMemberId);
     }
 
     /**
@@ -792,9 +861,11 @@ public class RoomService {
         // 문장 녹음 완료 마킹
         roomSessionService.markRecordingComplete(roomId, round, message.getMemberId(), message.getSentenceId());
 
-        // 오디오 URL 저장
+        // 오디오 URL 저장 (S3 URL 형식으로 변환)
         if (message.getAudioUrl() != null) {
-            roomSessionService.saveAudioUrl(roomId, round, message.getMemberId(), message.getSentenceId(), message.getAudioUrl());
+            String s3Url = convertToS3Url(message.getAudioUrl());
+            roomSessionService.saveAudioUrl(roomId, round, message.getMemberId(), message.getSentenceId(), s3Url);
+            log.debug("오디오 URL 변환: {} -> {}", message.getAudioUrl(), s3Url);
         }
 
         // 이 멤버의 모든 문장이 완료되었는지 체크
@@ -802,7 +873,7 @@ public class RoomService {
             log.info("멤버 {} 모든 녹음 완료, 분석 요청", message.getMemberId());
 
             // 멤버별 발음 분석 요청 (비동기)
-            analysisProducer.requestMemberAnalysis(roomId, round, message.getMemberId());
+            analysisService.requestMemberAnalysis(roomId, round, message.getMemberId());
         }
 
         // 타임아웃 체크
@@ -1077,7 +1148,7 @@ public class RoomService {
                     if (recordedCount != null && recordedCount > 0) {
                         log.info("타임아웃: 부분 완료 멤버 분석 요청 - memberId={}, recordedCount={}",
                                 memberId, recordedCount);
-                        analysisProducer.requestMemberAnalysis(roomId, round, memberId);
+                        analysisService.requestMemberAnalysis(roomId, round, memberId);
                     }
                 }
             }
@@ -1093,5 +1164,27 @@ public class RoomService {
         }
 
         return false;
+    }
+
+    /**
+     * S3 URL 형식 변환
+     * - Key만 들어온 경우: s3://bucket/key 형식으로 변환
+     * - 이미 s3:// 또는 https:// 형식인 경우: 그대로 반환
+     *
+     * @param audioUrl 원본 URL 또는 S3 Key
+     * @return s3:// 형식의 URL
+     */
+    private String convertToS3Url(String audioUrl) {
+        if (audioUrl == null || audioUrl.isEmpty()) {
+            return audioUrl;
+        }
+
+        // 이미 s3:// 또는 https:// 형식이면 그대로 반환
+        if (audioUrl.startsWith("s3://") || audioUrl.startsWith("https://")) {
+            return audioUrl;
+        }
+
+        // Key만 있는 경우 s3:// 형식으로 변환
+        return "s3://" + s3Bucket + "/" + audioUrl;
     }
 }

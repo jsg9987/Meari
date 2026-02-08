@@ -24,8 +24,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import com.ssafy.meari.domain.room.dto.websocket.ChatMessage;
-import com.ssafy.meari.domain.room.entity.Chat;
-import com.ssafy.meari.domain.room.repository.ChatRepository;
+import com.ssafy.meari.domain.room.service.ChatService;
+import com.ssafy.meari.domain.room.service.RoomService;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,7 +42,10 @@ class RoomWebSocketControllerTest {
     private RoomSessionService roomSessionService;
 
     @Mock
-    private ChatRepository chatRepository;
+    private RoomService roomService;
+
+    @Mock
+    private ChatService chatService;
 
     private Long testRoomId;
     private Long testMemberId;
@@ -68,22 +71,14 @@ class RoomWebSocketControllerTest {
                     .timestamp(LocalDateTime.now())
                     .build();
 
-            Chat savedChat = Chat.builder()
-                    .roomId(testRoomId)
-                    .senderId(testMemberId)
-                    .nickname("테스터")
-                    .message("안녕하세요!")
-                    .timestamp(LocalDateTime.now())
-                    .build();
-
-            given(chatRepository.save(any(Chat.class))).willReturn(savedChat);
+            doNothing().when(chatService).saveChat(eq(testRoomId), any(ChatMessage.class));
             doNothing().when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
 
             // When
             roomWebSocketController.chat(testRoomId, message);
 
             // Then
-            verify(chatRepository).save(any(Chat.class));
+            verify(chatService).saveChat(eq(testRoomId), any(ChatMessage.class));
             verify(messagingTemplate).convertAndSend(
                     eq("/topic/room/1/chat"),
                     any(Object.class)
@@ -91,8 +86,8 @@ class RoomWebSocketControllerTest {
         }
 
         @Test
-        @DisplayName("성공 - 채팅 메시지 저장 시 올바른 데이터 전달")
-        void chat_Success_CorrectDataSaved() {
+        @DisplayName("성공 - ChatService에 올바른 데이터 전달")
+        void chat_Success_CorrectDataPassed() {
             // Given
             ChatMessage message = ChatMessage.builder()
                     .senderId(testMemberId)
@@ -101,28 +96,18 @@ class RoomWebSocketControllerTest {
                     .timestamp(LocalDateTime.now())
                     .build();
 
-            ArgumentCaptor<Chat> chatCaptor = ArgumentCaptor.forClass(Chat.class);
-            Chat savedChat = Chat.builder()
-                    .roomId(testRoomId)
-                    .senderId(testMemberId)
-                    .nickname("테스터")
-                    .message("테스트 메시지")
-                    .timestamp(LocalDateTime.now())
-                    .build();
-
-            when(chatRepository.save(chatCaptor.capture())).thenReturn(savedChat);
+            ArgumentCaptor<ChatMessage> chatCaptor = ArgumentCaptor.forClass(ChatMessage.class);
+            doNothing().when(chatService).saveChat(eq(testRoomId), chatCaptor.capture());
             doNothing().when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
 
             // When
             roomWebSocketController.chat(testRoomId, message);
 
             // Then
-            Chat capturedChat = chatCaptor.getValue();
-            assertThat(capturedChat.getRoomId()).isEqualTo(testRoomId);
-            assertThat(capturedChat.getSenderId()).isEqualTo(testMemberId);
-            assertThat(capturedChat.getNickname()).isEqualTo("테스터");
-            assertThat(capturedChat.getMessage()).isEqualTo("테스트 메시지");
-            assertThat(capturedChat.getTimestamp()).isNotNull();
+            ChatMessage capturedMessage = chatCaptor.getValue();
+            assertThat(capturedMessage.getSenderId()).isEqualTo(testMemberId);
+            assertThat(capturedMessage.getNickname()).isEqualTo("테스터");
+            assertThat(capturedMessage.getMessage()).isEqualTo("테스트 메시지");
         }
 
         @Test
@@ -135,13 +120,14 @@ class RoomWebSocketControllerTest {
                     .message("안녕하세요!")
                     .build();
 
-            given(chatRepository.save(any(Chat.class))).willThrow(new RuntimeException("Redis 연결 실패"));
+            doThrow(new RuntimeException("Redis 연결 실패"))
+                    .when(chatService).saveChat(eq(testRoomId), any(ChatMessage.class));
 
             // When
             roomWebSocketController.chat(testRoomId, message);
 
             // Then
-            verify(chatRepository).save(any(Chat.class));
+            verify(chatService).saveChat(eq(testRoomId), any(ChatMessage.class));
             verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
         }
     }

@@ -30,6 +30,7 @@ public enum ErrorCode {
     CSV_INVALID_HEADER(HttpStatus.BAD_REQUEST, "CSV 헤더가 올바르지 않습니다."),
     CSV_INVALID_DATA_TYPE(HttpStatus.BAD_REQUEST, "CSV 데이터 타입이 올바르지 않습니다."),
     CSV_EMPTY_FILE(HttpStatus.BAD_REQUEST, "빈 CSV 파일입니다."),
+    INVALID_ROLE_FOR_CONTENT(HttpStatus.BAD_REQUEST, "해당 콘텐츠에 속하지 않는 역할입니다."),
 
     // Unauthorized Error: 401
     UNAUTHORIZED_MEMBER(HttpStatus.UNAUTHORIZED, "인증되지 않은 사용자입니다."),
@@ -52,6 +53,7 @@ public enum ErrorCode {
     NOT_ROOM_OWNER(HttpStatus.FORBIDDEN, "방장 권한이 필요합니다."),
     NOT_ROOM_MEMBER(HttpStatus.FORBIDDEN, "방 참여자가 아닙니다."),
     OWNER_CANNOT_READY(HttpStatus.BAD_REQUEST, "방장은 준비 상태를 변경할 수 없습니다."),
+    CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 강퇴할 수 없습니다."),
 
     // Not Found Error: 404
     NOT_FOUND(HttpStatus.NOT_FOUND, "Not Found "),
@@ -71,6 +73,7 @@ public enum ErrorCode {
     NOT_FOUND_KOPIC_TOTAL_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 코픽 통합 리포트입니다."),
     NOT_FOUND_REPORT(HttpStatus.NOT_FOUND, "존재하지 않는 리포트입니다."),
     NOT_FOUND_AUDIO_URL(HttpStatus.NOT_FOUND, "녹음 파일 URL을 찾을 수 없습니다."),
+    NO_RECORDINGS_FOUND(HttpStatus.NOT_FOUND, "완료된 녹음이 없습니다."),
     OPENVIDU_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "OpenVidu 세션을 찾을 수 없습니다."),
 
     // Method Not Allowed Error: 405
@@ -111,6 +114,7 @@ public enum ErrorCode {
     OPENVIDU_DISCONNECT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 연결 강제 종료에 실패했습니다."),
     OPENVIDU_FETCH_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OpenVidu 세션 정보 조회에 실패했습니다."),
     GEMINI_ANALYSIS_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Gemini AI 분석에 실패했습니다."),
+    ANALYSIS_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "발음 분석에 실패했습니다."),
     CHAT_SAVE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 저장에 실패했습니다."),
     CHAT_BROADCAST_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "채팅 메시지 브로드캐스트에 실패했습니다."),
 
