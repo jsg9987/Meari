@@ -116,6 +116,13 @@ public class RoomStateMessage {
                 .build();
     }
 
+    public static RoomStateMessage memberKicked(Long memberId) {
+        return RoomStateMessage.builder()
+                .type("MEMBER_KICKED")
+                .memberId(memberId)
+                .build();
+    }
+
     public static RoomStateMessage gameFinished() {
         return RoomStateMessage.builder()
                 .type("GAME_FINISHED")

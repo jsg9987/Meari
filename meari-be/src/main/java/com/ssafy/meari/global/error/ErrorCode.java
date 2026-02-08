@@ -53,6 +53,7 @@ public enum ErrorCode {
     NOT_ROOM_OWNER(HttpStatus.FORBIDDEN, "방장 권한이 필요합니다."),
     NOT_ROOM_MEMBER(HttpStatus.FORBIDDEN, "방 참여자가 아닙니다."),
     OWNER_CANNOT_READY(HttpStatus.BAD_REQUEST, "방장은 준비 상태를 변경할 수 없습니다."),
+    CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 강퇴할 수 없습니다."),
 
     // Not Found Error: 404
     NOT_FOUND(HttpStatus.NOT_FOUND, "Not Found "),
