@@ -63,6 +63,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
 
     // 7. Spring boot
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -92,6 +94,9 @@ dependencies {
 
     // 12. csv 처리
     implementation 'org.apache.commons:commons-csv:1.10.0'
+
+    // 13. cloudinary 업로드
+    implementation 'com.cloudinary:cloudinary-http44:1.39.0'
 }
 
 tasks.named('test') {

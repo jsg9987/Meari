@@ -7,10 +7,36 @@ interface UseAudioRecorderOptions {
 
 export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecorderOptions = {}) {
   const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const isRecordingRef = useRef(false);
+  const sampleRateRef = useRef<number>(48000);
+
+  const cleanup = useCallback(() => {
+    // 오디오 노드 정리
+    if (sourceNodeRef.current) {
+      sourceNodeRef.current.disconnect();
+      sourceNodeRef.current = null;
+    }
+
+    if (audioWorkletNodeRef.current) {
+      audioWorkletNodeRef.current.disconnect();
+      audioWorkletNodeRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    // 스트림 정리
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  }, []);
 
   const startRecording = useCallback(async () => {
     try {
@@ -18,50 +44,56 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // MediaRecorder 생성 (WAV 또는 WebM)
-      const mimeType = MediaRecorder.isTypeSupported('audio/wav')
-        ? 'audio/wav'
-        : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : 'audio/ogg';
+      // AudioContext 생성
+      const audioContext = new AudioContext();
+      audioContextRef.current = audioContext;
+      sampleRateRef.current = audioContext.sampleRate;
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      // AudioWorklet 모듈 로드
+      await audioContext.audioWorklet.addModule('/audio-recorder-worklet.js');
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+      // AudioWorkletNode 생성
+      const workletNode = new AudioWorkletNode(audioContext, 'audio-recorder-worklet');
+      audioWorkletNodeRef.current = workletNode;
+
+      // 마이크 스트림을 AudioContext에 연결
+      const sourceNode = audioContext.createMediaStreamSource(stream);
+      sourceNodeRef.current = sourceNode;
+
+      // 소스 노드를 워크렛에 연결
+      sourceNode.connect(workletNode);
+      // destination에는 연결하지 않음 (마이크 피드백 방지)
+
+      // 워크렛에서 메시지 수신 처리
+      workletNode.port.onmessage = (event) => {
+        if (event.data.eventType === 'recordingComplete') {
+          const buffers: Float32Array[] = event.data.buffers;
+
+          // PCM 데이터를 WAV로 변환
+          const wavBlob = pcmToWav(buffers, sampleRateRef.current);
+          onRecordingComplete?.(wavBlob);
+
+          // 정리
+          cleanup();
         }
       };
 
-      mediaRecorder.onstop = async () => {
-        // 원본 MIME 타입 유지 (실제 녹음된 형식)
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+      // 녹음 시작 명령 전송
+      workletNode.port.postMessage({ command: 'start' });
 
-        // 항상 WAV로 변환
-        const wavBlob = await convertToWav(audioBlob);
-        onRecordingComplete?.(wavBlob);
-
-        // 스트림 정리
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
-      };
-
-      mediaRecorder.start();
       isRecordingRef.current = true;
       setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
+      cleanup();
       onError?.(error as Error);
     }
-  }, [onRecordingComplete, onError]);
+  }, [onRecordingComplete, onError, cleanup]);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecordingRef.current) {
-      mediaRecorderRef.current.stop();
+    if (audioWorkletNodeRef.current && isRecordingRef.current) {
+      // 녹음 중지 명령 전송
+      audioWorkletNodeRef.current.port.postMessage({ command: 'stop' });
       isRecordingRef.current = false;
       setIsRecording(false);
     }
@@ -74,38 +106,28 @@ export function useAudioRecorder({ onRecordingComplete, onError }: UseAudioRecor
   };
 }
 
-// WAV 변환 함수 (모든 형식을 WAV로 변환)
-async function convertToWav(blob: Blob): Promise<Blob> {
-  try {
-    // AudioContext를 사용하여 디코딩 후 WAV로 변환
-    const arrayBuffer = await blob.arrayBuffer();
-    const audioContext = new AudioContext();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+/**
+ * PCM 데이터 배열을 WAV Blob으로 변환
+ */
+function pcmToWav(buffers: Float32Array[], sampleRate: number): Blob {
+  // 모든 버퍼를 하나로 합치기
+  const totalLength = buffers.reduce((acc, buffer) => acc + buffer.length, 0);
+  const pcmData = new Float32Array(totalLength);
 
-    // WAV 파일 생성 (PCM 16bit)
-    const wavBlob = audioBufferToWav(audioBuffer);
-
-    await audioContext.close();
-
-    return wavBlob;
-  } catch (error) {
-    console.error('Failed to convert to WAV:', error);
-    throw error;
+  let offset = 0;
+  for (const buffer of buffers) {
+    pcmData.set(buffer, offset);
+    offset += buffer.length;
   }
-}
 
-// AudioBuffer를 WAV Blob으로 변환
-function audioBufferToWav(audioBuffer: AudioBuffer): Blob {
-  const numberOfChannels = audioBuffer.numberOfChannels;
-  const sampleRate = audioBuffer.sampleRate;
-  const format = 1; // PCM
+  // WAV 파일 생성
+  const numberOfChannels = 1; // Mono
   const bitDepth = 16;
+  const format = 1; // PCM
 
   const bytesPerSample = bitDepth / 8;
   const blockAlign = numberOfChannels * bytesPerSample;
-
-  const data = interleave(audioBuffer);
-  const dataLength = data.length * bytesPerSample;
+  const dataLength = pcmData.length * bytesPerSample;
   const buffer = new ArrayBuffer(44 + dataLength);
   const view = new DataView(buffer);
 
@@ -125,24 +147,9 @@ function audioBufferToWav(audioBuffer: AudioBuffer): Blob {
   view.setUint32(40, dataLength, true);
 
   // PCM 데이터 작성
-  floatTo16BitPCM(view, 44, data);
+  floatTo16BitPCM(view, 44, pcmData);
 
   return new Blob([buffer], { type: 'audio/wav' });
-}
-
-function interleave(audioBuffer: AudioBuffer): Float32Array {
-  const numberOfChannels = audioBuffer.numberOfChannels;
-  const length = audioBuffer.length * numberOfChannels;
-  const result = new Float32Array(length);
-
-  let offset = 0;
-  for (let i = 0; i < audioBuffer.length; i++) {
-    for (let channel = 0; channel < numberOfChannels; channel++) {
-      result[offset++] = audioBuffer.getChannelData(channel)[i];
-    }
-  }
-
-  return result;
 }
 
 function writeString(view: DataView, offset: number, string: string): void {
