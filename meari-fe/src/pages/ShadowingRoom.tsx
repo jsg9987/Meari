@@ -27,7 +27,7 @@ type LayoutMode = "narrow" | "grid" | "wide";
 // WebRTC 비활성화 플래그
 // true로 설정하면 WebRTC 없이 쉐도잉 기능만 테스트
 // ========================================
-const DISABLE_WEBRTC = true;
+const DISABLE_WEBRTC = false;
 
 // TODO: 헤더 변경, 비디오 타일 변경
 export default function ShadowingRoom() {
@@ -1697,7 +1697,7 @@ export default function ShadowingRoom() {
               <div className="flex flex-col items-center gap-3">
                 <p className="text-red-500">{error}</p>
                 <button
-                  onClick={join}
+                  onClick={() => join()}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   다시 시도
@@ -2187,7 +2187,7 @@ export default function ShadowingRoom() {
             {/* WebRTC 비활성화 시 참여하기 버튼 숨김 */}
             {!DISABLE_WEBRTC && status === "idle" && (
               <button
-                onClick={join}
+                onClick={() => join()}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 참여하기
