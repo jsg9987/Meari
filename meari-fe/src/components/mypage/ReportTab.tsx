@@ -286,7 +286,7 @@ const ReportTab = () => {
               : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
           }`}
         >
-          코픽(OPIc) 리포트
+          KOPIC 리포트
         </button>
       </div>
 
