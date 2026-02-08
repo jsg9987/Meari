@@ -212,12 +212,12 @@ class RoomServiceTest {
     class GetRoomList {
 
         @Test
-        @DisplayName("성공 - 전체 방 목록 조회")
+        @DisplayName("성공 - 전체 방 목록 조회 (Redis 기준 인원 수)")
         void getRoomList_Success_AllRooms() {
             // Given
             given(roomRepository.findAllRoomsWithCursor(any(), any(), any()))
                     .willReturn(List.of(testRoom));
-            given(memberRoomRepository.countByRoom_RoomId(1L)).willReturn(2L);
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1", "2"));
 
             // When
             CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 10);
@@ -234,7 +234,7 @@ class RoomServiceTest {
             // Given
             given(roomRepository.findRoomsWithCursor(eq(1L), any(), any(), any()))
                     .willReturn(List.of(testRoom));
-            given(memberRoomRepository.countByRoom_RoomId(1L)).willReturn(1L);
+            given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));
 
             // When
             CursorPageResponse<RoomListResponse> response = roomService.getRoomList(1L, null, 10);
@@ -242,6 +242,7 @@ class RoomServiceTest {
             // Then
             assertThat(response).isNotNull();
             assertThat(response.getContents()).hasSize(1);
+            assertThat(response.getContents().get(0).getCurrentPeople()).isEqualTo(1);
         }
 
         @Test
@@ -258,7 +259,7 @@ class RoomServiceTest {
 
             given(roomRepository.findAllRoomsWithCursor(any(), any(), any()))
                     .willReturn(List.of(testRoom, room2));
-            given(memberRoomRepository.countByRoom_RoomId(anyLong())).willReturn(1L);
+            given(roomSessionService.getMembers(anyLong())).willReturn(java.util.Set.of("1"));
 
             // When
             CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 1);
@@ -267,6 +268,59 @@ class RoomServiceTest {
             assertThat(response.isHasNext()).isTrue();
             assertThat(response.getNextCursor()).isEqualTo(1L);
             assertThat(response.getContents()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("성공 - Redis 인원 0명인 WAITING 방은 좀비방으로 정리")
+        void getRoomList_Success_CleanupZombieRoom() {
+            // Given
+            Room zombieRoom = Room.builder()
+                    .owner(testMember)
+                    .theme(testTheme)
+                    .title("좀비 방")
+                    .maxPeople(4)
+                    .build();
+            ReflectionTestUtils.setField(zombieRoom, "roomId", 2L);
+            // 상태가 WAITING (기본값)
+
+            given(roomRepository.findAllRoomsWithCursor(any(), any(), any()))
+                    .willReturn(List.of(zombieRoom));
+            given(roomSessionService.getMembers(2L)).willReturn(java.util.Collections.emptySet());
+
+            // When
+            CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 10);
+
+            // Then
+            assertThat(response.getContents()).hasSize(1);
+            assertThat(response.getContents().get(0).getCurrentPeople()).isEqualTo(0);
+            assertThat(zombieRoom.getStatus()).isEqualTo(RoomStatus.COMPLETED);
+            verify(memberRoomRepository).deleteAllByRoom_RoomId(2L);
+        }
+
+        @Test
+        @DisplayName("성공 - 이미 COMPLETED인 방은 중복 정리하지 않음")
+        void getRoomList_Success_SkipAlreadyCompletedRoom() {
+            // Given
+            Room completedRoom = Room.builder()
+                    .owner(testMember)
+                    .theme(testTheme)
+                    .title("완료된 방")
+                    .maxPeople(4)
+                    .build();
+            ReflectionTestUtils.setField(completedRoom, "roomId", 3L);
+            completedRoom.updateStatus(RoomStatus.COMPLETED);
+
+            given(roomRepository.findAllRoomsWithCursor(any(), any(), any()))
+                    .willReturn(List.of(completedRoom));
+            given(roomSessionService.getMembers(3L)).willReturn(null);
+
+            // When
+            CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 10);
+
+            // Then
+            assertThat(response.getContents()).hasSize(1);
+            assertThat(response.getContents().get(0).getCurrentPeople()).isEqualTo(0);
+            verify(memberRoomRepository, never()).deleteAllByRoom_RoomId(3L);
         }
     }
 
