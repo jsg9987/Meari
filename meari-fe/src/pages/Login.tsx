@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
 
 // Assets
-import logoDark from '../assets/images/common/logo-dark.svg';
+import logoDark from '../assets/images/common/logo-dark-2.svg';
 import loginIllustration from '../assets/images/auth/login-illustration.svg';
 
 const Login = () => {
@@ -17,7 +17,7 @@ const Login = () => {
         await login({ email, password });
         // 로그인 에러가 없으면 메인으로 이동
         if (!useAuthStore.getState().error) {
-            navigate('/');
+            navigate('/main');
         }
     };
 

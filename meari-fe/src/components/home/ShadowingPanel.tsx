@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import RoomCard from './RoomCard'
 import PasswordModal from '../webrtc/PasswordModal'
 import CreateRoomButton from './CreateRoomButton'
-import { getRooms, joinRoom, type RoomItem } from '../../api/rooms.api'
-import { getThemes, type Theme } from '../../api/contents.api'
+import { getRooms, joinRoom, quickCreateRoom, type RoomItem } from '../../api/rooms.api'
+import { getThemes, getThemeContents, type Theme } from '../../api/contents.api'
 
 // 테마 목록은 API를 통해 가져옵니다.
 
@@ -26,6 +26,17 @@ const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
 
   const observerTarget = useRef<HTMLDivElement>(null)
   const minLoadingTimeRef = useRef<number | null>(null)
+
+  // 추천 콘텐츠 상태
+  interface FeaturedContent {
+    title: string
+    description: string
+    thumbnail: string
+    duration: string
+    themeName: string
+    themeId: number
+  }
+  const [featuredContents, setFeaturedContents] = useState<FeaturedContent[]>([])
 
   // 비밀번호 모달 상태
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
@@ -164,33 +175,63 @@ const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
     }
   }
 
-    // 추천 콘텐츠 목업 데이터
-  const featuredContents = [
-    {
-      id: 1,
-      title: '그래서 쪼끔은 후회해?',
-      description: '한국어 일상 대화 쉐도잉 연습',
-      thumbnail: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800',
-      duration: '2:47',
-      themeName: '일상회화',
-    },
-    {
-      id: 2,
-      title: '식당에서 예약하기',
-      description: '전화로 식당 예약하는 대화 연습',
-      thumbnail: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
-      duration: '4:00',
-      themeName: '일상회화',
-    },
-    {
-      id: 3,
-      title: '메뉴 추천 받기',
-      description: '식당에서 직원에게 메뉴 추천을 받는 상황',
-      thumbnail: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800',
-      duration: '3:20',
-      themeName: '여행',
-    },
-  ]
+    const [isQuickCreating, setIsQuickCreating] = useState(false)
+
+    // 빠른 방 생성 핸들러
+  const handleQuickCreate = async (themeId: number) => {
+    if (isQuickCreating) return
+    setIsQuickCreating(true)
+    try {
+      const response = await quickCreateRoom({ theme_id: themeId })
+      if (response.data.success && response.data.data) {
+        const roomId = response.data.data.room_id
+        navigate(`/shadowing/${roomId}`, { state: { isOwner: true } })
+      }
+    } catch (error) {
+      console.error('Failed to quick create room:', error)
+    } finally {
+      setIsQuickCreating(false)
+    }
+  }
+
+  // 추천 콘텐츠 로드 (테마 1, 2, 3의 첫 번째 콘텐츠)
+  useEffect(() => {
+    if (themeData.length === 0) return
+
+    const loadFeaturedContents = async () => {
+      try {
+        const targetThemeIds = [1, 2, 3]
+        const results = await Promise.all(
+          targetThemeIds.map(id => getThemeContents(id))
+        )
+
+        const featured: FeaturedContent[] = []
+        results.forEach((res, idx) => {
+          if (res.data.success && res.data.data && res.data.data.length > 0) {
+            const content = res.data.data[0]
+            const theme = themeData.find(t => t.theme_id === targetThemeIds[idx])
+            const totalSec = Math.floor(content.total_duration)
+            const min = Math.floor(totalSec / 60)
+            const sec = totalSec % 60
+            featured.push({
+              title: content.title,
+              description: theme?.description ?? '',
+              thumbnail: content.thumbnail_url,
+              duration: `${min}:${sec.toString().padStart(2, '0')}`,
+              themeName: theme?.name ?? '',
+              themeId: targetThemeIds[idx],
+            })
+          }
+        })
+
+        setFeaturedContents(featured)
+      } catch (error) {
+        console.error('Failed to load featured contents:', error)
+      }
+    }
+
+    loadFeaturedContents()
+  }, [themeData])
 
   return (
     <section className='px-8 py-6'>
@@ -200,11 +241,10 @@ const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
             <h2 className='text-xl font-bold text-gray-900'>쉐도잉 콘텐츠</h2>
             <CreateRoomButton />
           </div>
-          <div className='flex gap-4 h-100'>
+          {featuredContents.length >= 3 && <div className='flex gap-4 h-100'>
             {/* 왼쪽 큰 사진 */}
             <div
               className='flex-1 relative rounded-xl overflow-hidden shadow-lg cursor-pointer group'
-              onClick={() => console.log('Selected:', featuredContents[0].id)}
             >
               <img
                 src={featuredContents[0].thumbnail}
@@ -224,15 +264,25 @@ const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
                 <h3 className='text-3xl font-extrabold mb-2'>{featuredContents[0].title}</h3>
                 <p className='text-lg text-gray-100'>{featuredContents[0].description}</p>
               </div>
+              <button
+                type='button'
+                disabled={isQuickCreating}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleQuickCreate(featuredContents[0].themeId)
+                }}
+                className='absolute top-4 right-4 px-5 py-2.5 bg-[oklch(0.63_0.12_232)] hover:bg-[oklch(0.55_0.12_232)] text-white font-bold rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
+              >
+                {isQuickCreating ? '생성 중...' : '바로 시작'}
+              </button>
             </div>
 
             {/* 오른쪽 세로 두 개 */}
             <div className='flex flex-col gap-4 w-95'>
               {featuredContents.slice(1, 3).map((content) => (
                 <div
-                  key={content.id}
+                  key={content.themeId}
                   className='flex-1 relative rounded-xl overflow-hidden shadow-lg cursor-pointer group'
-                  onClick={() => console.log('Selected:', content.id)}
                 >
                   <img
                     src={content.thumbnail}
@@ -252,10 +302,21 @@ const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
                     <h3 className='text-lg font-bold mb-1'>{content.title}</h3>
                     <p className='text-sm text-gray-200 line-clamp-1'>{content.description}</p>
                   </div>
+                  <button
+                    type='button'
+                    disabled={isQuickCreating}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleQuickCreate(content.themeId)
+                    }}
+                    className='absolute top-3 right-3 px-4 py-2 bg-[oklch(0.63_0.12_232)] hover:bg-[oklch(0.55_0.12_232)] text-white text-sm font-bold rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
+                  >
+                    {isQuickCreating ? '생성 중...' : '바로 시작'}
+                  </button>
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* 검색창 */}
