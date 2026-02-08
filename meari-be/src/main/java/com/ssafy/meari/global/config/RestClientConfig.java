@@ -1,7 +1,6 @@
 package com.ssafy.meari.global.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -17,18 +16,17 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class RestClientConfig {
 
-    @Value("${analysis.fastapi.url:http://localhost:8000}")
-    private String fastApiUrl;
+    private static final String FAST_API_URL = "http://fastapi:8000";
 
     /**
      * FastAPI 호출용 RestClient
      */
     @Bean
     public RestClient fastApiRestClient() {
-        log.info("FastAPI RestClient 생성: baseUrl={}", fastApiUrl);
+        log.info("FastAPI RestClient 생성: baseUrl={}", FAST_API_URL);
 
         return RestClient.builder()
-                .baseUrl(fastApiUrl)
+                .baseUrl(FAST_API_URL)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .build();
