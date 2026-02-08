@@ -89,6 +89,12 @@ export default function ShadowingRoom() {
   const [volume, setVolume] = useState(100);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>();
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>();
+  const mediaSettingsRef = useRef<{
+    audioEnabled: boolean;
+    videoEnabled: boolean;
+    audioDeviceId?: string;
+    videoDeviceId?: string;
+  } | null>(null);
   const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(true);
   const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
@@ -1449,7 +1455,7 @@ export default function ShadowingRoom() {
     if (DISABLE_WEBRTC) return;
 
     if (isEntered && roomId && status === 'idle' && isMediaChecked) {
-      join();
+      join(mediaSettingsRef.current || undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEntered, roomId, status, isMediaChecked]);
@@ -1599,28 +1605,14 @@ export default function ShadowingRoom() {
     audioDeviceId?: string,
     videoDeviceId?: string
   ) => {
-    setIsMediaChecked(true);
+    // 미디어 설정을 ref에 저장 → join() 호출 시 전달됨
+    mediaSettingsRef.current = { audioEnabled, videoEnabled, audioDeviceId, videoDeviceId };
 
     // 선택된 장치 정보 저장
     setSelectedAudioDevice(audioDeviceId);
     setSelectedVideoDevice(videoDeviceId);
 
-    // 오디오/비디오 설정 반영
-    if (publisher) {
-      publisher.publishAudio(audioEnabled);
-      publisher.publishVideo(videoEnabled);
-    }
-
-    // useVideoRoom 상태 동기화 (VideoControls 반영용)
-    // 초기값이 true이므로 false인 경우만 토글
-    if (!audioEnabled && isAudioEnabled) {
-      toggleAudio();
-    }
-    if (!videoEnabled && isVideoEnabled) {
-      toggleVideo();
-    }
-
-    // publishStream() 호출 제거 - useEffect에서 status === 'connected'일 때 자동 호출됨
+    setIsMediaChecked(true);
   };
 
   // 방 정보 로딩 중
