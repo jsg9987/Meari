@@ -437,7 +437,7 @@ export const getShadowingReportsAPI = async (
   params.append('size', size.toString())
 
   const response = await axiosInstance.get<ApiResponse<ShadowingReportListData>>(
-    `/api/v1/shadowing/reports?${params.toString()}`
+    `/reports/shadowing?${params.toString()}`
   )
   return response
 }

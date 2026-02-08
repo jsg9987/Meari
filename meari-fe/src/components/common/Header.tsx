@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Settings, ChevronDown, User, LogOut } from 'lucide-react'
 import logoDark from '../../assets/images/common/logo-dark-2.svg'
 import { useAuthStore } from '../../store/auth.store'
+import NotificationBell from './NotificationBell'
 
 export type HomeTab = 'shadowing' | 'copik' | 'daily'
 export type Language = 'ko' | 'vi' | 'en'
@@ -103,6 +104,9 @@ const Header = () => {
               </div>
             )}
           </div>
+
+          {/* 알림 벨 */}
+          <NotificationBell />
 
           {/* 설정 버튼 */}
           <button

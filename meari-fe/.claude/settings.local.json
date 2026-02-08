@@ -11,7 +11,8 @@
       "Bash(pnpm exec tsc:*)",
       "Bash(git checkout:*)",
       "mcp__sequential-thinking__sequentialthinking",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "mcp__fileSystem__list_allowed_directories"
     ]
   },
   "enableAllProjectMcpServers": true,
