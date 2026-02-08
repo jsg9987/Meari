@@ -694,7 +694,7 @@ export const getKopicReportsAPI = async (
   params.append('size', size.toString())
 
   const response = await axiosInstance.get<ApiResponse<KopicReportListData>>(
-    `/kopic/reports?${params.toString()}`
+    `/reports/kopic?${params.toString()}`
   )
   return response
 }
