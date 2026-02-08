@@ -158,6 +158,17 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
+    @Operation(summary = "라운드 종료", description = "방장이 라운드를 강제 종료하고 부분 완료 멤버도 분석 요청합니다.")
+    @PostMapping("/{roomId}/rounds/{round}/finish")
+    public ResponseEntity<ApiResponse<Void>> finishRound(
+            @Parameter(description = "방 ID") @PathVariable Long roomId,
+            @Parameter(description = "라운드 번호 (1 또는 2)") @PathVariable Integer round,
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        roomService.finishRound(roomId, round, userDetails.getMember().getMemberId());
+        return ResponseEntity.ok(ApiResponse.successWithoutData());
+    }
+
     @Operation(summary = "게임 종료 (준비 단계로 복귀)", description = "게임을 종료하고 준비 단계로 복귀합니다. 방장만 가능하며, Round2 종료 시에만 사용합니다.")
     @PostMapping("/{roomId}/finish")
     public ResponseEntity<ApiResponse<Void>> finishGame(
