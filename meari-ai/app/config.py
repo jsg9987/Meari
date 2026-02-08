@@ -35,6 +35,7 @@ class Settings:
     AWS_S3_BUCKET: str = os.getenv("AWS_S3_BUCKET")  # 환경변수 필수
 
     # 모델 경로 (HuggingFace 모델명 또는 로컬 경로)
+    # WAV2VEC2_MODEL_PATH: str = os.getenv("WAV2VEC2_MODEL_PATH", "Taeham/wav2vec2-ksponspeech")
     WAV2VEC2_MODEL_PATH: str = os.getenv("WAV2VEC2_MODEL_PATH", "kresnik/wav2vec2-large-xlsr-korean")
     MDD_MODEL_PATH: str = os.getenv("MDD_MODEL_PATH", "./models/mdd")  # MDD는 선택사항
 

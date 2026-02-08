@@ -98,7 +98,7 @@ class AnalysisService:
                 intonation_result = analyze_intonation(
                     ref_waveform,
                     user_waveform,
-                    user_sr
+                    16000  # 이미 preprocess_audio에서 16kHz로 리샘플링 완료
                 )
 
                 # 문장 결과 저장
