@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
-import { getDailyActivity, type DailyActivity, type DailyActivityStatus } from '../../api/mypage.api'
+import { getDailyRecords, type DailyRecordActivity } from '../../api/mypage.api'
 
-const statusColors: Record<DailyActivityStatus, string> = {
-  NONE: 'bg-gray-100',
-  WORD: 'bg-blue-300',
-  SENTENCE: 'bg-green-300',
-  BOTH: 'bg-purple-400'
+// completed_count에 따른 색상 강도
+const getColorByCount = (count: number): string => {
+  if (count === 0) return 'bg-gray-100'
+  if (count === 1) return 'bg-blue-200'
+  if (count === 2) return 'bg-blue-300'
+  if (count === 3) return 'bg-blue-400'
+  if (count >= 4) return 'bg-blue-500'
+  return 'bg-gray-100'
 }
 
-const statusLabels: Record<DailyActivityStatus, string> = {
-  NONE: '학습 X',
-  WORD: '단어 학습',
-  SENTENCE: '문장 학습',
-  BOTH: '단어+문장 학습'
+const getCountLabel = (count: number): string => {
+  if (count === 0) return '학습 안함'
+  if (count === 1) return '단어 학습'
+  if (count === 2) return '문장 학습'
+  return '모두 학습'
 }
 
 interface DailyActivityHeatmapProps {
@@ -20,19 +23,24 @@ interface DailyActivityHeatmapProps {
 }
 
 const DailyActivityHeatmap = ({ className }: DailyActivityHeatmapProps) => {
-  const [activities, setActivities] = useState<DailyActivity[]>([])
+  const [activities, setActivities] = useState<DailyRecordActivity[]>([])
+  const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
       try {
-        const response = await getDailyActivity()
+        const response = await getDailyRecords('yearly')
         if (response.data.success && response.data.data) {
           setActivities(response.data.data.activities)
+          setDateRange({
+            startDate: response.data.data.startDate,
+            endDate: response.data.data.endDate
+          })
         }
       } catch (error) {
-        console.error('Failed to load daily activity:', error)
+        console.error('Failed to load daily records:', error)
       } finally {
         setIsLoading(false)
       }
@@ -58,34 +66,48 @@ const DailyActivityHeatmap = ({ className }: DailyActivityHeatmapProps) => {
   }
 
   // 날짜를 주 단위로 그룹화
-  const getWeeksData = (acts: DailyActivity[]) => {
-    const weeks: DailyActivity[][] = []
-    let currentWeek: DailyActivity[] = []
+  const getWeeksData = (acts: DailyRecordActivity[]) => {
+    const weeks: (DailyRecordActivity | { date: ''; completed_count: 0 })[][] = []
+    let currentWeek: (DailyRecordActivity | { date: ''; completed_count: 0 })[] = []
 
-    if (acts.length === 0) return weeks
+    // API에서 받은 날짜 범위 사용
+    if (!dateRange) return weeks
 
-    // 시작 날짜 찾기 (일요일부터 시작하도록)
-    const startDate = new Date(acts[0].date)
-    const startDay = startDate.getDay()
+    const startDate = new Date(dateRange.startDate)
+    const endDate = new Date(dateRange.endDate)
+
+    // 활동 데이터를 Map으로 변환 (빠른 조회)
+    const activityMap = new Map<string, number>()
+    acts.forEach((act) => {
+      activityMap.set(act.date, act.completed_count)
+    })
 
     // 시작 요일이 일요일이 아니면 앞부분을 빈 칸으로 채움
+    const startDay = startDate.getDay()
     for (let i = 0; i < startDay; i++) {
-      currentWeek.push({ date: '', status: 'NONE' })
+      currentWeek.push({ date: '', completed_count: 0 })
     }
 
-    acts.forEach((activity) => {
-      currentWeek.push(activity)
+    // 모든 날짜를 순회하면서 데이터 채우기
+    const currentDate = new Date(startDate)
+    while (currentDate <= endDate) {
+      const dateString = currentDate.toISOString().split('T')[0]
+      const completedCount = activityMap.get(dateString) || 0
+
+      currentWeek.push({ date: dateString, completed_count: completedCount })
 
       if (currentWeek.length === 7) {
         weeks.push(currentWeek)
         currentWeek = []
       }
-    })
+
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
 
     // 마지막 주가 7일이 안 되면 빈 칸으로 채움
     if (currentWeek.length > 0) {
       while (currentWeek.length < 7) {
-        currentWeek.push({ date: '', status: 'NONE' })
+        currentWeek.push({ date: '', completed_count: 0 })
       }
       weeks.push(currentWeek)
     }
@@ -172,10 +194,10 @@ const DailyActivityHeatmap = ({ className }: DailyActivityHeatmapProps) => {
                     return (
                       <div key={dayIndex} className='relative group'>
                         <div
-                          className={`w-5 h-5 rounded-sm ${statusColors[day.status]} border border-gray-200 hover:ring-2 hover:ring-gray-400 transition-all cursor-pointer`}
+                          className={`w-5 h-5 rounded-sm ${getColorByCount(day.completed_count)} border border-gray-200 hover:ring-2 hover:ring-gray-400 transition-all cursor-pointer`}
                         />
                         <div className='absolute hidden group-hover:block bg-gray-900/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap -top-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none'>
-                          {dateString} - {statusLabels[day.status]}
+                          {dateString} - {getCountLabel(day.completed_count)}
                         </div>
                       </div>
                     )
@@ -187,12 +209,17 @@ const DailyActivityHeatmap = ({ className }: DailyActivityHeatmapProps) => {
 
           {/* 범례 */}
           <div className='flex items-center justify-end gap-3 mt-4 text-xs text-gray-600'>
-            {(['NONE', 'WORD', 'SENTENCE', 'BOTH'] as DailyActivityStatus[]).map((status) => (
-              <div key={status} className='flex items-center gap-1.5'>
+            {[
+              { count: 0, label: '학습 안함' },
+              { count: 1, label: '단어 학습' },
+              { count: 2, label: '문장 학습' },
+              { count: 3, label: '모두 학습' }
+            ].map(({ count, label }) => (
+              <div key={count} className='flex items-center gap-1.5'>
                 <div
-                  className={`w-5 h-5 rounded-sm ${statusColors[status]} border border-gray-200`}
+                  className={`w-5 h-5 rounded-sm ${getColorByCount(count)} border border-gray-200`}
                 />
-                <span>{statusLabels[status]}</span>
+                <span>{label}</span>
               </div>
             ))}
           </div>
