@@ -14,7 +14,7 @@ const NotificationBell = () => {
     const fetchReports = async () => {
       try {
         const response = await getShadowingReportsAPI()
-        const reports = response.data.data.contents
+        const reports = response.data.data?.contents ?? []
         const unread = reports.filter((report) => !report.is_read)
         setUnreadReports(unread)
       } catch {
