@@ -39,7 +39,7 @@ const SideBar = ({
   }
 
   const handleLogoClick = () => {
-    navigate('/')
+    navigate('/main')
   }
 
   const handleLogout = () => {

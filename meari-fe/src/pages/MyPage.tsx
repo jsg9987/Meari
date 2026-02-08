@@ -163,7 +163,7 @@ const MyPage = () => {
 
   const handleLogout = () => {
     logout()
-    navigate('/')
+    navigate('/main')
   }
 
   const handleVerifySubmit = (event: React.FormEvent<HTMLFormElement>) => {

@@ -152,7 +152,7 @@ const WordStudy = () => {
         <div className="mx-auto flex h-full w-full max-w-[75rem] items-center px-6">
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/main')}
             className="inline-flex items-center"
             aria-label="메인 페이지로 이동"
           >
@@ -293,7 +293,7 @@ const WordStudy = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => navigate('/')}
+                          onClick={() => navigate('/main')}
                           className="rounded-full border border-gray-200 bg-white px-6 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-300"
                         >
                           홈으로 이동하기

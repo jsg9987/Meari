@@ -1,4 +1,5 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
+import Landing from "../pages/Landing";
 import Login from "../pages/Login";
 import Signup from "../pages/Signup";
 import ShadowingRoom from "../pages/ShadowingRoom";
@@ -14,21 +15,16 @@ import { ProtectedRoute } from './guards'
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* 테스트 목적으로 잠시 protect 해제 */}
+      <Route path="/" element={<Landing />} />
+      <Route path="/landing" element={<Navigate to="/" replace />} />
       <Route
-        path="/"
+        path="/main"
         element={
           <ProtectedRoute>
             <Home />
           </ProtectedRoute>
         }
       />
-      {/* <Route
-        path="/"
-        element={
-            <Home />
-        }
-      /> */}
       <Route
         path="/login"
         element={
