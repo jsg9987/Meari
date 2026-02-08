@@ -18,8 +18,8 @@ const topMenuItem = { id: 'dashboard' as SideBarMenu, icon: LayoutDashboard, lab
 
 const menuItems = [
   { id: 'profile' as SideBarMenu, icon: User, label: '프로필' },
-  { id: 'settings' as SideBarMenu, icon: Settings, label: '설정' },
-  { id: 'report' as SideBarMenu, icon: FileText, label: '리포트' }
+  { id: 'report' as SideBarMenu, icon: FileText, label: '리포트' },
+  { id: 'settings' as SideBarMenu, icon: Settings, label: '설정' }
 ]
 
 const SideBar = ({
