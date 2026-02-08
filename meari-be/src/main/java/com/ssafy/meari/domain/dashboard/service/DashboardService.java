@@ -1,6 +1,7 @@
 package com.ssafy.meari.domain.dashboard.service;
 
 import com.ssafy.meari.domain.dashboard.dto.response.DailyRecordsResponse;
+import com.ssafy.meari.domain.dashboard.dto.response.KopicDashboardResponse;
 import com.ssafy.meari.domain.dashboard.dto.response.UserActivityResponse;
 
 import java.time.LocalDate;
@@ -34,4 +35,13 @@ public interface DashboardService {
      * @return 최근 활동 내역 리스트 (최대 5개)
      */
     List<UserActivityResponse> getUserActivities(Long memberId);
+
+    /**
+     * 코픽 대시보드 점수 요약 조회
+     * - 최고 점수 시험과 전체 평균 점수 비교
+     * - 문장별 점수 및 평균 점수 포함
+     * @param memberId 회원 ID
+     * @return 코픽 대시보드 응답
+     */
+    KopicDashboardResponse getKopicDashboard(Long memberId);
 }
