@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import MyActivityFeed from './MyActivityFeed'
 import ShadowingProgressChart from './ShadowingProgressChart'
 import KopicSummaryChart from './KopicSummaryChart'
-import DailyActivityHeatmap from './DailyActivityHeatMap'
+import DailyActivityHeatmap from './DailyActivityHeatmap'
 
 const Dashboard = () => {
   const [isInitialLoading, setIsInitialLoading] = useState(true)
