@@ -25,7 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Room", description = "쉐도잉 방 관리 API")
+@Tag(name = "2. Room", description = "쉐도잉 방 관리 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/rooms")

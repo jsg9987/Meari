@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * S3 파일 관리 컨트롤러
  */
-@Tag(name = "S3", description = "S3 파일 관리 API")
+@Tag(name = "7. S3", description = "파일 업로드/다운로드 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/s3")

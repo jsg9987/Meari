@@ -92,7 +92,7 @@ export default function VideoTile({ streamManager, muted, label, isSpeaker, isRe
   return (
     <div
       className={`relative overflow-hidden rounded-xl bg-gray-100 border border-gray-200 ${
-        isSpeaker ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-white" : ""
+        isSpeaker ? "ring-2 ring-green-500 ring-offset-2 ring-offset-white" : ""
       } ${className || ""}`}
     >
       <video

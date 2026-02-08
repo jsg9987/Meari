@@ -95,23 +95,98 @@ public class DetailedAnalysis {
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class IntonationAnalysis {
 
-        @Schema(description = "억양 점수", example = "85")
+        @Schema(description = "억양 점수 (0~100, -1=분석불가)", example = "94")
         private Integer score;
-
-        @Schema(description = "정답 pitch 배열")
-        private List<Double> referencePitch;
-
-        @Schema(description = "사용자 pitch 배열")
-        private List<Double> userPitch;
-
-        @Schema(description = "시간 프레임 (초)")
-        private List<Double> timeFrames;
-
-        @Schema(description = "DTW 매핑 경로")
-        private List<List<Integer>> dtwPath;
 
         @Schema(description = "피드백 메시지", example = "억양이 매우 자연스럽습니다!")
         private String feedback;
+
+        @Schema(description = "차트용 pitch 데이터 (길이 통일)")
+        private PitchData pitchData;
+
+        @Schema(description = "통계 정보")
+        private Statistics statistics;
+
+        @Schema(description = "원본 데이터 (디버깅용)")
+        private RawData rawData;
+    }
+
+    @Schema(description = "차트용 Pitch 데이터")
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public static class PitchData {
+
+        @Schema(description = "정답 pitch (100개, Hz)", example = "[216.5, 218.3, ...]")
+        private List<Double> reference;
+
+        @Schema(description = "사용자 pitch (100개, Hz)", example = "[195.2, 197.8, ...]")
+        private List<Double> user;
+
+        @Schema(description = "시간 축 (100개, 초)", example = "[0.0, 0.05, ...]")
+        private List<Double> timePoints;
+    }
+
+    @Schema(description = "Pitch 통계 정보")
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public static class PitchStatistics {
+
+        @Schema(description = "평균 주파수 (Hz)", example = "216.5")
+        private Double mean;
+
+        @Schema(description = "표준편차 (Hz)", example = "12.3")
+        private Double std;
+
+        @Schema(description = "최소 주파수 (Hz)", example = "180.0")
+        private Double min;
+
+        @Schema(description = "최대 주파수 (Hz)", example = "250.0")
+        private Double max;
+    }
+
+    @Schema(description = "억양 통계")
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public static class Statistics {
+
+        @Schema(description = "정답 음성 통계")
+        private PitchStatistics reference;
+
+        @Schema(description = "사용자 음성 통계")
+        private PitchStatistics user;
+
+        @Schema(description = "평균 주파수 차이 (Hz)", example = "21.3")
+        private Double pitchDifference;
+    }
+
+    @Schema(description = "원본 Pitch 데이터")
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public static class RawData {
+
+        @Schema(description = "정답 원본 pitch 배열 (가변 길이)")
+        private List<Double> referencePitch;
+
+        @Schema(description = "사용자 원본 pitch 배열 (가변 길이)")
+        private List<Double> userPitch;
+
+        @Schema(description = "정답 프레임 수", example = "292")
+        private Integer referenceFrames;
+
+        @Schema(description = "사용자 프레임 수", example = "371")
+        private Integer userFrames;
     }
 
     @Schema(description = "전체 요약")
