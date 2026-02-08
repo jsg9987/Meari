@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(name = "NLP", description = "자연어 처리 API")
+@Tag(name = "🛠️ Development", description = "개발/테스트 전용 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/nlp")

@@ -156,6 +156,7 @@ export interface RoomItem {
   status: string;
   has_password: boolean;
   created_at: string;
+  thumbnail?: string;
 }
 
 export interface GetRoomsRequest {

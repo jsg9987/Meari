@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(name = "OpenVidu", description = "OpenVidu 관리 API (관리자/테스트용)")
+@Tag(name = "🛠️ Development", description = "개발/테스트 전용 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/openvidu")
