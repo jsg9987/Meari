@@ -185,7 +185,7 @@ const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
       const response = await quickCreateRoom({ theme_id: themeId })
       if (response.data.success && response.data.data) {
         const roomId = response.data.data.room_id
-        navigate(`/shadowing/${roomId}`, { state: { isOwner: true } })
+        navigate(`/shadowing/${roomId}`, { state: { isOwner: true, isQuickCreate: true } })
       }
     } catch (error) {
       console.error('Failed to quick create room:', error)

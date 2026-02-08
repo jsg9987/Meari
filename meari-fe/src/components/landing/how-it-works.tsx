@@ -171,7 +171,7 @@ const steps: Step[] = [
   },
 ]
 
-export function HowItWorks() {
+export function   HowItWorks() {
   return (
     <section id="how-it-works" className="relative py-32 bg-white">
       <div className="max-w-6xl mx-auto px-6">

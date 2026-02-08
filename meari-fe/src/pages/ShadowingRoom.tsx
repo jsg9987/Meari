@@ -10,6 +10,7 @@ import MediaCheckScreen from "../components/webrtc/MediaCheckScreen";
 import ContentSelectModal from "../components/webrtc/ContentSelectModal";
 import Toast from "../components/common/Toast";
 import RoleSelectModal from "../components/webrtc/RoleSelectModal";
+import RecordingIndicator from "../components/webrtc/RecordingIndicator";
 import { useVideoRoom } from "../hooks/useVideoRoom";
 import { useRoomWebSocket, type Role, type RoleSegment, type Sentence, type ChatMessage } from "../hooks/useRoomWebSocket";
 import type { Content } from "../api/contents.api";
@@ -79,6 +80,7 @@ export default function ShadowingRoom() {
   const [isWaitingForRolePick, setIsWaitingForRolePick] = useState(false); // 영상 시청 완료 후 역할 선택 대기 중
   const [participantsReady, setParticipantsReady] = useState<Record<number, boolean>>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'error' | 'success' | 'info'>('error');
   const [videoReady, setVideoReady] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
   const readyTimeoutRef = useRef<number | null>(null);
@@ -99,6 +101,7 @@ export default function ShadowingRoom() {
   const [selectedNationality, setSelectedNationality] = useState<"KR" | "VN">("KR");
   const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(true);
   const [isLeaving, setIsLeaving] = useState(false); // 방 나가는 중 상태
+  const [isMyTurnRecording, setIsMyTurnRecording] = useState(false); // 현재 내 차례인지 (녹음 중)
 
   // 영상 재생 관련 상태
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -133,6 +136,7 @@ export default function ShadowingRoom() {
   const currentRecordingSentenceIdRef = useRef<number | null>(null);
   const presignedUrlsRef = useRef<Map<number, string>>(new Map());
   const s3KeysRef = useRef<Map<number, string>>(new Map());
+  const hasShownNextTurnToastRef = useRef<Set<number>>(new Set()); // 다음 차례 토스트 표시 여부 (sentence_id로 추적)
 
   const nickname = userInfo?.nickname || "User";
 
@@ -701,7 +705,6 @@ export default function ShadowingRoom() {
         setParticipantsReady(initialReadyState);
 
         // content_id가 이미 있으면 video_url 가져오기 + 콘텐츠 선택 확정
-        const navIsOwner = (location.state as { isOwner?: boolean })?.isOwner;
         if (response.data.data.content_id) {
           const existingContentId = response.data.data.content_id;
           const existingThemeId = response.data.data.theme_id || 1;
@@ -736,7 +739,7 @@ export default function ShadowingRoom() {
           } catch (error) {
             console.error('[fetchRoomDetail] Failed to get video URL:', error);
           }
-        } else if (navIsOwner && response.data.data.theme_id) {
+        } else if ((location.state as { isQuickCreate?: boolean })?.isQuickCreate && response.data.data.theme_id) {
           // 빠른 생성: content_id가 없으면 WebSocket 연결 후 자동 선택하도록 플래그 설정
           setNeedsAutoContentSelect(true);
         }
@@ -1028,6 +1031,51 @@ export default function ShadowingRoom() {
     video.addEventListener('timeupdate', updateSubtitle);
     return () => video.removeEventListener('timeupdate', updateSubtitle);
   }, [mySelectedRoleId, isPlaying, currentRound, selectedNationality, selectedRoles, roomData]);
+
+  // 다음 차례 알림 (내 자막 바로 전 자막이 시작될 때)
+  useEffect(() => {
+    if (!isRoundInProgress) return;
+
+    // 다음(next) 타이밍이면서 내 역할인 자막 찾기
+    const myNextSubtitle = currentSubtitles.find(
+      subtitle => subtitle.timing === 'next' && subtitle.isMyRole
+    );
+
+    if (myNextSubtitle) {
+      // 해당 자막에 대해 이미 토스트를 표시했는지 확인
+      // sentence_id가 없으므로 roleId와 text의 조합으로 고유성 판단
+      const uniqueKey = `${myNextSubtitle.roleId}-${myNextSubtitle.text}`;
+      const uniqueId = uniqueKey.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
+      if (!hasShownNextTurnToastRef.current.has(uniqueId)) {
+        setToastType('info');
+        setToastMessage('다음 차례입니다!');
+        hasShownNextTurnToastRef.current.add(uniqueId);
+
+        // Toast 컴포넌트가 자동으로 사라지므로 별도 처리 불필요
+      }
+    }
+  }, [currentSubtitles, isRoundInProgress]);
+
+  // 라운드가 변경되면 토스트 표시 이력 초기화
+  useEffect(() => {
+    hasShownNextTurnToastRef.current.clear();
+  }, [currentRound]);
+
+  // 현재 내 차례인지 감지 (녹음 중 표시용)
+  useEffect(() => {
+    if (!isRoundInProgress) {
+      setIsMyTurnRecording(false);
+      return;
+    }
+
+    // 현재(current) 타이밍이면서 내 역할인 자막 찾기
+    const myCurrentSubtitle = currentSubtitles.find(
+      subtitle => subtitle.timing === 'current' && subtitle.isMyRole
+    );
+
+    setIsMyTurnRecording(!!myCurrentSubtitle);
+  }, [currentSubtitles, isRoundInProgress]);
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -2049,15 +2097,6 @@ export default function ShadowingRoom() {
                         {!selectedContent ? (
                           isOwner ? (
                             <div className="absolute inset-0 overflow-hidden">
-                              {/* 좌측 상단 타이틀 */}
-                              <div
-                                className={`absolute top-8 left-8 z-40 transition-all duration-700 ${
-                                  isTransitioning && selectedContent ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
-                                }`}
-                              >
-                                <h1 className="text-white text-2xl font-bold">컨텐츠 선택</h1>
-                              </div>
-
                               {isContentsLoading ? (
                                 <div className="flex items-center justify-center h-full">
                                   <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
@@ -2085,90 +2124,106 @@ export default function ShadowingRoom() {
                                   {/* 하단 강한 gradient */}
                                   <div className="absolute bottom-0 left-0 right-0 h-2/3 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none z-10" />
 
-                                  {/* 컨텐츠 정보 */}
-                                  <div className="absolute left-8 top-[35%] z-20 max-w-2xl transition-all duration-700 ease-in-out">
-                                    {/* 테마 이름 */}
-                                    <span className="inline-block px-4 py-1.5 bg-gray-500/30 text-gray-300 text-sm font-medium rounded-full mb-3">
-                                      {roomInfo.themeName}
-                                    </span>
-
-                                    {/* 제목 */}
-                                    <h2 className="text-white text-5xl font-bold mb-3">{availableContents[mainContentIndex].title}</h2>
-
-                                    {/* 설명 */}
-                                    <p className="text-gray-200 text-base leading-relaxed line-clamp-2 mb-4">{availableContents[mainContentIndex].description}</p>
-
-                                    {/* 하단 정보 및 버튼 */}
-                                    <div className="flex items-center gap-6">
-                                      {/* 인원수 */}
-                                      {availableContents[mainContentIndex].max_people && (
-                                        <div className="flex items-center gap-2 text-white">
-                                          <Users size={20} />
-                                          <span className="text-base font-medium">{availableContents[mainContentIndex].max_people}명</span>
-                                        </div>
-                                      )}
-                                      {/* 영상 길이 */}
-                                      <div className="flex items-center gap-2 text-white">
-                                        <Clock size={20} />
-                                        <span className="text-base font-medium">{Math.floor(availableContents[mainContentIndex].total_duration / 60)}:{Math.floor(availableContents[mainContentIndex].total_duration % 60).toString().padStart(2, '0')}</span>
+                                  {/* 스크롤 가능한 컨텐츠 레이어 */}
+                                  <div className="absolute inset-0 z-20 overflow-y-auto scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent">
+                                    <div className="relative min-h-full flex flex-col px-8 py-8">
+                                      {/* 좌측 상단 타이틀 */}
+                                      <div
+                                        className={`transition-all duration-700 ${
+                                          isTransitioning && selectedContent ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+                                        }`}
+                                      >
+                                        <h1 className="text-white text-2xl font-bold">컨텐츠 선택</h1>
                                       </div>
 
-                                      {/* 선택 버튼 */}
-                                      <button
-                                        onClick={() => handleContentSelect(availableContents[mainContentIndex])}
-                                        className="ml-2 px-8 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-full font-semibold text-lg transition-all shadow-xl"
-                                      >
-                                        이 컨텐츠로 시작하기
-                                      </button>
-                                    </div>
-                                  </div>
+                                      {/* 컨텐츠 정보 영역 */}
+                                      <div className="flex-1 flex items-end min-h-[200px] py-8">
+                                        <div className="max-w-2xl transition-all duration-700 ease-in-out">
+                                          {/* 테마 이름 */}
+                                          <span className="inline-block px-4 py-1.5 bg-gray-500/30 text-gray-300 text-sm font-medium rounded-full mb-3">
+                                            {roomInfo.themeName}
+                                          </span>
 
-                                  {/* 하단 캐러셀 - 다른 컨텐츠들 (현재 메인 컨텐츠 제외) */}
-                                  <div
-                                    className={`absolute bottom-0 left-0 right-0 z-30 px-8 min-[1920px]:pb-8 transition-all duration-700 ${
-                                      isTransitioning && selectedContent ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'
-                                    }`}
-                                  >
-                                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent hover:scrollbar-thumb-white/50">
-                                      {carouselOrder.map((contentIndex) => {
-                                        const content = availableContents[contentIndex];
-                                        if (!content) return null;
-                                        return (
-                                          <button
-                                            key={content.content_id}
-                                            onClick={() => handleMainContentChange(contentIndex)}
-                                            className="shrink-0 w-64 min-[1920px]:w-80 border border-white/20 hover:border-white/40 hover:shadow-lg bg-white/5 rounded-lg overflow-hidden transition-all duration-500 text-left group animate-slide-in-right"
-                                          >
-                                          <div className="relative w-full h-44 min-[1920px]:h-52 overflow-hidden">
-                                            <img
-                                              src={content.thumbnail_url}
-                                              alt={content.title}
-                                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                            />
+                                          {/* 제목 */}
+                                          <h2 className="text-white text-5xl font-bold mb-3">{availableContents[mainContentIndex].title}</h2>
+
+                                          {/* 설명 */}
+                                          <p className="text-gray-200 text-base leading-relaxed line-clamp-2 mb-4">{availableContents[mainContentIndex].description}</p>
+
+                                          {/* 하단 정보 및 버튼 */}
+                                          <div className="flex items-center gap-6">
                                             {/* 인원수 */}
-                                            {content.max_people && (
-                                              <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                                                <Users size={12} />
-                                                <span>{content.max_people}명</span>
+                                            {availableContents[mainContentIndex].max_people && (
+                                              <div className="flex items-center gap-2 text-white">
+                                                <Users size={20} />
+                                                <span className="text-base font-medium">{availableContents[mainContentIndex].max_people}명</span>
                                               </div>
                                             )}
                                             {/* 영상 길이 */}
-                                            <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                                              <Clock size={12} />
-                                              <span>{Math.floor(content.total_duration / 60)}:{Math.floor(content.total_duration % 60).toString().padStart(2, '0')}</span>
+                                            <div className="flex items-center gap-2 text-white">
+                                              <Clock size={20} />
+                                              <span className="text-base font-medium">{Math.floor(availableContents[mainContentIndex].total_duration / 60)}:{Math.floor(availableContents[mainContentIndex].total_duration % 60).toString().padStart(2, '0')}</span>
                                             </div>
+
+                                            {/* 선택 버튼 */}
+                                            <button
+                                              onClick={() => handleContentSelect(availableContents[mainContentIndex])}
+                                              className="ml-2 px-8 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-full font-semibold text-lg transition-all shadow-xl"
+                                            >
+                                              이 컨텐츠로 시작하기
+                                            </button>
                                           </div>
-                                          <div className="p-4">
-                                            <h3 className="font-semibold mb-1 line-clamp-1 transition-colors text-gray-200">
-                                              {content.title}
-                                            </h3>
-                                            <p className="text-sm text-gray-300 line-clamp-2">
-                                              {content.description}
-                                            </p>
-                                          </div>
-                                          </button>
-                                        );
-                                      })}
+                                        </div>
+                                      </div>
+
+                                      {/* 하단 캐러셀 - 다른 컨텐츠들 (현재 메인 컨텐츠 제외) */}
+                                      <div
+                                        className={`transition-all duration-700 ${
+                                          isTransitioning && selectedContent ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+                                        }`}
+                                      >
+                                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent hover:scrollbar-thumb-white/50">
+                                          {carouselOrder.map((contentIndex) => {
+                                            const content = availableContents[contentIndex];
+                                            if (!content) return null;
+                                            return (
+                                              <button
+                                                key={content.content_id}
+                                                onClick={() => handleMainContentChange(contentIndex)}
+                                                className="shrink-0 w-64 min-[1920px]:w-80 border border-white/20 hover:border-white/40 hover:shadow-lg bg-white/5 rounded-lg overflow-hidden transition-all duration-500 text-left group animate-slide-in-right"
+                                              >
+                                              <div className="relative w-full h-44 min-[1920px]:h-52 overflow-hidden">
+                                                <img
+                                                  src={content.thumbnail_url}
+                                                  alt={content.title}
+                                                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                />
+                                                {/* 인원수 */}
+                                                {content.max_people && (
+                                                  <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                                                    <Users size={12} />
+                                                    <span>{content.max_people}명</span>
+                                                  </div>
+                                                )}
+                                                {/* 영상 길이 */}
+                                                <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                                                  <Clock size={12} />
+                                                  <span>{Math.floor(content.total_duration / 60)}:{Math.floor(content.total_duration % 60).toString().padStart(2, '0')}</span>
+                                                </div>
+                                              </div>
+                                              <div className="p-4">
+                                                <h3 className="font-semibold mb-1 line-clamp-1 transition-colors text-gray-200">
+                                                  {content.title}
+                                                </h3>
+                                                <p className="text-sm text-gray-300 line-clamp-2">
+                                                  {content.description}
+                                                </p>
+                                              </div>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 </>
@@ -2506,10 +2561,16 @@ export default function ShadowingRoom() {
       {toastMessage && (
         <Toast
           message={toastMessage}
-          type="error"
-          onClose={() => setToastMessage(null)}
+          type={toastType}
+          onClose={() => {
+            setToastMessage(null);
+            setToastType('error'); // 기본값으로 리셋
+          }}
         />
       )}
+
+      {/* 녹음 중 인디케이터 */}
+      {isMyTurnRecording && <RecordingIndicator />}
 
       {/* 미디어 체크 모달 (블러 배경) */}
       {/* WebRTC 비활성화 시 미디어 체크 모달 표시 안 함 */}
