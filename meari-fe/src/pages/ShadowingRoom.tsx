@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Users, MessageCircle, Lock, Unlock, Copy, Check, X, LayoutList, LayoutGrid, Maximize2, UserCircle, Play, Home, Clock } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
@@ -33,6 +33,7 @@ const DISABLE_WEBRTC = false;
 export default function ShadowingRoom() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { userInfo } = useAuthStore();
   const roomOwnerId = useRoomStore((state) => state.roomData?.owner_id);
   const isOwner = userInfo?.memberId === roomOwnerId;
@@ -709,6 +710,11 @@ export default function ShadowingRoom() {
         );
 
         if (isAlreadyMember) {
+          // navigate state에서 받은 비밀번호가 있으면 sessionStorage에 백업
+          const navPassword = (location.state as { password?: string })?.password;
+          if (navPassword) {
+            sessionStorage.setItem(`room_${roomId}_pwd`, navPassword);
+          }
           // 멤버 목록 및 준비 상태 동기화
           previousMembersRef.current = response.data.data.members.map(m => ({
             member_id: m.member_id,
@@ -722,8 +728,49 @@ export default function ShadowingRoom() {
           setIsEntered(true);
         } else {
           // 아직 입장하지 않은 경우 enterRoom API 호출
-          try {
-            await enterRoom(Number(roomId), {});
+          // navigate state 또는 sessionStorage에서 비밀번호 복원
+          const navPassword = (location.state as { password?: string })?.password;
+          const savedPassword = sessionStorage.getItem(`room_${roomId}_pwd`);
+          const roomPassword = navPassword || savedPassword || undefined;
+
+          const maxRetries = 3;
+          let entered = false;
+
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+              await enterRoom(Number(roomId), { password: roomPassword });
+              entered = true;
+              break;
+            } catch (error: unknown) {
+              const axiosError = error as { response?: { status?: number } };
+              // 이미 방에 있는 유저인 경우 (409 Conflict) 정상 진입 처리
+              if (axiosError.response?.status === 409) {
+                entered = true;
+                break;
+              }
+              // 마지막 시도가 아니면 대기 후 재시도
+              if (attempt < maxRetries - 1) {
+                await new Promise(r => setTimeout(r, 1000));
+                // 재시도 전 멤버 재확인
+                const retryResp = await getRoomDetail(Number(roomId));
+                if (retryResp.data.data?.members.some(m => m.member_id === userInfo?.memberId)) {
+                  entered = true;
+                  break;
+                }
+              } else {
+                console.error('Failed to enter room:', error);
+                alert('방 입장에 실패했습니다.');
+                navigate('/');
+                return;
+              }
+            }
+          }
+
+          if (entered) {
+            // 비밀번호를 sessionStorage에 백업 (새로고침 대비)
+            if (roomPassword) {
+              sessionStorage.setItem(`room_${roomId}_pwd`, roomPassword);
+            }
 
             // 입장 후 최신 방 정보 다시 가져오기 (members 업데이트)
             const updatedResponse = await getRoomDetail(Number(roomId));
@@ -745,10 +792,6 @@ export default function ShadowingRoom() {
             }
 
             setIsEntered(true);
-          } catch (error) {
-            console.error('Failed to enter room:', error);
-            alert('방 입장에 실패했습니다.');
-            navigate('/');
           }
         }
       } catch (error) {
@@ -1513,15 +1556,27 @@ export default function ShadowingRoom() {
   // 브라우저 닫기/새로고침 시 퇴장 처리
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // useVideoRoom의 cleanup에서 미디어 트랙 정리가 자동으로 처리됨
-      // 백엔드는 WebSocket 연결 해제로 자동 정리됨
+      if (roomId && isEntered) {
+        const token = localStorage.getItem('access_token');
+        const baseUrl = import.meta.env.VITE_BASE_SERVER_URL;
+        // keepalive: true로 페이지 닫혀도 요청 전송 보장
+        fetch(`${baseUrl}/rooms/${roomId}/leave`, {
+          method: 'DELETE',
+          keepalive: true,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        sessionStorage.removeItem(`room_${roomId}_pwd`);
+      }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, []);
+  }, [roomId, isEntered]);
 
   if (!roomId) {
     return (
@@ -1565,6 +1620,7 @@ export default function ShadowingRoom() {
         // 4. 로컬 데이터 정리
         clearRoomData();
         clearRoles(); // 역할 정보 초기화
+        sessionStorage.removeItem(`room_${roomId}_pwd`);
       }
 
       // 5. 모든 정리 완료 후 홈으로 이동

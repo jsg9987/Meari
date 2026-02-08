@@ -158,7 +158,7 @@ const ShadowingPanel = ({ selectedTheme }: ShadowingPanelProps) => {
     })
     if (response.data.success) {
       setIsPasswordModalOpen(false)
-      navigate(`/shadowing/${selectedRoomId}`)
+      navigate(`/shadowing/${selectedRoomId}`, { state: { password } })
     } else {
       throw new Error('비밀번호가 일치하지 않습니다.')
     }
