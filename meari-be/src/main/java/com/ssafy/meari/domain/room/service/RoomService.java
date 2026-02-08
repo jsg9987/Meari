@@ -526,9 +526,14 @@ public class RoomService {
             throw new BusinessException(ErrorCode.CONTENT_SELECT_ONLY_WAITING);
         }
 
-        // 콘텐츠 존재 확인
-        if (!contentRepository.existsById(contentId)) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_CONTENT);
+        // 콘텐츠 조회
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_CONTENT));
+
+        // 현재 참여자 수가 콘텐츠 최대 인원을 초과하는지 확인
+        long currentMemberCount = roomSessionService.getMemberCount(roomId);
+        if (content.getMaxPeople() < currentMemberCount) {
+            throw new BusinessException(ErrorCode.CONTENT_MAX_PEOPLE_EXCEEDED);
         }
 
         // Redis에 콘텐츠 저장 (phase는 변경하지 않음)

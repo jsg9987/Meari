@@ -92,6 +92,7 @@ public enum ErrorCode {
     CONTENT_NOT_SELECTED(HttpStatus.CONFLICT, "동영상이 선택되지 않았습니다."),
     CONTENT_MISMATCH(HttpStatus.CONFLICT, "선택된 동영상과 일치하지 않습니다."),
     CONTENT_SELECT_ONLY_WAITING(HttpStatus.CONFLICT, "동영상은 대기 중일 때만 선택할 수 있습니다."),
+    CONTENT_MAX_PEOPLE_EXCEEDED(HttpStatus.CONFLICT, "현재 참여자 수가 해당 콘텐츠의 최대 인원을 초과합니다."),
     ROOM_ALREADY_STARTED(HttpStatus.CONFLICT, "이미 학습이 시작된 방입니다."),
     ROOM_ALREADY_CLOSED(HttpStatus.CONFLICT, "이미 종료된 방입니다."),
     ROLE_NOT_SELECTED(HttpStatus.CONFLICT, "모든 참여자가 역할을 선택하지 않았습니다."),
