@@ -255,7 +255,7 @@ export default function KopicReport() {
         kopicSessionData.kopicTotalReportId = 0
         kopicSessionData.sentences = []
         sessionStorage.removeItem(KOPIC_SESSION_STORAGE_KEY)
-        navigate('/')
+        navigate('/main')
     }
 
     // 비동기 분석 결과 조회 (각 문제별 개별 조회)
@@ -264,7 +264,7 @@ export default function KopicReport() {
             return
         }
         if (!themeId) {
-            navigate('/')
+            navigate('/main')
             return
         }
 

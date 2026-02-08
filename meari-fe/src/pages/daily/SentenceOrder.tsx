@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import logoWhite from '../../assets/images/common/logo-white.svg'
 import progressBarBg from '../../assets/images/daily/word-study/word-study-top-frame-2.svg'
 import dailyCharacter from '../../assets/images/daily/word-study/daily-study-character.svg'
@@ -62,6 +62,8 @@ const SentenceOrder = () => {
   })
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
   const [isWrongModalOpen, setIsWrongModalOpen] = useState(false)
+  const [hintLevel, setHintLevel] = useState(0) // 0: 전체 블러, 1: 부분 힌트, 2: 전체 공개
+  const [blurredIndices, setBlurredIndices] = useState<number[]>([])
 
   const total = questions.length
   const activeQuestion = questions[currentIndex]
@@ -125,6 +127,21 @@ const SentenceOrder = () => {
     setContainers({ bank: ids, sentence: [] })
     setFeedbackMessage(null)
     setIsWrongModalOpen(false)
+    setHintLevel(0)
+
+    // 랜덤으로 단어 인덱스 선택 (전체 단어 수를 3으로 나눈 후 올림)
+    const wordCount = activeQuestion.words.length
+    const indicesToBlur: number[] = []
+    const numToBlur = Math.ceil(wordCount / 3)
+
+    while (indicesToBlur.length < numToBlur) {
+      const randomIndex = Math.floor(Math.random() * wordCount)
+      if (!indicesToBlur.includes(randomIndex)) {
+        indicesToBlur.push(randomIndex)
+      }
+    }
+
+    setBlurredIndices(indicesToBlur)
   }, [activeQuestion])
 
   const handlePrev = () => {
@@ -225,7 +242,7 @@ const SentenceOrder = () => {
         <div className="mx-auto flex h-full w-full max-w-[75rem] items-center px-6">
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/main')}
             className="inline-flex items-center"
             aria-label="메인 페이지로 이동"
           >
@@ -389,8 +406,56 @@ const SentenceOrder = () => {
                               </div>
                             </div>
 
-                            <div className="mt-[15px] px-[15px] text-sm text-gray-500">
-                              정답 예시: <span className="font-medium text-gray-700">{ordered}</span>
+                            <div className="mt-[15px] px-[15px]">
+                              <button
+                                type="button"
+                                onClick={() => setHintLevel((prev) => (prev + 1) % 3)}
+                                className="group inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-white px-4 py-2.5 text-sm transition-all hover:border-blue-300 hover:shadow-md active:scale-95"
+                              >
+                                <span className="text-gray-600">힌트 :</span>
+                                <span className="font-semibold">
+                                  {ordered.split(' ').map((word, index) => {
+                                    const isBlurredWord = blurredIndices.includes(index)
+                                    let showBlur = false
+
+                                    if (hintLevel === 0) {
+                                      // 전체 블러
+                                      showBlur = true
+                                    } else if (hintLevel === 1) {
+                                      // 부분 힌트 (일부만 블러)
+                                      showBlur = isBlurredWord
+                                    } else {
+                                      // hintLevel === 2: 전체 공개
+                                      showBlur = false
+                                    }
+
+                                    return (
+                                      <span key={index}>
+                                        {index > 0 && ' '}
+                                        <span
+                                          className={`transition-all duration-300 ${
+                                            showBlur
+                                              ? 'select-none text-gray-400 blur-[6px]'
+                                              : 'text-blue-600 blur-none'
+                                          }`}
+                                        >
+                                          {word}
+                                        </span>
+                                      </span>
+                                    )
+                                  })}
+                                </span>
+                                {hintLevel === 2 ? (
+                                  <EyeOff size={16} className="text-blue-500 transition-colors" />
+                                ) : hintLevel === 1 ? (
+                                  <Eye size={16} className="text-blue-500 transition-colors" />
+                                ) : (
+                                  <Eye size={16} className="text-gray-400 transition-colors group-hover:text-blue-500" />
+                                )}
+                              </button>
+                              <p className="mt-2 text-xs text-gray-400">
+                                💡 한 번 더 클릭하면 정답이 나와요
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -412,7 +477,7 @@ const SentenceOrder = () => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => navigate('/')}
+                            onClick={() => navigate('/main')}
                             className="rounded-full border border-gray-200 bg-white px-6 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-300"
                           >
                             홈으로 이동

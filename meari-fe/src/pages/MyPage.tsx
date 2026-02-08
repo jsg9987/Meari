@@ -163,7 +163,7 @@ const MyPage = () => {
 
   const handleLogout = () => {
     logout()
-    navigate('/')
+    navigate('/main')
   }
 
   const handleVerifySubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -390,23 +390,26 @@ const MyPage = () => {
                     if (!file) return
                     setProfileImageName(file.name)
                     try {
-                      const { width, height } = await getImageDimensions(file)
+                      // 파일 확장자 추출
+                      const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+
+                      // 1. Presigned URL 발급
                       const uploadResponse = await requestProfileImageUploadUrl({
-                        fileName: file.name,
-                        contentType: file.type,
-                        fileSize: file.size,
-                        width,
-                        height
+                        file_extension: fileExtension
                       })
                       const uploadData = uploadResponse.data?.data
                       if (!uploadData) throw new Error('업로드 URL 발급 실패')
-                      await fetch(uploadData.uploadUrl, {
+
+                      // 2. S3에 직접 업로드
+                      await fetch(uploadData.upload_url, {
                         method: 'PUT',
                         headers: { 'Content-Type': file.type },
                         body: file
                       })
-                      await confirmProfileImage({ profileUrl: uploadData.profileUrl })
-                      setProfileImageUrl(uploadData.profileUrl)
+
+                      // 3. 프로필 이미지 URL 업데이트
+                      await confirmProfileImage({ profile_url: uploadData.s3_key })
+                      setProfileImageUrl(uploadData.s3_key)
                     } catch (error) {
                       console.error('[MyPage] Profile image upload failed', error)
                       alert('프로필 이미지 업로드에 실패했습니다.')
@@ -594,7 +597,7 @@ const MyPage = () => {
         onLogout={handleLogout}
       />
 
-      <main className='flex-1 bg-white ml-64'>
+      <main className='flex-1 bg-white ml-64 min-w-0'>
         {renderContent()}
       </main>
     </div>
