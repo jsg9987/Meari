@@ -303,6 +303,50 @@ public class RoomService {
     }
 
     /**
+     * 멤버 강퇴 (방장 전용, WAITING 상태에서만)
+     */
+    @Transactional
+    public void kickMember(Long roomId, Long targetMemberId, Long requestMemberId) {
+        log.info("멤버 강퇴 요청: roomId={}, targetMemberId={}, requestMemberId={}", roomId, targetMemberId, requestMemberId);
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
+
+        // WAITING 상태 확인
+        if (room.getStatus() != RoomStatus.WAITING) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_WAITING);
+        }
+
+        // 방장 권한 확인
+        if (!room.getOwner().getMemberId().equals(requestMemberId)) {
+            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
+        }
+
+        // 자기 자신 강퇴 방지
+        if (requestMemberId.equals(targetMemberId)) {
+            throw new BusinessException(ErrorCode.CANNOT_KICK_SELF);
+        }
+
+        // 대상 멤버가 방에 참여 중인지 확인
+        MemberRoom memberRoom = memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(roomId, targetMemberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER_ROOM));
+
+        // MemberRoom DB 삭제
+        memberRoomRepository.delete(memberRoom);
+
+        // Redis 정리 (멤버/준비상태/역할 제거 + 멤버→방 매핑 제거 + Grace Period 마킹 제거)
+        roomSessionService.removeMember(roomId, targetMemberId);
+        roomSessionService.clearMemberRoom(targetMemberId);
+        roomSessionService.clearDisconnected(roomId, targetMemberId);
+
+        // 강퇴 알림 브로드캐스트
+        RoomStateMessage message = RoomStateMessage.memberKicked(targetMemberId);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+
+        log.info("멤버 강퇴 완료: roomId={}, targetMemberId={}", roomId, targetMemberId);
+    }
+
+    /**
      * 비정상 종료 처리 (WebSocket 연결 끊김)
      * SessionDisconnectEvent에서 호출됨
      */
