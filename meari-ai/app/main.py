@@ -31,6 +31,148 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
+# OpenAPI schema 커스터마이징 (Swagger UI 개선)
+def custom_openapi():
+    """Swagger UI에 detailed_analysis JSON 구조 표시"""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    from fastapi.openapi.utils import get_openapi
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # detailed_analysis JSON 구조 상세 정의
+    openapi_schema["components"]["schemas"]["DetailedAnalysisExample"] = {
+        "type": "object",
+        "description": "detailed_analysis JSON 파싱 후 구조",
+        "properties": {
+            "summary": {
+                "type": "object",
+                "properties": {
+                    "total_sentences": {"type": "integer", "example": 3},
+                    "analyzed_sentences": {"type": "integer", "example": 3},
+                    "average_accuracy": {"type": "integer", "example": 85},
+                    "average_confidence": {"type": "number", "example": 0.92},
+                    "average_intonation": {"type": "integer", "example": 94}
+                }
+            },
+            "sentences": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "sentence_id": {"type": "integer"},
+                        "text_expected": {"type": "string"},
+                        "text_recognized": {"type": "string"},
+                        "accuracy": {"type": "integer"},
+                        "mean_confidence": {"type": "number"},
+                        "syllables": {"type": "array", "items": {"type": "string"}},
+                        "syllable_confidences": {"type": "array", "items": {"type": "number"}},
+                        "errors": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {"type": "string", "example": "replace"},
+                                    "position": {"type": "integer"},
+                                    "expected": {"type": "string"},
+                                    "actual": {"type": "string"},
+                                    "confidence": {"type": "number"},
+                                    "description": {"type": "string"}
+                                }
+                            }
+                        },
+                        "intonation": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "integer", "minimum": -1, "maximum": 100, "example": 94},
+                                "feedback": {"type": "string", "example": "억양이 매우 자연스럽습니다!"},
+                                "pitch_data": {
+                                    "type": "object",
+                                    "description": "차트용 데이터 (100개 고정)",
+                                    "properties": {
+                                        "reference": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "description": "정답 pitch (100개, Hz)",
+                                            "example": [216.5, 218.3, 220.1]
+                                        },
+                                        "user": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "description": "사용자 pitch (100개, Hz)",
+                                            "example": [195.2, 197.8, 199.5]
+                                        },
+                                        "time_points": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "description": "시간 축 (100개, 초)",
+                                            "example": [0.0, 0.05, 0.10]
+                                        }
+                                    }
+                                },
+                                "statistics": {
+                                    "type": "object",
+                                    "properties": {
+                                        "reference": {
+                                            "type": "object",
+                                            "properties": {
+                                                "mean": {"type": "number", "example": 216.5},
+                                                "std": {"type": "number", "example": 12.3},
+                                                "min": {"type": "number", "example": 180.0},
+                                                "max": {"type": "number", "example": 250.0}
+                                            }
+                                        },
+                                        "user": {
+                                            "type": "object",
+                                            "properties": {
+                                                "mean": {"type": "number", "example": 195.2},
+                                                "std": {"type": "number", "example": 15.8},
+                                                "min": {"type": "number", "example": 160.0},
+                                                "max": {"type": "number", "example": 230.0}
+                                            }
+                                        },
+                                        "pitch_difference": {"type": "number", "example": 21.3}
+                                    }
+                                },
+                                "raw_data": {
+                                    "type": "object",
+                                    "description": "원본 데이터 (디버깅용)",
+                                    "properties": {
+                                        "reference_pitch": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "description": "정답 원본 pitch (가변 길이)"
+                                        },
+                                        "user_pitch": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "description": "사용자 원본 pitch (가변 길이)"
+                                        },
+                                        "reference_frames": {"type": "integer", "example": 292},
+                                        "user_frames": {"type": "integer", "example": 371}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+
 # 전역 변수
 consumer = None
 analysis_service = None

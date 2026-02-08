@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Users, MessageCircle, Lock, Unlock, Copy, Check, X, LayoutList, LayoutGrid, Maximize2, UserCircle, Play, Home, Clock } from "lucide-react";
 // import Header from "../components/common/Header";
 import VideoTile from "../components/webrtc/VideoTile";
@@ -27,12 +27,13 @@ type LayoutMode = "narrow" | "grid" | "wide";
 // WebRTC 비활성화 플래그
 // true로 설정하면 WebRTC 없이 쉐도잉 기능만 테스트
 // ========================================
-const DISABLE_WEBRTC = false;
+const DISABLE_WEBRTC = true;
 
 // TODO: 헤더 변경, 비디오 타일 변경
 export default function ShadowingRoom() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { userInfo } = useAuthStore();
   const roomOwnerId = useRoomStore((state) => state.roomData?.owner_id);
   const isOwner = userInfo?.memberId === roomOwnerId;
@@ -235,8 +236,12 @@ export default function ShadowingRoom() {
     stopRecordingRef.current = stopRecording;
   });
 
+  // 빠른 생성 자동 콘텐츠 선택 플래그
+  const [needsAutoContentSelect, setNeedsAutoContentSelect] = useState(false);
+
   // 웹소켓 연결
   const {
+    isConnected,
     toggleReady: wsToggleReady,
     assignRole,
     sendChatMessage,
@@ -274,11 +279,30 @@ export default function ShadowingRoom() {
           return prev;
         }
 
-        // 참가자들은 임시 객체 생성
+        // 참가자: 실제 콘텐츠 정보를 비동기로 가져오기
+        const themeId = roomData?.theme_id || 1;
+        getThemeContents(themeId).then(res => {
+          if (res.data.success && res.data.data) {
+            const actual = res.data.data.find(c => c.content_id === contentId);
+            if (actual) {
+              setSelectedContent({
+                content_id: contentId,
+                theme_id: themeId,
+                title: actual.title,
+                description: actual.description,
+                video_url: videoUrlFromApi || actual.video_url,
+                thumbnail_url: actual.thumbnail_url,
+                total_duration: actual.total_duration,
+              });
+            }
+          }
+        }).catch(() => {});
+
+        // 일단 임시 객체 반환
         return {
           content_id: contentId,
-          theme_id: roomData?.theme_id || 1,
-          title: '선택된 컨텐츠', // 실제 제목은 방장이 선택한 컨텐츠에서만 표시됨
+          theme_id: themeId,
+          title: '컨텐츠 로딩 중...',
           description: '',
           video_url: videoUrlFromApi,
           thumbnail_url: '',
@@ -656,7 +680,7 @@ export default function ShadowingRoom() {
 
         if (!response.data.success || !response.data.data) {
           alert('방 정보를 가져올 수 없습니다.');
-          navigate('/');
+          navigate('/main');
           return;
         }
 
@@ -676,31 +700,45 @@ export default function ShadowingRoom() {
         console.log('[fetchRoomDetail] Initial participantsReady:', initialReadyState);
         setParticipantsReady(initialReadyState);
 
-        // content_id가 이미 있으면 video_url 가져오기
+        // content_id가 이미 있으면 video_url 가져오기 + 콘텐츠 선택 확정
+        const navIsOwner = (location.state as { isOwner?: boolean })?.isOwner;
         if (response.data.data.content_id) {
           const existingContentId = response.data.data.content_id;
+          const existingThemeId = response.data.data.theme_id || 1;
           setContentId(existingContentId);
 
           try {
-            const videoResponse = await getContentVideoUrl(existingContentId);
-            if (videoResponse.data.success && videoResponse.data.data) {
-              const videoUrlFromApi = videoResponse.data.data.video_url;
-              setVideoUrl(videoUrlFromApi);
+            const [videoResponse, contentsResponse] = await Promise.all([
+              getContentVideoUrl(existingContentId),
+              getThemeContents(existingThemeId),
+              selectRoomContent(Number(roomId), existingContentId).catch(() => null),
+            ]);
 
-              // 임시 컨텐츠 객체 생성
-              setSelectedContent({
-                content_id: existingContentId,
-                theme_id: response.data.data.theme_id || 1,
-                title: '선택된 컨텐츠',
-                description: '',
-                video_url: videoUrlFromApi,
-                thumbnail_url: '',
-                total_duration: 0,
-              });
+            let videoUrlFromApi = '';
+            if (videoResponse.data.success && videoResponse.data.data) {
+              videoUrlFromApi = videoResponse.data.data.video_url;
+              setVideoUrl(videoUrlFromApi);
             }
+
+            const actualContent = contentsResponse.data.success && contentsResponse.data.data
+              ? contentsResponse.data.data.find(c => c.content_id === existingContentId)
+              : null;
+
+            setSelectedContent({
+              content_id: existingContentId,
+              theme_id: existingThemeId,
+              title: actualContent?.title ?? '선택된 컨텐츠',
+              description: actualContent?.description ?? '',
+              video_url: videoUrlFromApi || actualContent?.video_url || '',
+              thumbnail_url: actualContent?.thumbnail_url ?? '',
+              total_duration: actualContent?.total_duration ?? 0,
+            });
           } catch (error) {
             console.error('[fetchRoomDetail] Failed to get video URL:', error);
           }
+        } else if (navIsOwner && response.data.data.theme_id) {
+          // 빠른 생성: content_id가 없으면 WebSocket 연결 후 자동 선택하도록 플래그 설정
+          setNeedsAutoContentSelect(true);
         }
 
         // 이미 멤버 목록에 있으면 (방장이거나, Home에서 joinRoom으로 이미 입장한 경우) 바로 입장
@@ -709,6 +747,11 @@ export default function ShadowingRoom() {
         );
 
         if (isAlreadyMember) {
+          // navigate state에서 받은 비밀번호가 있으면 sessionStorage에 백업
+          const navPassword = (location.state as { password?: string })?.password;
+          if (navPassword) {
+            sessionStorage.setItem(`room_${roomId}_pwd`, navPassword);
+          }
           // 멤버 목록 및 준비 상태 동기화
           previousMembersRef.current = response.data.data.members.map(m => ({
             member_id: m.member_id,
@@ -722,8 +765,49 @@ export default function ShadowingRoom() {
           setIsEntered(true);
         } else {
           // 아직 입장하지 않은 경우 enterRoom API 호출
-          try {
-            await enterRoom(Number(roomId), {});
+          // navigate state 또는 sessionStorage에서 비밀번호 복원
+          const navPassword = (location.state as { password?: string })?.password;
+          const savedPassword = sessionStorage.getItem(`room_${roomId}_pwd`);
+          const roomPassword = navPassword || savedPassword || undefined;
+
+          const maxRetries = 3;
+          let entered = false;
+
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+              await enterRoom(Number(roomId), { password: roomPassword });
+              entered = true;
+              break;
+            } catch (error: unknown) {
+              const axiosError = error as { response?: { status?: number } };
+              // 이미 방에 있는 유저인 경우 (409 Conflict) 정상 진입 처리
+              if (axiosError.response?.status === 409) {
+                entered = true;
+                break;
+              }
+              // 마지막 시도가 아니면 대기 후 재시도
+              if (attempt < maxRetries - 1) {
+                await new Promise(r => setTimeout(r, 1000));
+                // 재시도 전 멤버 재확인
+                const retryResp = await getRoomDetail(Number(roomId));
+                if (retryResp.data.data?.members.some(m => m.member_id === userInfo?.memberId)) {
+                  entered = true;
+                  break;
+                }
+              } else {
+                console.error('Failed to enter room:', error);
+                alert('방 입장에 실패했습니다.');
+                navigate('/main');
+                return;
+              }
+            }
+          }
+
+          if (entered) {
+            // 비밀번호를 sessionStorage에 백업 (새로고침 대비)
+            if (roomPassword) {
+              sessionStorage.setItem(`room_${roomId}_pwd`, roomPassword);
+            }
 
             // 입장 후 최신 방 정보 다시 가져오기 (members 업데이트)
             const updatedResponse = await getRoomDetail(Number(roomId));
@@ -745,16 +829,12 @@ export default function ShadowingRoom() {
             }
 
             setIsEntered(true);
-          } catch (error) {
-            console.error('Failed to enter room:', error);
-            alert('방 입장에 실패했습니다.');
-            navigate('/');
           }
         }
       } catch (error) {
         console.error('Failed to fetch room detail:', error);
         alert('방 정보를 가져오는데 실패했습니다.');
-        navigate('/');
+        navigate('/main');
       } finally {
         setIsRoomLoading(false);
       }
@@ -1009,6 +1089,28 @@ export default function ShadowingRoom() {
 
     fetchContents();
   }, [roomData?.theme_id]);
+
+  // 빠른 생성: WebSocket 연결 + 방 입장 + 콘텐츠 로드 완료 후 첫 번째 콘텐츠 자동 선택
+  useEffect(() => {
+    if (!needsAutoContentSelect || !isConnected || !isEntered || availableContents.length === 0 || !roomId) return;
+
+    const autoSelectContent = async () => {
+      try {
+        const firstContent = availableContents[0];
+        const response = await selectRoomContent(Number(roomId), firstContent.content_id);
+        if (response.data.success) {
+          // setSelectedContent는 여기서 직접 설정 (방장용)
+          // contentId, videoUrl은 onContentSelected WebSocket 핸들러에서 설정됨
+          setSelectedContent(firstContent);
+        }
+      } catch (error) {
+        console.error('[autoSelectContent] Failed:', error);
+      }
+      setNeedsAutoContentSelect(false);
+    };
+
+    autoSelectContent();
+  }, [needsAutoContentSelect, isConnected, isEntered, availableContents, roomId]);
 
   // 방 정보 (store에서 가져오기)
   const roomInfo = roomData ? {
@@ -1513,22 +1615,34 @@ export default function ShadowingRoom() {
   // 브라우저 닫기/새로고침 시 퇴장 처리
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // useVideoRoom의 cleanup에서 미디어 트랙 정리가 자동으로 처리됨
-      // 백엔드는 WebSocket 연결 해제로 자동 정리됨
+      if (roomId && isEntered) {
+        const token = localStorage.getItem('access_token');
+        const baseUrl = import.meta.env.VITE_BASE_SERVER_URL;
+        // keepalive: true로 페이지 닫혀도 요청 전송 보장
+        fetch(`${baseUrl}/rooms/${roomId}/leave`, {
+          method: 'DELETE',
+          keepalive: true,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        sessionStorage.removeItem(`room_${roomId}_pwd`);
+      }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, []);
+  }, [roomId, isEntered]);
 
   if (!roomId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-gray-50">
         <p className="text-red-600 text-lg font-medium">유효하지 않은 방 ID입니다</p>
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/main")}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           홈으로 돌아가기
@@ -1565,14 +1679,15 @@ export default function ShadowingRoom() {
         // 4. 로컬 데이터 정리
         clearRoomData();
         clearRoles(); // 역할 정보 초기화
+        sessionStorage.removeItem(`room_${roomId}_pwd`);
       }
 
       // 5. 모든 정리 완료 후 홈으로 이동
-      navigate("/", { replace: true });
+      navigate("/main", { replace: true });
     } catch (error) {
       console.error('Failed to leave room:', error);
       // 에러 발생해도 페이지 이동
-      navigate("/", { replace: true });
+      navigate("/main", { replace: true });
     } finally {
       setIsLeaving(false);
     }

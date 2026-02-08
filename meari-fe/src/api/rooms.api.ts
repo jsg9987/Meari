@@ -145,6 +145,20 @@ const useMock = apiConfig.shouldMock('ROOMS');
 
 export const createRoom = useMock ? createRoomMock : createRoomReal;
 
+// --- Quick Create Room (빠른 방 생성) ---
+export interface QuickCreateRoomRequest {
+  theme_id: number;
+}
+
+export type QuickCreateRoomResponse = AxiosResponse<ApiResponse<CreateRoomData>>;
+
+export const quickCreateRoom = async (
+  payload: QuickCreateRoomRequest
+): Promise<QuickCreateRoomResponse> => {
+  const response = await axiosInstance.post<ApiResponse<CreateRoomData>>('/rooms/quick', payload);
+  return response;
+};
+
 // --- Get Rooms (방 목록 조회) ---
 export interface RoomItem {
   room_id: number;

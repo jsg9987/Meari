@@ -90,7 +90,7 @@ export default function KopicEvaluation() {
 
         const handlePopState = () => {
             clearKopicSession()
-            navigate('/', { replace: true })
+            navigate('/main', { replace: true })
         }
 
         window.addEventListener('beforeunload', handleBeforeUnload)
@@ -299,7 +299,7 @@ export default function KopicEvaluation() {
                     <button
                         onClick={() => {
                             clearKopicSession()
-                            navigate('/')
+                            navigate('/main')
                         }}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >

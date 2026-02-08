@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { signup, checkEmail, checkNickname } from '../api/auth.api';
 
 // Assets
-import logoDark from '../assets/images/common/logo-dark.svg';
+import logoDark from '../assets/images/common/logo-dark-2.svg';
 import signupIllustration from '../assets/images/auth/Signup-illustaration.svg';
 
 const Signup = () => {
