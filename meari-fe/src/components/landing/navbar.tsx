@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import logoDark from '../../assets/images/common/logo-dark-2.svg'
 
 export function Navbar() {
   const navigate = useNavigate()
@@ -25,7 +26,7 @@ export function Navbar() {
         <div className="w-full max-w-6xl flex items-center justify-between">
           {/* Logo */}
           <a href="#" className="flex items-center gap-2">
-            <img src="/src/assets/images/common/logo-dark-2.svg" alt="logo" className="h-7" />
+            <img src={logoDark} alt="logo" className="h-7" />
           </a>
 
           {/* CTA */}
