@@ -1,3 +1,5 @@
+import logoDark from '../../assets/images/common/logo-dark-2.svg'
+
 export function Footer() {
   return (
     <footer className="border-t border-gray-200 py-16 px-6 bg-white">
@@ -5,7 +7,7 @@ export function Footer() {
         {/* Logo */}
         <div className="mb-8">
           <a href="#" className="inline-flex items-center gap-2">
-            <img src="/src/assets/images/common/logo-dark-2.svg" alt="메아리 로고" className="h-8" />
+            <img src={logoDark} alt="메아리 로고" className="h-8" />
           </a>
         </div>
 

@@ -2,6 +2,11 @@
 
 import React, { useState } from "react"
 import { motion } from "framer-motion"
+import logoDark from '../../assets/images/common/logo-dark-2.svg'
+import videoMock from '../../assets/images/video_mock.jpg'
+import avatar1 from '../../assets/images/avatars/user1.jpg'
+import avatar2 from '../../assets/images/avatars/user2.jpg'
+import avatar3 from '../../assets/images/avatars/user3.jpg'
 import {
   Inbox,
   FolderKanban,
@@ -70,9 +75,9 @@ export function DashboardMockup() {
   }
 
   const mockParticipants = [
-    { id: 1, name: "Jane", isReady: true, isOwner: true, avatar: "/src/assets/images/avatars/user1.jpg" },
-    { id: 2, name: "박민수", isReady: true, isOwner: false, avatar: "/src/assets/images/avatars/user2.jpg" },
-    { id: 3, name: "이영희", isReady: false, isOwner: false, avatar: "/src/assets/images/avatars/user3.jpg" },
+    { id: 1, name: "Jane", isReady: true, isOwner: true, avatar: avatar1 },
+    { id: 2, name: "박민수", isReady: true, isOwner: false, avatar: avatar2 },
+    { id: 3, name: "이영희", isReady: false, isOwner: false, avatar: avatar3 },
   ]
 
   const mockSubtitles = [
@@ -133,7 +138,7 @@ export function DashboardMockup() {
         {/* Logo */}
         <div className="pb-8">
           <div className="h-4 flex items-center justify-start">
-            <img src="/src/assets/images/common/logo-dark-2.svg" alt="MEARI" className="h-full" />
+            <img src={logoDark} alt="MEARI" className="h-full" />
           </div>
         </div>
 
@@ -231,7 +236,7 @@ export function DashboardMockup() {
           <div className="relative h-full w-full rounded-lg bg-black flex items-center justify-center overflow-hidden">
             {/* 목업 비디오 배경 */}
             <img
-              src="/src/assets/images/video_mock.jpg"
+              src={videoMock}
               alt="영상"
               className="absolute inset-0 w-full h-full object-cover"
             />
