@@ -8,7 +8,6 @@ import {
   changeMyPagePassword,
   checkMyPagePassword,
   confirmProfileImage,
-  getProfileImage,
   getMyPageProfile,
   requestProfileImageUploadUrl,
   updateMyPageProfile
@@ -76,21 +75,22 @@ const MyPage = () => {
     }
   }, [isAuthenticated, userInfo, fetchUserInfo])
 
-  useEffect(() => {
-    if (!userInfo?.memberId) return
-    const fetchProfileImage = async () => {
-      try {
-        const response = await getProfileImage(userInfo.memberId)
-        const data = response.data?.data
-        if (data?.profileUrl) {
-          setProfileImageUrl(data.profileUrl)
-        }
-      } catch (error) {
-        console.error('[MyPage] Failed to load profile image', error)
-      }
-    }
-    fetchProfileImage()
-  }, [userInfo?.memberId])
+  // 프로필 이미지 API 비활성화 (500 에러 발생)
+  // useEffect(() => {
+  //   if (!userInfo?.memberId) return
+  //   const fetchProfileImage = async () => {
+  //     try {
+  //       const response = await getProfileImage(userInfo.memberId)
+  //       const data = response.data?.data
+  //       if (data?.profileUrl) {
+  //         setProfileImageUrl(data.profileUrl)
+  //       }
+  //     } catch (error) {
+  //       console.error('[MyPage] Failed to load profile image', error)
+  //     }
+  //   }
+  //   fetchProfileImage()
+  // }, [userInfo?.memberId])
 
   const getLanguageLabel = (value: 'KR' | 'VN' | 'EN') => {
     if (value === 'KR') return '한국어'
