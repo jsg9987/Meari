@@ -70,6 +70,17 @@ const KopicSummaryChart = () => {
 
   const { best, average } = data
 
+  if (!best?.sentences || !average?.sentences) {
+    return (
+      <div className='rounded-2xl border border-gray-200 bg-white p-5'>
+        <h2 className='text-xl font-semibold text-gray-900 mb-4'>KOPIC 시험 요약</h2>
+        <div className='flex justify-center items-center h-80 text-gray-500'>
+          데이터가 없습니다
+        </div>
+      </div>
+    )
+  }
+
   // 문항별 점수 데이터 (막대 그래프용)
   const questionData = best.sentences.map((sentence, index) => {
     const avgSentence = average.sentences.find(
