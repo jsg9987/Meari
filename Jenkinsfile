@@ -28,8 +28,6 @@ pipeline {
                 dir('meari-be') {
                     script {
                         def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
-                        def cacheOption = params.NO_CACHE_BUILD ? "--no-cache" : "--cache-from backend-image:latest"
-
                         if (isReleaseBranch) {
                             withCredentials([
                                 string(credentialsId: 'DB_PASSWORD', variable: 'DB_PW'),
@@ -49,7 +47,6 @@ pipeline {
                                 // Docker 이미지 생성 (캐시 활용으로 빌드 시간 단축)
                                 sh '''
                                 docker build \
-                                  ${cacheOption} \
                                   --cache-from backend-image:latest \
                                   --build-arg DB_PASSWORD="${DB_PW}" \
                                   --build-arg JWT_SECRET_KEY="${JWT_KEY}" \
@@ -68,7 +65,7 @@ pipeline {
                                 '''
                             }
                         } else {
-                            sh 'docker build ${cacheOption} backend-image:latest -t backend-image:latest .'
+                            sh 'docker build  --no-cache backend-image:latest -t backend-image:latest .'
                         }
                     }
                 }
@@ -81,15 +78,12 @@ pipeline {
                 dir('meari-fe') {
                     script {
                         def isReleaseBranch = env.GIT_BRANCH == 'release' || env.GIT_BRANCH == 'origin/release'
-                        def cacheOption = params.NO_CACHE_BUILD ? "--no-cache" : "--cache-from backend-image:latest"
-
                         if (isReleaseBranch) {
                             withCredentials([
                                 string(credentialsId: 'VITE_BASE_SERVER_URL', variable: 'BE_URL')
                             ]) {
                                 sh '''
                                 docker build \
-                                  ${cacheOption} \
                                   --cache-from frontend-image:latest \
                                   --build-arg VITE_BASE_SERVER_URL="${BE_URL}" \
                                   --build-arg VITE_USE_MOCK_API=false \
@@ -101,7 +95,7 @@ pipeline {
                                 '''
                             }
                         } else {
-                            sh 'docker build ${cacheOption} frontend-image:latest -t frontend-image:latest .'
+                            sh 'docker build --no-cache frontend-image:latest -t frontend-image:latest .'
                         }
                     }
                 }
