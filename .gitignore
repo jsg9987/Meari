@@ -1,0 +1,9 @@
+.idea/*
+.idea/**
+.claude/
+.env
+.env.example
+
+# IDE
+.vscode/
+.idea/
