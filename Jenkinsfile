@@ -173,7 +173,7 @@ pipeline {
                             echo "CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}" >> .env
 
                             # docker-compose로 배포 (최신 yml 파일 사용)
-                            docker-compose -f docker-compose.yml up -d --remove-orphans spring-api frontend fastapi
+                            docker compose -f docker-compose.yml up -d --remove-orphans spring-api frontend fastapi
                         '''
                         sh 'docker image prune -f'
                     }
