@@ -13,7 +13,7 @@ pipeline {
         )
     }
 
-//     stages {
+    stages {
 //         // 코드 내려받기
 //         stage('Checkout') {
 //             steps {
