@@ -65,7 +65,7 @@ pipeline {
                                 '''
                             }
                         } else {
-                            sh 'docker build  --no-cache backend-image:latest -t backend-image:latest .'
+                            sh 'docker build  --cache-from backend-image:latest -t backend-image:latest .'
                         }
                     }
                 }
@@ -95,7 +95,7 @@ pipeline {
                                 '''
                             }
                         } else {
-                            sh 'docker build --no-cache frontend-image:latest -t frontend-image:latest .'
+                            sh 'docker build --cache-from frontend-image:latest -t frontend-image:latest .'
                         }
                     }
                 }
