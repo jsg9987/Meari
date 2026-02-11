@@ -16,7 +16,7 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class RestClientConfig {
 
-    private static final String FAST_API_URL = "http://localhost:8000";
+    private static final String FAST_API_URL = "http://fastapi:8000";
 
     /**
      * FastAPI 호출용 RestClient

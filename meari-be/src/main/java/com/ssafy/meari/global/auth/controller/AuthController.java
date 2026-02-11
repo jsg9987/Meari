@@ -66,12 +66,12 @@ public class AuthController {
     }
 
     // 회원가입
-    /*@PostMapping("/signup")
+    @PostMapping("/signup")
     public ResponseEntity<ApiResponse<Void>> signup(@Valid @RequestBody SignupRequestDto request) {
         memberService.signup(request);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.successWithoutData());
-    }*/
+    }
 
     // 이메일 중복 확인
     @GetMapping("/email/check")

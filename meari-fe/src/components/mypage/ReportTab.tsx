@@ -254,7 +254,7 @@ const ReportTab = () => {
   }
 
   return (
-    <div className='p-8'>
+    <div className='p-8 pb-4 flex flex-col h-screen'>
       <h1 className='text-3xl font-bold text-gray-900 mb-6'>리포트</h1>
 
       {/* 탭 메뉴 */}
@@ -284,10 +284,10 @@ const ReportTab = () => {
       </div>
 
       {/* 컨텐츠 영역 */}
-      <div className='bg-white border border-gray-200 rounded-b-lg shadow-sm max-w-2xl'>
+      <div className='bg-white border border-gray-200 rounded-b-lg shadow-sm max-w-2xl flex-1 min-h-0 flex flex-col'>
         {/* 쉐도잉 리포트 */}
         {activeTab === 'shadowing' && (
-          <div className='p-4 flex flex-col h-[calc(100vh-280px)]'>
+          <div className='p-4 flex flex-col flex-1 min-h-0'>
             {/* 통계 대시보드 */}
             <ReportStats reports={shadowingReports} />
 
@@ -360,7 +360,7 @@ const ReportTab = () => {
 
         {/* 코픽 리포트 */}
         {activeTab === 'kopic' && (
-          <div className='p-4 flex flex-col h-[calc(100vh-280px)]'>
+          <div className='p-4 flex flex-col flex-1 min-h-0'>
             <div className='flex-1 overflow-y-auto space-y-2.5 scrollbar-hide'>
               {kopicReports.map((report) => (
                 <div
