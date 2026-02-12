@@ -12,8 +12,6 @@ import lombok.*;
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
-@Builder
 public class MemberRoom extends BaseEntity {
 
     @Id
@@ -28,4 +26,10 @@ public class MemberRoom extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id", nullable = false, foreignKey = @ForeignKey(name = "FK_room_TO_member_room_1"))
     private Room room;
+
+    @Builder
+    public MemberRoom(Member member, Room room) {
+        this.member = member;
+        this.room = room;
+    }
 }

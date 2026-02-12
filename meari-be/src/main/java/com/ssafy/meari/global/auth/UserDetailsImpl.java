@@ -15,7 +15,7 @@ public class UserDetailsImpl implements UserDetails {
 
 	private final Member member;
 
-	// TODO 멤버 엔티티에 role 필드 추가 + SecurityConfig에서 role 기반 체크 추가 시 수정 필요
+	// 멤버 엔티티에 role 필드가 없고, SecurityConfig에서 role 기반 체크를 하지 않으므로 빈 리스트 설정
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {
 		return List.of();

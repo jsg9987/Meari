@@ -20,8 +20,11 @@ configurations {
     }
 }
 
-repositories {
-    mavenCentral()
+allprojects {
+    repositories {
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
 }
 
 dependencies {
@@ -34,10 +37,14 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.session:spring-session-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'redis.clients:jedis'
 
     // 3. Web & WebSocket
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-websocket' // STOMP 통신용
+
+    // 3-1. OpenVidu (WebRTC)
+    implementation 'io.openvidu:openvidu-java-client:2.30.0'
 
     // 4. Security & JWT
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -46,22 +53,50 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
     // 5. AWS
+    implementation 'software.amazon.awssdk:s3:2.20.26'
+
+    // 5-1. FFmpeg (Video Processing)
+    implementation 'ws.schild:jave-core:3.3.1'
+    implementation 'ws.schild:jave-nativebin-linux64:3.3.1'
 
     // 6. Utils
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
 
     // 7. Spring boot
     implementation 'org.springframework.boot:spring-boot-starter-security'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
     // 8. RabbitMQ
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    implementation 'io.projectreactor.netty:reactor-netty'
+    // 8. Gemini REST API - RestTemplate 사용 (spring-boot-starter-web에 포함)
 
-    // 9. Test
+    // 9. Swagger (SpringDoc OpenAPI UI)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4'
+
+    // 10. NLP (KOMORAN - via JitPack)
+    implementation 'com.github.shin285:KOMORAN:3.3.4'
+    // JDK 9+ 호환성 해결을 위한 JAXB 의존성 추가
+    implementation 'javax.xml.bind:jaxb-api:2.3.1'
+    implementation 'com.sun.xml.bind:jaxb-core:2.3.0'
+    implementation 'com.sun.xml.bind:jaxb-impl:2.3.0'
+    implementation 'javax.activation:activation:1.1.1'
+
+    // 11. Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+
+    // 12. csv 처리
+    implementation 'org.apache.commons:commons-csv:1.10.0'
+
+    // 13. cloudinary 업로드
+    implementation 'com.cloudinary:cloudinary-http44:1.39.0'
 }
 
 tasks.named('test') {
