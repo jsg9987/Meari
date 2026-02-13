@@ -219,7 +219,6 @@ networks:
     driver: bridge
 
 volumes:
-  jenkins_home:
   postgres_data:
   redis_data:
   rabbitmq_data:
