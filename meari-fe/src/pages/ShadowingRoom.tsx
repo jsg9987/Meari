@@ -28,7 +28,7 @@ type LayoutMode = "narrow" | "grid" | "wide";
 // WebRTC 비활성화 플래그
 // true로 설정하면 WebRTC 없이 쉐도잉 기능만 테스트
 // ========================================
-const DISABLE_WEBRTC = true;
+const DISABLE_WEBRTC = false;
 
 // TODO: 헤더 변경, 비디오 타일 변경
 export default function ShadowingRoom() {

@@ -69,6 +69,8 @@ const RoomCard = ({ title, themeName, currentPeople, maxPeople, status, hasPassw
                     }`}>
                         {status === 'WAITING' ? '대기 중' :
                          status === 'PLAYING' ? '게임 중' :
+                         status === 'COMPLETED' ? '완료' :
+                         status === 'IN_PROGRESS' ? '진행 중' :
                          status}
                     </div>
                 </div>
