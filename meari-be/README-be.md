@@ -14,7 +14,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 
 <div align="center">
 
-<h2>목차</h2>
+<h2> 📜 목차 </h2>
 
 </div>
 
@@ -73,7 +73,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - 커서 기반 리포트/활동 조회
 - 관리자 기능(스크립트 CSV 업로드, KOPIC 이미지 업로드, 콘텐츠 오디오 전처리)
 
-<br>
+<br><br><br>
 
 ---
 
@@ -90,7 +90,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - SpringDoc(OpenAPI/Swagger), JPA/Hibernate
 - KOMORAN, Gemini/OpenAI/Claude 연동
 
-<br>
+<br><br><br>
 
 ---
 
@@ -131,7 +131,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 | 3 | 개별 리포트 완료 |
 | 4 | 통합 리포트 집계 |
 
-<br>
+<br><br><br>
 
 ---
 
@@ -154,7 +154,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - `ROUND_1`: 1라운드
 - `ROUND_2`: 2라운드
 
-<br>
+<br><br><br>
 
 ---
 
@@ -169,7 +169,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - `rabbitmq`: Spring Boot → RabbitMQ → FastAPI
 - 분석 결과는 `ShadowingReport`에 반영됩니다.
 
-<br>
+<br><br><br>
 
 ---
 
@@ -183,7 +183,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - 라운드별 녹음 완료/시청 완료 상태를 추적하여 브로드캐스트 타이밍을 결정합니다.
 - WebSocket 세션과 memberId 매핑을 저장해 비정상 종료를 처리합니다.
 
-<br>
+<br><br><br>
 
 ---
 
@@ -197,7 +197,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - 콘텐츠 영상은 Presigned URL로 안전하게 조회합니다.
 - KOPIC 음성 파일은 S3 업로드 후 분석에 사용됩니다.
 
-<br>
+<br><br><br>
 
 ---
 
@@ -211,7 +211,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - `size`: 페이지 크기(기본값 10)
 - 다음 페이지 여부는 `hasNext`로 판단합니다.
 
-<br>
+<br><br><br>
 
 ---
 
@@ -224,7 +224,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - 민감 정보(키/시크릿)는 환경 변수로 주입합니다.
 - WebSocket 연결 시에도 `Authorization: Bearer <ACCESS_TOKEN>` 헤더가 필요합니다.
 
-<br>
+<br><br><br>
 
 ---
 
@@ -241,7 +241,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - OpenVidu 2.30+
 - Docker/Docker Compose (선택)
 
-<br>
+<br><br><br>
 
 ---
 
@@ -273,7 +273,7 @@ docker compose up -d
 ./gradlew bootRun
 ```
 
-<br>
+<br><br><br>
 
 ---
 
@@ -313,7 +313,7 @@ CLOUDINARY_API_KEY=YOUR_CLOUDINARY_KEY
 CLOUDINARY_API_SECRET=YOUR_CLOUDINARY_SECRET
 ```
 
-<br>
+<br><br><br>
 
 ---
 
@@ -332,7 +332,7 @@ CLOUDINARY_API_SECRET=YOUR_CLOUDINARY_SECRET
 RabbitMQ를 `docker-compose.yml` 그대로 사용하면 호스트 포트가 `5673`입니다.
 애플리케이션을 호스트에서 실행할 경우 `spring.rabbitmq.port`를 `5673`으로 맞추거나 compose 포트를 `5672:5672`로 변경하세요.
 
-<br>
+<br><br><br>
 
 ---
 
@@ -346,7 +346,7 @@ RabbitMQ를 `docker-compose.yml` 그대로 사용하면 호스트 포트가 `567
 - 프로젝트 전체 소개: `readme/README_project.md`
 - 개발 가이드: `HELP.md`
 
-<br>
+<br><br><br>
 
 ---
 
@@ -361,7 +361,7 @@ RabbitMQ를 `docker-compose.yml` 그대로 사용하면 호스트 포트가 `567
 
 상세 구조는 `PROJECT_STRUCTURE.md`를 참고하세요.
 
-<br><br>
+<br><br><br>
 
 ---
 
