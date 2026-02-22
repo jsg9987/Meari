@@ -2,13 +2,17 @@
 
 ![logo-dark-2.svg](readme/logo-dark-2.svg)
 
-</div>
+
 
 # MEARI Backend (meari-be)
 
 MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowing), 실시간 WebRTC 연습방, 발음·억양 분석 파이프라인, 리포트/대시보드를 담당합니다.
 
+
+</div>
+
 <br><br><br>
+
 
 ---
 
