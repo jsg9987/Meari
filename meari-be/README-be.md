@@ -18,6 +18,11 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - 발음·억양 분석(HTTP 또는 RabbitMQ 기반 비동기 처리)
 - KOPIC 리포트 및 학습 결과 리포트 제공
 - 미디어 업로드 및 Presigned URL 발급(S3), 이미지 업로드(Cloudinary)
+- Redis 기반 실시간 상태 관리(방 상태/준비/역할/라운드 진행)
+- WebSocket(STOMP) 실시간 이벤트(준비/역할/채팅/시청 완료/녹음 완료)
+- KOPIC 통합 리포트 흐름(통합 리포트 생성 → 문항 평가 → 집계)
+- 커서 기반 리포트/활동 조회
+- 관리자 기능(스크립트 CSV 업로드, KOPIC 이미지 업로드, 콘텐츠 오디오 전처리)
 
 ## 기술 스택
 - Java 21, Spring Boot 3.5.9, Gradle
@@ -27,12 +32,64 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - SpringDoc(OpenAPI/Swagger), JPA/Hibernate
 - KOMORAN, Gemini/OpenAI/Claude 연동
 
+## 핵심 플로우
+
+### 1) 실시간 방/섀도잉 플로우
+방 생성 → 입장/준비 → 영상 시청(WATCHING) → 역할 선택(ROLE_PICK) →  
+라운드 진행(ROUND_1/ROUND_2) → 녹음 완료 → 분석 요청 → 리포트 생성
+
+### 2) 발음·억양 분석 플로우
+녹음 완료 시점에 분석 요청 → (HTTP 또는 RabbitMQ) → 분석 결과 수신 →  
+`ShadowingReport` 업데이트 및 리포트 조회
+
+### 3) KOPIC 평가 플로우
+통합 리포트 생성 → 문항별 음성 업로드/평가 →  
+개별 리포트 완료 → 통합 리포트 집계
+
+## 상태/페이즈 정의
+
+### RoomStatus
+- `WAITING`: 대기 중
+- `IN_PROGRESS`: 진행 중
+- `COMPLETED`: 종료
+
+### GamePhase
+- `WATCHING`: 영상 시청
+- `ROLE_PICK`: 역할 선택
+- `ROUND_1`: 1라운드
+- `ROUND_2`: 2라운드
+
+## 분석 파이프라인
+- `analysis.mode` 값에 따라 분석 요청 방식이 바뀝니다.
+  - `http`: Spring Boot → FastAPI 직접 호출
+  - `rabbitmq`: Spring Boot → RabbitMQ → FastAPI
+- 분석 결과는 `ShadowingReport`에 반영됩니다.
+
+## Redis 세션 관리 개요
+- 방 참여자, 준비 상태, 역할 선택, 진행 페이즈, 콘텐츠 선택 상태를 Redis에 저장합니다.
+- 라운드별 녹음 완료/시청 완료 상태를 추적하여 브로드캐스트 타이밍을 결정합니다.
+- WebSocket 세션과 memberId 매핑을 저장해 비정상 종료를 처리합니다.
+
+## S3/미디어 흐름
+- 녹음 파일 업로드용 Presigned URL을 발급합니다.
+- 콘텐츠 영상은 Presigned URL로 안전하게 조회합니다.
+- KOPIC 음성 파일은 S3 업로드 후 분석에 사용됩니다.
+
+## 커서 페이지네이션 규칙
+- `cursor`: 마지막 아이템의 기준값(예: `createdAt`의 epoch ms)
+- `size`: 페이지 크기(기본값 10)
+- 다음 페이지 여부는 `hasNext`로 판단합니다.
+
+## 운영/보안 포인트
+- 민감 정보(키/시크릿)는 환경 변수로 주입합니다.
+- WebSocket 연결 시에도 `Authorization: Bearer <ACCESS_TOKEN>` 헤더가 필요합니다.
+
 ## 실행 요구 사항
 - Java 21
 - PostgreSQL 15
 - Redis
 - RabbitMQ 3.x
-- OpenVidu 2.29+
+- OpenVidu 2.30+
 - Docker/Docker Compose (선택)
 
 ## 로컬 실행
@@ -94,7 +151,7 @@ CLOUDINARY_API_SECRET=YOUR_CLOUDINARY_SECRET
 RabbitMQ를 `docker-compose.yml` 그대로 사용하면 호스트 포트가 `5673`입니다. 애플리케이션을 호스트에서 실행할 경우 `spring.rabbitmq.port`를 `5673`으로 맞추거나 compose 포트를 `5672:5672`로 변경하세요.
 
 ## 문서/참고
-- API 문서: Swagger UI(`/swagger-ui.html`), OpenAPI JSON(`/api-docs`)
+- API 요약: `API.md`
 - 프로젝트 전체 소개: `readme/README_project.md`
 - 개발 가이드: `HELP.md`
 
