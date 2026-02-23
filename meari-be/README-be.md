@@ -36,9 +36,6 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 
 **[Redis 세션 관리 개요](#redis-세션-관리-개요)**
 
-**[S3/미디어 흐름](#s3미디어-흐름)**
-
-**[커서 페이지네이션 규칙](#커서-페이지네이션-규칙)**
 
 **[운영/보안 포인트](#운영보안-포인트)**
 
@@ -70,7 +67,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 - 실시간 연습방(입장/진행/채팅/녹화)과 WebRTC 연동(OpenVidu)
 - 발음·억양 분석(HTTP 또는 RabbitMQ 기반 비동기 처리)
 - KOPIC 리포트 및 학습 결과 리포트 제공
-- 미디어 업로드 및 Presigned URL 발급(S3), 이미지 업로드(Cloudinary)
+- 미디어 처리(S3, Cloudinary)
 - Redis 기반 실시간 상태 관리(방 상태/준비/역할/라운드 진행)
 - WebSocket(STOMP) 실시간 이벤트(준비/역할/채팅/시청 완료/녹음 완료)
 - KOPIC 통합 리포트 흐름(통합 리포트 생성 → 문항 평가 → 집계)
@@ -282,40 +279,18 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 
 <div align="center">
 
-<h2>S3/미디어 흐름</h2>
-
-</div>
-
-- 녹음 파일 업로드용 Presigned URL을 발급합니다.
-- 콘텐츠 영상은 Presigned URL로 안전하게 조회합니다.
-- KOPIC 음성 파일은 S3 업로드 후 분석에 사용됩니다.
-
-<br><br><br>
-
----
-
-<div align="center">
-
-<h2>커서 페이지네이션 규칙</h2>
-
-</div>
-
-- `cursor`: 마지막 아이템의 기준값(예: `createdAt`의 epoch ms)
-- `size`: 페이지 크기(기본값 10)
-- 다음 페이지 여부는 `hasNext`로 판단합니다.
-
-<br><br><br>
-
----
-
-<div align="center">
-
 <h2>운영/보안 포인트</h2>
 
 </div>
 
-- 민감 정보(키/시크릿)는 환경 변수로 주입합니다.
-- WebSocket 연결 시에도 `Authorization: Bearer <ACCESS_TOKEN>` 헤더가 필요합니다.
+| 항목 | 운영 기준 |
+|---|---|
+| 인증/인가 | JWT 기반 인증을 사용하며, 인증이 필요한 API는 토큰 검증을 거쳐 처리합니다. |
+| 비밀정보 관리 | 액세스 키/시크릿/외부 API 키 등 민감 값은 환경 변수로 주입하고 저장소에 커밋하지 않습니다. |
+| 세션 데이터 관리 | Redis 세션성 키는 TTL 정책(기본 24시간)과 상태 리셋 로직으로 정리합니다. |
+| 분석 처리 안정성 | 분석 결과는 `PROCESSING -> COMPLETED/FAILED` 상태 전이로 관리하여 실패 케이스를 분리 추적합니다. |
+| 실행 환경 분리 | `analysis.mode` 설정으로 개발(HTTP)과 운영(RabbitMQ) 경로를 분리 운영합니다. |
+| 로그/추적 | 라운드 진행, 분석 요청/실패, 연결 상태 변화 등 주요 이벤트를 로그로 남겨 운영 이슈를 추적합니다. |
 
 <br><br><br>
 
@@ -376,19 +351,16 @@ docker compose up -d
 
 </div>
 
-필수(환경에 맞게 설정):
+개발 편의를 위해 일부 기본값이 포함되어 있습니다. 실제 환경에서는 아래 설정 키를 환경에 맞게 교체하세요.
 
-- DB 연결 정보: `spring.datasource.*`
+- DB: `spring.datasource.*`
 - Redis: `spring.data.redis.*`
 - RabbitMQ: `spring.rabbitmq.*`
 - JWT: `jwt.secret-key`
-- OpenVidu(WebRTC 사용 시): `OPENVIDU_URL`, `OPENVIDU_SECRET`
-
-선택:
-
+- OpenVidu(WebRTC): `OPENVIDU_URL`, `OPENVIDU_SECRET`
 - S3: `AWS_S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`
 - Cloudinary: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
-- AI 분석: `GEMINI_API_KEY`, `GMS_KEY`
+- AI 분석: `GEMINI_API_KEY`
 
 예시:
 
@@ -400,7 +372,6 @@ AWS_REGION=YOUR_REGION
 AWS_ACCESS_KEY=YOUR_ACCESS_KEY
 AWS_SECRET_KEY=YOUR_SECRET_KEY
 GEMINI_API_KEY=YOUR_GEMINI_KEY
-GMS_KEY=YOUR_GMS_KEY
 CLOUDINARY_CLOUD_NAME=YOUR_CLOUD_NAME
 CLOUDINARY_API_KEY=YOUR_CLOUDINARY_KEY
 CLOUDINARY_API_SECRET=YOUR_CLOUDINARY_SECRET
