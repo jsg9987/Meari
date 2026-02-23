@@ -209,6 +209,7 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 |---|---|
 | 멤버가 라운드 문장 전체 녹음 완료 | 해당 멤버 분석 요청 |
 | 방장이 라운드 강제 종료(`finishRound`) | 부분 완료(1문장 이상 녹음) 멤버도 분석 요청 |
+| 라운드 타임아웃 종료 | 라운드 완료 브로드캐스트 중심으로 처리 |
 
 ### 4) 상태 전이
 
@@ -222,13 +223,58 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 
 <div align="center">
 
-<h2>Redis 세션 관리 개요</h2>
+<h2>Redis 세션 관리</h2>
 
 </div>
 
-- 방 참여자, 준비 상태, 역할 선택, 진행 페이즈, 콘텐츠 선택 상태를 Redis에 저장합니다.
-- 라운드별 녹음 완료/시청 완료 상태를 추적하여 브로드캐스트 타이밍을 결정합니다.
-- WebSocket 세션과 memberId 매핑을 저장해 비정상 종료를 처리합니다.
+### 1) Redis 세션 관리 범위
+
+| 구분 | Redis에서 관리하는 상태 | 대표 Key |
+|---|---|---|
+| 방 참여 | 현재 방 참여자, 멤버-방 매핑 | `room:{roomId}:members`, `member:{memberId}:roomId` |
+| 준비/역할 | ready 상태, 역할 선점/확정 | `room:{roomId}:ready`, `room:{roomId}:roles`, `room:{roomId}:roles_confirmed` |
+| 게임 진행 | 선택 콘텐츠, phase, 시청 완료 | `room:{roomId}:content_id`, `room:{roomId}:phase`, `room:{roomId}:watching_complete`, `room:{roomId}:round:{round}:watching_complete` |
+| 라운드/녹음 | 타임아웃, 완료 플래그, 문장 녹음 진행 데이터 | `room:{roomId}:round:{round}:timeout`, `room:{roomId}:round:{round}:completed`, `room:{roomId}:round:{round}:member:{memberId}:recordings`, `room:{roomId}:round:{round}:member:{memberId}:total_sentences`, `room:{roomId}:round:{round}:member:{memberId}:audio_urls` |
+| 연결 복구 보조 | WebSocket 세션 매핑, 끊김 마킹 | `session:{sessionId}:member`, `session:{sessionId}:room`, `room:{roomId}:disconnected` |
+
+### 2) 한눈에 보는 세션 흐름
+
+```text
+[입장]
+  -> members/add, member->room 매핑
+  -> ready/roles/content/phase 갱신
+        |
+        v
+[라운드 시작]
+  -> member별 total_sentences 저장
+  -> round timeout 저장
+        |
+        v
+[녹음 진행]
+  -> recordings(Set) 누적
+  -> audio_urls(Hash) 저장
+        |
+        v
+[라운드 종료]
+  -> round completed=true
+  -> 상태 브로드캐스트(RECORDINGS_COMPLETE)
+        |
+        v
+[방 종료/리셋]
+  -> clearRoomSession 또는 resetGameState 정리
+  -> 세션성 데이터는 TTL + 상태 리셋 로직으로 정리
+```
+
+### 3) TTL 정책
+
+- `RoomSessionService`가 주요 세션 키에 공통 TTL 적용
+- 기본 TTL: **24시간**
+- 쓰기/갱신 시 `expire`를 재설정하는 방식
+
+### 4) Disconnect 처리
+
+- disconnect 시 세션 상태는 Redis 기준으로 정리되며, 재접속 상황을 고려해 처리됩니다.
+- 녹음 분석에 필요한 라운드별 녹음/오디오 정보는 Redis에 저장됩니다.
 
 <br><br><br>
 
