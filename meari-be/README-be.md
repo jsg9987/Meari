@@ -168,10 +168,53 @@ MEARI 프로젝트의 백엔드 서비스입니다. 음성/회화 연습(Shadowi
 
 </div>
 
-- `analysis.mode` 값에 따라 분석 요청 방식이 바뀝니다.
-- `http`: Spring Boot → FastAPI 직접 호출
-- `rabbitmq`: Spring Boot → RabbitMQ → FastAPI
-- 분석 결과는 `ShadowingReport`에 반영됩니다.
+### 1) 분석 실행 모드 (Dev / Prod)
+
+| 환경 관점 | 설정값 | 권장 환경 | 처리 경로 |
+|---|---|---|---|
+| 개발 모드 | `analysis.mode=http` | 로컬/개발 | `Spring Boot -> FastAPI(/analyze) -> DB` |
+| 운영 모드 | `analysis.mode=rabbitmq` | 스테이징/운영 | `Spring Boot -> RabbitMQ -> FastAPI -> RabbitMQ -> DB` |
+
+> 실제 구현 선택은 `analysis.mode` 값으로 동작합니다.
+
+### 2) 한눈에 보는 흐름
+
+```text
+[녹음 완료 이벤트]
+      |
+      v
+[분석 요청 트리거]
+  - 전체 녹음 완료 멤버
+  - 라운드 강제 종료 시 부분 완료 멤버
+      |
+      v
+[AnalysisRequestBuilder]
+  Redis + DB 데이터 조합
+      |
+      +--------------------+
+      |                    |
+      v                    v
+ [DEV: HTTP]          [PROD: RabbitMQ]
+ Spring -> FastAPI    Spring -> MQ -> FastAPI
+      |                    |
+      +---------+----------+
+                v
+          [결과 DB 반영]
+   ShadowingReport: PROCESSING -> COMPLETED/FAILED
+```
+
+### 3) 트리거 조건
+
+| 시점 | 동작 |
+|---|---|
+| 멤버가 라운드 문장 전체 녹음 완료 | 해당 멤버 분석 요청 |
+| 방장이 라운드 강제 종료(`finishRound`) | 부분 완료(1문장 이상 녹음) 멤버도 분석 요청 |
+
+### 4) 상태 전이
+
+- 생성 시: `PROCESSING`
+- 분석 성공: `COMPLETED` (`accuracy`, `intonation`, `detailedAnalysis` 저장)
+- 분석 실패: `FAILED`
 
 <br><br><br>
 
