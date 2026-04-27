@@ -175,7 +175,6 @@ pipeline {
                             # docker-compose로 배포 (최신 yml 파일 사용)
                             docker-compose up -d --remove-orphans spring-api frontend fastapi
                         '''
-                        sh 'docker image prune -f'
                     }
                 }
             }
