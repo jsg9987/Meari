@@ -8,7 +8,7 @@ import pika
 from app.config import settings
 from app.schemas.request import AnalysisRequestMessage
 from app.services.analysis_service import AnalysisService
-from app.services.rabbitmq_producer import producer
+from app.services.rabbitmq_producer import get_producer
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +87,8 @@ class RabbitMQConsumer:
             # 분석 수행
             result = self.analysis_service.analyze_member(message)
 
-            # 결과 발행
-            producer.publish_result(result)
+            # 결과 발행 (thread-local producer — 이 consumer 스레드가 소유한 connection 사용)
+            get_producer().publish_result(result)
 
             # ACK
             ch.basic_ack(delivery_tag=method.delivery_tag)

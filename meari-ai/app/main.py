@@ -15,7 +15,7 @@ from app.schemas.response import AnalysisResultMessage
 # RabbitMQ는 선택적으로 import (ENABLE_RABBITMQ=true일 때만)
 if settings.ENABLE_RABBITMQ:
     from app.services.rabbitmq_consumer import RabbitMQConsumer
-    from app.services.rabbitmq_producer import producer
+    # Producer는 thread-local이라 여기서 인스턴스화하지 않음 (Consumer 스레드에서 get_producer()로 최초 생성)
 
 # 로깅 설정
 logging.basicConfig(
@@ -230,10 +230,10 @@ async def shutdown_event():
 
     try:
         # RabbitMQ 종료 (활성화된 경우만)
+        # Producer는 thread-local이라 consumer_thread(daemon=True)와 함께 자연스럽게 정리됨
         if settings.ENABLE_RABBITMQ:
             if consumer:
                 consumer.stop_consuming()
-            producer.close()
 
         logger.info("서버 종료 완료")
     except Exception as e:
@@ -295,7 +295,6 @@ def signal_handler(sig, frame):
     if settings.ENABLE_RABBITMQ:
         if consumer:
             consumer.stop_consuming()
-        producer.close()
     sys.exit(0)
 
 
