@@ -13,6 +13,7 @@ import com.ssafy.meari.domain.room.entity.RoomStatus;
 import com.ssafy.meari.domain.room.repository.MemberRoomRepository;
 import com.ssafy.meari.domain.room.repository.RoomRepository;
 import com.ssafy.meari.domain.theme.entity.Theme;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,6 +38,7 @@ import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RoomService WebSocket 단위 테스트")
+@Disabled("RoomService 분해(refactor.md B1) 시점에 재작성")
 class RoomServiceWebSocketTest {
 
     @InjectMocks

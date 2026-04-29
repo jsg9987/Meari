@@ -596,7 +596,7 @@ const ReportTab = () => {
                   <ErrorPieChart detail={selectedReportDetail} />
 
                   {/* 전체 분석 요약 */}
-                  {selectedReportDetail.detailed_analysis && (
+                  {selectedReportDetail.detailed_analysis?.summary && (
                     <div className='bg-white rounded-lg p-5 border border-gray-200'>
                       <h3 className='font-semibold text-gray-900 mb-4 text-lg'>분석 요약</h3>
                       <div className='grid grid-cols-2 gap-3 text-sm'>

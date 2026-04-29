@@ -1,9 +1,14 @@
 """
 RabbitMQ Producer
 FastAPI에서 Spring Boot로 분석 결과 전송
+
+스레드 안전성 주의: pika.BlockingConnection은 생성 스레드에서만 사용해야 함.
+Consumer 콜백 스레드와 Main 스레드가 달라 발생하던 StreamLostError(10053)를
+thread-local 패턴으로 해결. get_producer()를 통해 접근할 것.
 """
 import json
 import logging
+import threading
 import pika
 from app.config import settings
 from app.schemas.response import AnalysisResultMessage
@@ -64,49 +69,71 @@ class RabbitMQProducer:
             logger.error(f"RabbitMQ 연결 실패: {e}")
             raise
 
-    def publish_result(self, result: AnalysisResultMessage):
-        """분석 결과 발행"""
-        try:
-            # 재연결 확인
-            if self.connection is None or self.connection.is_closed:
-                logger.warning("RabbitMQ 연결이 끊어짐, 재연결 시도")
-                self.connect()
+    def publish_result(self, result: AnalysisResultMessage, max_retries: int = 2):
+        """
+        분석 결과 발행 (재시도 포함)
 
-            message_body = result.model_dump_json()
+        StreamLostError / ConnectionClosed 발생 시 재연결 후 1회 더 시도.
+        라우팅 실패(UnroutableError)는 재시도해도 소용없으므로 즉시 예외.
+        """
+        message_body = result.model_dump_json()
+        last_err = None
 
-            logger.debug(
-                f"메시지 발행 시도: Exchange={settings.ANALYSIS_EXCHANGE}, "
-                f"RoutingKey={settings.RESULT_ROUTING_KEY}, "
-                f"BodySize={len(message_body)} bytes"
-            )
+        for attempt in range(1, max_retries + 1):
+            try:
+                if self.connection is None or self.connection.is_closed:
+                    logger.warning(f"RabbitMQ 연결 끊어짐, 재연결 시도 (attempt={attempt})")
+                    self.connect()
 
-            # basic_publish는 confirm_delivery()가 설정되어 있으면
-            # 메시지가 라우팅되지 않으면 UnroutableError 예외 발생
-            self.channel.basic_publish(
-                exchange=settings.ANALYSIS_EXCHANGE,
-                routing_key=settings.RESULT_ROUTING_KEY,
-                body=message_body,
-                properties=pika.BasicProperties(
-                    delivery_mode=2,  # 메시지 영속성
-                    content_type='application/json'
-                ),
-                mandatory=True  # 라우팅 실패 시 에러 발생
-            )
+                self.channel.basic_publish(
+                    exchange=settings.ANALYSIS_EXCHANGE,
+                    routing_key=settings.RESULT_ROUTING_KEY,
+                    body=message_body,
+                    properties=pika.BasicProperties(
+                        delivery_mode=2,
+                        content_type='application/json'
+                    ),
+                    mandatory=True
+                )
 
-            logger.info(
-                f"✅ 분석 결과 발행 성공 (라우팅 확인됨): "
-                f"roomId={result.room_id}, round={result.round}, "
-                f"memberId={result.member_id}"
-            )
-        except pika.exceptions.UnroutableError:
-            logger.error(
-                f"❌ 메시지 라우팅 실패! Exchange '{settings.ANALYSIS_EXCHANGE}'에서 "
-                f"RoutingKey '{settings.RESULT_ROUTING_KEY}'로 라우팅할 Queue가 없습니다."
-            )
-            raise
-        except Exception as e:
-            logger.error(f"❌ 분석 결과 발행 실패: {e}", exc_info=True)
-            raise
+                logger.info(
+                    f"✅ 분석 결과 발행 성공 (attempt={attempt}): "
+                    f"roomId={result.room_id}, round={result.round}, "
+                    f"memberId={result.member_id}"
+                )
+                return
+
+            except pika.exceptions.UnroutableError:
+                logger.error(
+                    f"❌ 라우팅 실패 — Exchange '{settings.ANALYSIS_EXCHANGE}' / "
+                    f"RoutingKey '{settings.RESULT_ROUTING_KEY}'에 바인딩된 Queue 없음. 재시도 무의미."
+                )
+                raise
+
+            except (pika.exceptions.StreamLostError,
+                    pika.exceptions.ConnectionClosed,
+                    pika.exceptions.ChannelClosed,
+                    ConnectionError) as e:
+                last_err = e
+                logger.warning(
+                    f"publish 실패 (attempt={attempt}/{max_retries}): {type(e).__name__}. "
+                    f"연결 재설정 후 재시도."
+                )
+                # 강제 reset — is_closed 체크로는 Windows TCP RST를 감지 못하는 경우 있음
+                try:
+                    if self.connection and not self.connection.is_closed:
+                        self.connection.close()
+                except Exception:
+                    pass
+                self.connection = None
+                self.channel = None
+
+            except Exception as e:
+                logger.error(f"❌ 분석 결과 발행 실패 (비복구성): {e}", exc_info=True)
+                raise
+
+        logger.error(f"❌ 분석 결과 발행 최종 실패 ({max_retries}회 재시도 소진): {last_err}")
+        raise last_err
 
     def close(self):
         """연결 종료"""
@@ -115,5 +142,24 @@ class RabbitMQProducer:
             logger.info("RabbitMQ Producer 연결 종료")
 
 
-# 전역 Producer 인스턴스
-producer = RabbitMQProducer()
+# ──────────────────────────────────────────────────────────────
+# Thread-local Producer 팩토리
+# pika.BlockingConnection은 생성 스레드에서만 사용 가능.
+# Consumer 콜백 스레드가 최초 호출 시 해당 스레드 소유의 connection 생성.
+# ──────────────────────────────────────────────────────────────
+_tl = threading.local()
+
+
+def get_producer() -> RabbitMQProducer:
+    """현재 스레드 소유의 Producer 인스턴스 반환 (최초 호출 시 생성)"""
+    if not hasattr(_tl, 'producer') or _tl.producer is None:
+        logger.info(f"Thread {threading.get_ident()}: RabbitMQProducer 최초 생성")
+        _tl.producer = RabbitMQProducer()
+    return _tl.producer
+
+
+def close_producer():
+    """현재 스레드 Producer 연결 종료"""
+    if hasattr(_tl, 'producer') and _tl.producer is not None:
+        _tl.producer.close()
+        _tl.producer = None
