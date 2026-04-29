@@ -78,7 +78,6 @@ public enum ErrorCode {
 
     // Method Not Allowed Error: 405
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메소드입니다."),
-    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 미디어 타입입니다."),
 
     // Conflict: 409
     DATA_ALREADY_EXISTS(HttpStatus.CONFLICT, "데이터가 이미 존재합니다."),
@@ -105,7 +104,7 @@ public enum ErrorCode {
 
 
     // Unsupported Media Type: 415
-
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 미디어 타입입니다."),
 
     // Internal Server Error: 500
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 에러입니다."),

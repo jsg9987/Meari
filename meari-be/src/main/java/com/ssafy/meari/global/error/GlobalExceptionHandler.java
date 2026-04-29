@@ -21,78 +21,85 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
-	// Convertor 에서 바인딩 실패시 발생하는 예외
-    @ExceptionHandler(value = {HttpMessageNotReadableException.class})
-    public ResponseEntity<ApiResponse<?>> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
-    	
+
+    // 잘못된 JSON 바디
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<?>> handleMessageNotReadable(HttpMessageNotReadableException e) {
+        return buildResponse(ErrorCode.BAD_REQUEST_JSON, e);
+    }
+
+    // 지원하지 않는 Content-Type
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<?>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
+        return buildResponse(ErrorCode.UNSUPPORTED_MEDIA_TYPE, e);
+    }
+
+    // 존재하지 않는 엔드포인트
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ApiResponse<?>> handleNoHandlerFound(NoHandlerFoundException e) {
+        return buildResponse(ErrorCode.NOT_FOUND_END_POINT, e);
+    }
+
+    // 지원하지 않는 HTTP 메서드
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<?>> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        return buildResponse(ErrorCode.METHOD_NOT_ALLOWED, e);
+    }
+
+    // @Valid @RequestBody 검증 실패 — 필드별 메시지 포함
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<?>> handleArgumentNotValid(MethodArgumentNotValidException e) {
+        log.warn("[INVALID_ARGUMENT] {}: {}", e.getClass().getSimpleName(), e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e));
     }
 
-    // 지원되지 않는 미디어 타입을 사용할 때 발생하는 예외
-    @ExceptionHandler(value = {HttpMediaTypeNotSupportedException.class})
-    public ResponseEntity<ApiResponse<?>> handleHttpMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException e) {
+    // @Validated 파라미터/PathVariable 검증 실패 — 필드별 메시지 포함
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<?>> handleConstraintViolation(ConstraintViolationException e) {
+        log.warn("[INVALID_ARGUMENT] {}: {}", e.getClass().getSimpleName(), e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e));
     }
 
-    // 지원되지 않는 HTTP 메소드를 사용할 때 발생하는 예외
-    @ExceptionHandler(value = {NoHandlerFoundException.class})
-    public ResponseEntity<ApiResponse<?>> handleNoHandlerFoundException(NoHandlerFoundException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e));
+    // 파라미터 타입 변환 실패
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<?>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        return buildResponse(ErrorCode.INVALID_PARAMETER_FORMAT, e);
     }
 
-    @ExceptionHandler(value = {HttpRequestMethodNotSupportedException.class})
-    public ResponseEntity<ApiResponse<?>> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e));
+    // 필수 PathVariable 누락
+    @ExceptionHandler(MissingPathVariableException.class)
+    public ResponseEntity<ApiResponse<?>> handleMissingPathVariable(MissingPathVariableException e) {
+        return buildResponse(ErrorCode.MISSING_PATH_VARIABLE, e);
     }
 
-    // Validation 에서 검증 실패시 발생하는 예외
-    @ExceptionHandler(value = {MethodArgumentNotValidException.class})
-    public ResponseEntity<ApiResponse<?>> handleArgumentNotValidException(MethodArgumentNotValidException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e));
+    // 필수 RequestParameter 누락
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<?>> handleMissingRequestParameter(MissingServletRequestParameterException e) {
+        return buildResponse(ErrorCode.MISSING_REQUEST_PARAMETER, e);
     }
 
-    @ExceptionHandler(value = {ConstraintViolationException.class})
-    public ResponseEntity<ApiResponse<?>> handleConstraintViolationException(ConstraintViolationException e) {
-        System.out.println("global exception handler");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e));
+    // 업로드 크기 초과
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<?>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException e) {
+        return buildResponse(ErrorCode.EXCEEDED_MAX_SIZE, e);
     }
 
-    // 메소드의 인자 타입이 일치하지 않을 때 발생하는 예외
-    @ExceptionHandler(value = {MethodArgumentTypeMismatchException.class})
-    public ResponseEntity<ApiResponse<?>> handleArgumentNotValidException(MethodArgumentTypeMismatchException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e));
+    // 직접 정의한 비즈니스 예외
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<?>> handleBusiness(BusinessException e) {
+        return buildResponse(e.getErrorCode(), e);
     }
 
-    // 필수 경로 변수가 누락되었을 때 발생하는 예외
-    @ExceptionHandler(value = {MissingPathVariableException.class})
-    public ResponseEntity<ApiResponse<?>> handlePathVariableNotValidException(MissingPathVariableException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e));
-    }
-
-    // 필수 파라미터가 누락되었을 때 발생하는 예외
-    @ExceptionHandler(value = {MissingServletRequestParameterException.class})
-    public ResponseEntity<ApiResponse<?>> handleArgumentNotValidException(MissingServletRequestParameterException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e));
-    }
-
-    @ExceptionHandler(value = {MaxUploadSizeExceededException.class})
-    public ResponseEntity<ApiResponse<?>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e));
-    }
-
-    // 개발자가 직접 정의한 예외
-    @ExceptionHandler(value = {BusinessException.class})
-    public ResponseEntity<ApiResponse<?>> handleApiException(BusinessException e) {
-        ErrorCode errorCode = e.getErrorCode();
-        
-        return ResponseEntity.status(errorCode.getHttpStatus()).body(ApiResponse.fail(e));
-    }
-
-    // 서버, DB 예외
-    @ExceptionHandler(value = {Exception.class})
+    // 그 외 모든 예외 — 서버/DB 에러
+    @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleException(Exception e) {
-    	log.error("Server Error", e);
-    	
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.fail(new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR)));
+        log.error("Server Error", e);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.fail(ErrorCode.INTERNAL_SERVER_ERROR));
+    }
+
+    private ResponseEntity<ApiResponse<?>> buildResponse(ErrorCode errorCode, Exception e) {
+        log.warn("[{}] {}: {}", errorCode.name(), e.getClass().getSimpleName(), e.getMessage());
+        return ResponseEntity.status(errorCode.getHttpStatus()).body(ApiResponse.fail(errorCode));
     }
 }

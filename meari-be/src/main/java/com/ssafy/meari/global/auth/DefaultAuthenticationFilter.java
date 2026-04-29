@@ -19,7 +19,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.meari.global.auth.request.LoginRequestDto;
 import com.ssafy.meari.global.common.ApiResponse;
 import com.ssafy.meari.global.error.ErrorCode;
-import com.ssafy.meari.global.error.exception.BusinessException;
 import com.ssafy.meari.global.auth.jwt.JwtUtil;
 import com.ssafy.meari.global.auth.service.RefreshTokenService;
 
@@ -99,7 +98,7 @@ public class DefaultAuthenticationFilter extends AbstractAuthenticationProcessin
 		response.setContentType("application/json;charset=UTF-8");
 		response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
-		ApiResponse<Object> failResponse = ApiResponse.fail(new BusinessException(ErrorCode.FAILURE_LOGIN));
+		ApiResponse<Void> failResponse = ApiResponse.fail(ErrorCode.FAILURE_LOGIN);
 		objectMapper.writeValue(response.getWriter(), failResponse);
 	}
 
