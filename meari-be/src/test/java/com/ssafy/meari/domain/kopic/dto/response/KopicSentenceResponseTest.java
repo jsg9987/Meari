@@ -49,7 +49,7 @@ class KopicSentenceResponseTest {
 
             // Then
             assertThat(response.getKopicPictureUrl())
-                    .isEqualTo("https://res.cloudinary.com/dznamrdwv/image/upload/v1770391114/kopic_picture_15.png");
+                    .isEqualTo("https://res.cloudinary.com/meari/image/upload/kopic/kopic_picture_15.png");
         }
 
         @Test
@@ -68,7 +68,7 @@ class KopicSentenceResponseTest {
                 KopicSentenceResponse response = KopicSentenceResponse.from(sentence);
 
                 assertThat(response.getKopicPictureUrl())
-                        .isEqualTo("https://res.cloudinary.com/dznamrdwv/image/upload/v1770391114/kopic_picture_" + id + ".png");
+                        .isEqualTo("https://res.cloudinary.com/meari/image/upload/kopic/kopic_picture_" + id + ".png");
             }
         }
 
@@ -87,7 +87,7 @@ class KopicSentenceResponseTest {
 
             // Then
             assertThat(response.getKopicPictureUrl())
-                    .isEqualTo("https://res.cloudinary.com/dznamrdwv/image/upload/v1770391114/kopic_picture_1.png");
+                    .isEqualTo("https://res.cloudinary.com/meari/image/upload/kopic/kopic_picture_1.png");
         }
 
         @Test
@@ -110,7 +110,7 @@ class KopicSentenceResponseTest {
                             42L,
                             "완벽한 테스트",
                             "https://s3.amazonaws.com/kopic/42.wav",
-                            "https://res.cloudinary.com/dznamrdwv/image/upload/v1770391114/kopic_picture_42.png"
+                            "https://res.cloudinary.com/meari/image/upload/kopic/kopic_picture_42.png"
                     );
         }
     }
