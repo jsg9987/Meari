@@ -49,7 +49,7 @@ public class JwtExceptionFilter extends OncePerRequestFilter {
 		response.setContentType("application/json;charset=UTF-8");
 		response.setStatus(errorCode.getHttpStatus().value());
 
-		ApiResponse<Object> failResponse = ApiResponse.fail(new BusinessException(errorCode));
+		ApiResponse<Void> failResponse = ApiResponse.fail(errorCode);
 		objectMapper.writeValue(response.getWriter(), failResponse);
 	}
 }

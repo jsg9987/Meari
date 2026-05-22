@@ -19,7 +19,6 @@ public enum ErrorCode {
     INVALID_PERIOD(HttpStatus.BAD_REQUEST, "유효하지 않은 period입니다."),
     MISSING_REQUEST_HEADER(HttpStatus.BAD_REQUEST, "필수 요청 헤더가 누락되었습니다."),
     BAD_REQUEST_PARAMETER(HttpStatus.BAD_REQUEST, "잘못된 요청 파라미터입니다."),
-    UNSUPPORTED_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 미디어 타입입니다."),
     BAD_REQUEST_JSON(HttpStatus.BAD_REQUEST, "잘못된 JSON 형식입니다."),
     EXCEEDED_MAX_SIZE(HttpStatus.BAD_REQUEST, "파일 크기가 3MB를 초과했습니다."),
     DUPLICATED_USER(HttpStatus.BAD_REQUEST, "중복된 사용자입니다."),
@@ -105,7 +104,7 @@ public enum ErrorCode {
 
 
     // Unsupported Media Type: 415
-
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 미디어 타입입니다."),
 
     // Internal Server Error: 500
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 에러입니다."),
