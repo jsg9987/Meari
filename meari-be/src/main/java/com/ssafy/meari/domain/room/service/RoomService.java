@@ -936,8 +936,10 @@ public class RoomService {
             log.debug("오디오 URL 변환: {} -> {}", message.getAudioUrl(), s3Url);
         }
 
-        // 이 멤버의 모든 문장이 완료되었는지 체크
-        if (roomSessionService.isMemberRecordingsComplete(roomId, round, message.getMemberId())) {
+        // 이 멤버의 모든 문장이 완료되었는지 체크 후 분석 요청
+        // 마지막 문장 메시지가 동시에 중복 도착해도 SETNX 가드로 분석 요청은 1회만 발생 (중복 추론 방지)
+        if (roomSessionService.isMemberRecordingsComplete(roomId, round, message.getMemberId())
+                && roomSessionService.tryMarkAnalysisRequested(roomId, round, message.getMemberId())) {
             log.info("멤버 {} 모든 녹음 완료, 분석 요청", message.getMemberId());
 
             // 멤버별 발음 분석 요청 (비동기)
@@ -1267,15 +1269,19 @@ public class RoomService {
                 continue;
             }
 
-            // 1개 이상 녹음했으면 분석 요청
+            // 녹음이 하나도 없으면 분석할 게 없음
             Long recordedCount = roomSessionService.getRecordedCount(roomId, round, targetMemberId);
-            if (recordedCount != null && recordedCount > 0) {
+            if (recordedCount == null || recordedCount == 0) {
+                log.warn("녹음 없음 - memberId={}", targetMemberId);
+                continue;
+            }
+
+            // 1개 이상 녹음했고, 아직 분석 요청된 적 없으면 요청 (recordingComplete와 중복 방지)
+            if (roomSessionService.tryMarkAnalysisRequested(roomId, round, targetMemberId)) {
                 log.info("부분 완료 멤버 분석 요청 - memberId={}, recordedCount={}",
                         targetMemberId, recordedCount);
                 analysisService.requestMemberAnalysis(roomId, round, targetMemberId);
                 requestCount++;
-            } else {
-                log.warn("녹음 없음 - memberId={}", targetMemberId);
             }
         }
         log.info("부분 완료 멤버 분석 요청 완료: roomId={}, round={}, 요청 수={}", roomId, round, requestCount);

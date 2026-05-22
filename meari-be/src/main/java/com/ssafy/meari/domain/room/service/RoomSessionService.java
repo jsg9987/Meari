@@ -43,6 +43,7 @@ public class RoomSessionService {
     private static final String KEY_MEMBER_AUDIO_URLS = "room:%d:round:%d:member:%d:audio_urls";
     private static final String KEY_ROUND_TIMEOUT = "room:%d:round:%d:timeout";
     private static final String KEY_ROUND_COMPLETED = "room:%d:round:%d:completed";
+    private static final String KEY_ANALYSIS_REQUESTED = "room:%d:round:%d:member:%d:analysis_requested"; // 분석 요청 중복 방지 (SETNX)
     private static final String KEY_WATCHING_COMPLETE_ROOM = "room:%d:watching_complete"; // 게임 시작 전 영상 시청 완료 (room-level)
     private static final String KEY_WATCHING_COMPLETE = "room:%d:round:%d:watching_complete"; // 라운드별 영상 시청 완료 (round-level)
     private static final String KEY_SESSION_MEMBER = "session:%s:member"; // WebSocket sessionId → memberId 매핑
@@ -538,6 +539,17 @@ public class RoomSessionService {
     }
 
     /**
+     * 멤버별 분석 요청을 원자적으로 1회만 허용 (Redis SETNX). => 분석 요청 방지
+     * @return true: 이번 호출이 최초 (분석 요청 진행), false: 이미 요청됨 (스킵)
+     */
+    public boolean tryMarkAnalysisRequested(Long roomId, Integer round, Long memberId) {
+        String key = String.format(KEY_ANALYSIS_REQUESTED, roomId, round, memberId);
+        Boolean firstRequest = redisTemplate.opsForValue()
+                .setIfAbsent(key, "1", SESSION_TTL_HOURS, TimeUnit.HOURS);
+        return Boolean.TRUE.equals(firstRequest);
+    }
+
+    /**
      * 멤버가 녹음한 문장 개수 조회
      */
     public Long getRecordedCount(Long roomId, Integer round, Long memberId) {
@@ -607,6 +619,7 @@ public class RoomSessionService {
                 Long memberId = Long.parseLong(memberIdStr);
                 redisTemplate.delete(String.format(KEY_MEMBER_RECORDINGS, roomId, round, memberId));
                 redisTemplate.delete(String.format(KEY_MEMBER_TOTAL_SENTENCES, roomId, round, memberId));
+                redisTemplate.delete(String.format(KEY_ANALYSIS_REQUESTED, roomId, round, memberId));
             }
         }
         redisTemplate.delete(String.format(KEY_ROUND_START_TIME, roomId));
@@ -658,6 +671,13 @@ public class RoomSessionService {
         Set<String> keys = redisTemplate.keys(pattern);
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
+        }
+
+        // 분석 요청 플래그도 패턴 매칭으로 삭제 (재시작 시 다시 분석 가능하도록)
+        String analysisPattern = String.format("room:%d:round:*:member:*:analysis_requested", roomId);
+        Set<String> analysisKeys = redisTemplate.keys(analysisPattern);
+        if (analysisKeys != null && !analysisKeys.isEmpty()) {
+            redisTemplate.delete(analysisKeys);
         }
 
         log.info("방 {} 게임 상태 초기화 (준비 단계로 복귀, phase 삭제)", roomId);
