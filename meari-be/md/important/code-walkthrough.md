@@ -30,14 +30,14 @@
 
 코드 들어가기 전에 큰 그림과 핵심 개념. 사용자가 "왜 이 코드를 적는지" 모른 채로 가면 무의미.
 
-| | 단위 | 다루는 것 |
-|---|---|---|
+|     | 단위 | 다루는 것 |
+|-----|---|---|
 | [x] | **0A** | 요청 한 번이 응답이 되기까지의 전체 여정 (Tomcat → Filter Chain → DispatcherServlet → Interceptor → Controller → Service → Repository → DB → 역순) |
-| [ ] | **0B** | Spring IoC/DI — `@Component`/`@Service`/`@Configuration`/`@Bean` 가족, ApplicationContext, Bean lifecycle, 생성자 주입 |
-| [ ] | **0C** | Layered Architecture — Controller/Service/Repository/Entity 책임 분리, 의존 방향, DTO가 왜 있는가 |
-| [ ] | **0D** | Spring MVC + Spring Security 동거 방식 — 두 영역의 경계, `@RestControllerAdvice`가 닿는 범위 vs 안 닿는 범위 |
-| [ ] | **0E** | JPA로 객체와 DB 잇기 — Entity/Repository/EntityManager, 트랜잭션, Dirty Checking, Lazy/Eager Loading, N+1 문제 |
-| [ ] | **0F** | Meari 프로젝트의 큰 그림 — 무엇을 만든 것이며 도메인끼리 어떻게 엮여 있나 (사용자 시나리오: 회원가입 → 방 만들기 → 영상 따라하기 → 분석 → 리포트) |
+| [x] | **0B** | Spring IoC/DI — `@Component`/`@Service`/`@Configuration`/`@Bean` 가족, ApplicationContext, Bean lifecycle, 생성자 주입 |
+| [x] | **0C** | Layered Architecture — Controller/Service/Repository/Entity 책임 분리, 의존 방향, DTO가 왜 있는가 |
+| [x] | **0D** | Spring MVC + Spring Security 동거 방식 — 두 영역의 경계, `@RestControllerAdvice`가 닿는 범위 vs 안 닿는 범위 |
+| [x] | **0E** | JPA로 객체와 DB 잇기 — Entity/Repository/EntityManager, 트랜잭션, Dirty Checking, Lazy/Eager Loading, N+1 문제 |
+| [~] | **0F** | Meari 프로젝트의 큰 그림 — 무엇을 만든 것이며 도메인끼리 어떻게 엮여 있나 (사용자 시나리오: 회원가입 → 방 만들기 → 영상 따라하기 → 분석 → 리포트) |
 
 ---
 
@@ -45,19 +45,23 @@
 
 `global/auth/`, `global/config/SecurityConfig`. refactor.md A2 항목과 직결.
 
-| | 단위 | 파일 | 주요 도입 개념 |
+> **학습 순서 재배치(2026-05-26)**: 기존 1A~1K는 색인 순서라 첫 학습엔 부적합 → "필요 기반" 순서로 재배치. 회원가입(Security 거의 불필요)에서 출발해 필요가 쌓이는 순서로 가고, 전체 배선인 SecurityConfig는 조각을 다 본 뒤 ⑧에서 재조립. (대괄호 안은 원래 색인 라벨)
+>
+> **첫 절반 = "로그인해서 토큰을 받기까지"(①~⑤), 두 번째 절반 = "그 토큰으로 매 요청 인증 + 배선 + 부가"(⑥~⑪).**
+
+| | 단위 (학습 순서) | 파일 | 주요 도입 개념 |
 |---|---|---|---|
-| [x] | **1A** | `SecurityConfig` (149L) | Spring Security FilterChain, @EnableWebSecurity, AuthenticationManager, BCrypt |
-| [ ] | **1B** | `JwtUtil` (97L) | JWT 구조 (header.payload.signature), 서명 알고리즘(HS256), Claims, ExpiredJwtException |
-| [ ] | **1C** | `JwtAuthenticationFilter` (98L) | OncePerRequestFilter, Authentication, SecurityContext, UserDetails |
-| [ ] | **1D** | `JwtExceptionFilter` (55L) | 필터에서 예외 잡는 패턴, ObjectMapper로 JSON 직접 작성 |
-| [ ] | **1E** | `DefaultAuthenticationFilter` (107L) | AbstractAuthenticationProcessingFilter, RequestMatcher, ResponseCookie, Set-Cookie |
-| [ ] | **1F** | `RefreshTokenService` + `TokenBlacklistService` | Redis 기본, RedisTemplate, TTL, 키 네임스페이싱 |
-| [ ] | **1G** | `UserDetailsImpl` + `UserDetailsServiceImpl` | Spring Security 어댑터 패턴, GrantedAuthority |
-| [ ] | **1H** | `AuthService` (74L) | Service 레이어의 책임, 예외 변환 |
-| [ ] | **1I** | `AuthController` (96L) | @AuthenticationPrincipal, REST 엔드포인트 매핑 |
-| [ ] | **1J** | Auth DTOs (Login/Signup/RefreshToken/AccessToken/EmailCheck/NicknameCheck) | record vs class, @Valid, Bean Validation |
-| [ ] | **1K** | `CorsConfig` | CORS 동작 원리, origin/methods/headers, preflight |
+| [x] | **① Auth DTO + 검증** [1J] | `LoginRequestDto`/`SignupRequestDto` | record, @Email/@NotBlank/@Size/@NotNull, @Valid→MethodArgumentNotValidException(0D 연결), @JsonProperty. A2 TODO(비번 패턴) |
+| [x] | **② 회원가입 + 비번 암호화** [1J/1I 일부] | `MemberServiceImpl.signup` | BCryptPasswordEncoder, 단방향 해싱, salt, matches |
+| [x] | **③ JWT + JwtUtil** [1B] | `JwtUtil` (97L) | JWT 구조(header.payload.signature), HS256, Claims(subject/type/exp), @Value, parseSignedClaims 예외 |
+| [x] | **④ UserDetails 어댑터** [1G] | `UserDetailsImpl` + `UserDetailsServiceImpl` | Adapter 패턴, UserDetails 규격, loadUserByUsername, DaoAuthenticationProvider 연결, 빈 authorities |
+| [x] | **⑤ 로그인 흐름** [1E + SecurityConfig 일부] | `DefaultAuthenticationFilter` + `AuthenticationManager` | AbstractAuthenticationProcessingFilter, RequestMatcher, attempt/success/unsuccess, ResponseCookie(httpOnly), Set-Cookie |
+| [x] | **⑥ 매 요청 검증** [1C] | `JwtAuthenticationFilter` (98L) | OncePerRequestFilter, SecurityContextHolder(ThreadLocal), 인증정보 주입, 스킵경로 중복 냄새 |
+| [x] | **⑦ 필터 예외 처리** [1D] | `JwtExceptionFilter` (55L) | 0D에서 봄, ⑥보다 바깥에 위치해 try-catch로 감쌈 |
+| [x] | **⑧ SecurityConfig 재조립** [1A] | `SecurityConfig` (149L) | AuthenticationManager, 기본값 disable(STATELESS), authorizeHttpRequests, addFilterBefore 3개, WebSecurityCustomizer(ignoring vs permitAll) |
+| [x] | **⑨ AuthController 종합** [1I/1H] | `AuthController` + `AuthService` | @AuthenticationPrincipal(⑥의 결실), refresh/logout, 예외 변환 패턴 |
+| [x] | **⑩ RefreshToken + Blacklist** [1F] | `RefreshTokenService` + `TokenBlacklistService` | Redis, RedisTemplate, TTL=토큰수명(자동삭제), 키 네임스페이싱, access/refresh 분리, stateless 로그아웃 |
+| [x] | **⑪ CorsConfig** [1K] | `CorsConfig` | SOP, preflight(OPTIONS), allowedOrigins/methods/headers, allowCredentials+"*" 금지 |
 
 ---
 
@@ -184,7 +188,7 @@
 
 각 단위 끝나면 이 문서 표의 `[ ]` → `[x]`로 바꿈. 사용자가 직접 체크해도 되고, AI에게 부탁해도 됨.
 
-전체 진행률: **2 / 64 완료** (0A, 1A)
+전체 진행률: **17 / 64 완료** (섹션 0 전체: 0A~0F, 섹션 1 전체: ①~⑪). 섹션 1은 학습 순서 재배치됨(위 표 참고). 다음: 섹션 2(독립 도메인) — 2A Member Entity.
 
 ## 사용 팁
 
