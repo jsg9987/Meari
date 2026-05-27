@@ -35,7 +35,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 @DisplayName("Dashboard 쉐도잉 이력 조회 통합 테스트")
-@Disabled("DB unique 충돌 — 테스트 격리 후 재활성화")
 class DashboardControllerTest {
 
     @Autowired

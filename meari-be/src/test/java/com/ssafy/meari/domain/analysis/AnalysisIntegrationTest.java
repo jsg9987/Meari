@@ -40,7 +40,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @Slf4j
 @SpringBootTest
 @ActiveProfiles("test")
-@Disabled("실제 FastAPI 호출 e2e + DB unique 충돌 — 환경 분리 후 재활성화")
 class AnalysisIntegrationTest {
 
     @Autowired

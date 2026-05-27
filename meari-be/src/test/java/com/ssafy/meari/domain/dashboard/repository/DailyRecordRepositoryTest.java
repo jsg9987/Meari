@@ -20,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @DisplayName("DailyRecordRepository 통합 테스트")
-@Disabled("DB unique 충돌(기존 데이터 잔존) — 테스트 격리 후 재활성화")
 class DailyRecordRepositoryTest {
 
     @Autowired

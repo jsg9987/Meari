@@ -29,7 +29,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @Transactional
 @DisplayName("KopicReportService 통합 테스트")
-@Disabled("풀 컨텍스트 의존 — 환경 분리 후 재활성화")
 class KopicReportServiceTest {
 
     @Autowired
