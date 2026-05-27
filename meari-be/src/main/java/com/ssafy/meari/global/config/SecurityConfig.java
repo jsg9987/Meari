@@ -72,19 +72,16 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(authz -> authz
                 // 인증 없이 접근 가능
-                .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers(
+                    "/api/v1/auth/login",
+                    "/api/v1/auth/signup",
+                    "/api/v1/auth/email/check",
+                    "/api/v1/auth/nickname/check",
+                    "/api/v1/auth/refresh"
+                ).permitAll()
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()
-
-                ////////////////// chat-test.html 테스트를 위한 접근제한 해제 /////////////
-               // .requestMatchers("/**/*.html").permitAll()
-               // .requestMatchers("/**/*.js").permitAll()
-               // .requestMatchers("/**/*.css").permitAll()
-               // .requestMatchers("/**/*.ico").permitAll()
-               // .requestMatchers("/**/*.png").permitAll()
-               // .requestMatchers("/**/*.jpg").permitAll()
-
 
                 // Swagger UI 접근 허용
                 .requestMatchers("/swagger", "/swagger-ui.html", "/swagger-ui/**", "/api-docs", "/api-docs/**", "/v3/api-docs/**").permitAll()
@@ -107,10 +104,6 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/rooms/**").permitAll()
                 .requestMatchers("/api/v1/contents/**").permitAll()
 
-                    // 로그인 회원가입
-                    .requestMatchers("/api/v1/members/login", "/api/v1/members/signup").permitAll()
-
-
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
             );
@@ -118,15 +111,15 @@ public class SecurityConfig {
         // JWT 필터 등록
         http // JwtExceptionFilter -> JwtAuthenticationFilter -> DefaultAuthenticationFilter 순서로 작동
 
-            // 토큰이 없다면 AuthenticationManager에게 DB조회를 통한 인증을 위임하여
-            // 성공하면 토큰을 반환하고(로그인 처리) 실패하면 예외 발생
-            .addFilterBefore(new DefaultAuthenticationFilter(authenticationManager(), jwtUtil, refreshTokenService, objectMapper), UsernamePasswordAuthenticationFilter.class)
+        // 토큰이 없다면 AuthenticationManager에게 DB조회를 통한 인증을 위임하여
+        // 성공하면 토큰을 반환하고(로그인 처리) 실패하면 예외 발생
+        .addFilterBefore(new DefaultAuthenticationFilter(authenticationManager(), jwtUtil, refreshTokenService, objectMapper), UsernamePasswordAuthenticationFilter.class)
 
-            // 토큰이 있으면 검증하고 없으면 DefaultAuthenticationFilter로 전달
-            .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userDetailsService, tokenBlacklistService), DefaultAuthenticationFilter.class)
+        // 토큰이 있으면 검증하고 없으면 DefaultAuthenticationFilter로 전달
+        .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userDetailsService, tokenBlacklistService), DefaultAuthenticationFilter.class)
 
-            // Spring Security 필터에서 발생한 예외를 처리
-            .addFilterBefore(new JwtExceptionFilter(objectMapper), JwtAuthenticationFilter.class);
+        // Spring Security 필터에서 발생한 예외를 처리
+        .addFilterBefore(new JwtExceptionFilter(objectMapper), JwtAuthenticationFilter.class);
 
 
         return http.build();
