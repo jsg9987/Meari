@@ -87,6 +87,9 @@ class RoomServiceTest {
     @Mock
     private com.ssafy.meari.domain.analysis.service.AnalysisService analysisService;
 
+    @Mock
+    private RoomQueryService roomQueryService;
+
     private Member testMember;
     private Theme testTheme;
     private Room testRoom;
@@ -313,7 +316,7 @@ class RoomServiceTest {
             given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1", "2"));
 
             // When
-            CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 10);
+            CursorPageResponse<RoomListResponse> response = roomQueryService.getRoomList(null, null, 10);
 
             // Then
             assertThat(response).isNotNull();
@@ -330,7 +333,7 @@ class RoomServiceTest {
             given(roomSessionService.getMembers(1L)).willReturn(java.util.Set.of("1"));
 
             // When
-            CursorPageResponse<RoomListResponse> response = roomService.getRoomList(1L, null, 10);
+            CursorPageResponse<RoomListResponse> response = roomQueryService.getRoomList(1L, null, 10);
 
             // Then
             assertThat(response).isNotNull();
@@ -355,7 +358,7 @@ class RoomServiceTest {
             given(roomSessionService.getMembers(anyLong())).willReturn(java.util.Set.of("1"));
 
             // When
-            CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 1);
+            CursorPageResponse<RoomListResponse> response = roomQueryService.getRoomList(null, null, 1);
 
             // Then
             assertThat(response.isHasNext()).isTrue();
@@ -381,7 +384,7 @@ class RoomServiceTest {
             given(roomSessionService.getMembers(2L)).willReturn(java.util.Collections.emptySet());
 
             // When
-            CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 10);
+            CursorPageResponse<RoomListResponse> response = roomQueryService.getRoomList(null, null, 10);
 
             // Then
             assertThat(response.getContents()).hasSize(1);
@@ -408,7 +411,7 @@ class RoomServiceTest {
             given(roomSessionService.getMembers(3L)).willReturn(null);
 
             // When
-            CursorPageResponse<RoomListResponse> response = roomService.getRoomList(null, null, 10);
+            CursorPageResponse<RoomListResponse> response = roomQueryService.getRoomList(null, null, 10);
 
             // Then
             assertThat(response.getContents()).hasSize(1);
@@ -441,7 +444,7 @@ class RoomServiceTest {
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
 
             // When
-            RoomDetailResponse response = roomService.getRoomDetail(1L);
+            RoomDetailResponse response = roomQueryService.getRoomDetail(1L);
 
             // Then
             assertThat(response).isNotNull();
@@ -475,7 +478,7 @@ class RoomServiceTest {
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
 
             // When
-            RoomDetailResponse response = roomService.getRoomDetail(1L);
+            RoomDetailResponse response = roomQueryService.getRoomDetail(1L);
 
             // Then
             assertThat(response.getContentId()).isEqualTo(5L);
@@ -504,7 +507,7 @@ class RoomServiceTest {
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
 
             // When
-            RoomDetailResponse response = roomService.getRoomDetail(1L);
+            RoomDetailResponse response = roomQueryService.getRoomDetail(1L);
 
             // Then
             assertThat(response.getContentId()).isEqualTo(3L);
@@ -533,7 +536,7 @@ class RoomServiceTest {
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
 
             // When
-            RoomDetailResponse response = roomService.getRoomDetail(1L);
+            RoomDetailResponse response = roomQueryService.getRoomDetail(1L);
 
             // Then
             assertThat(response.getContentId()).isEqualTo(3L);
@@ -562,7 +565,7 @@ class RoomServiceTest {
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
 
             // When
-            RoomDetailResponse response = roomService.getRoomDetail(1L);
+            RoomDetailResponse response = roomQueryService.getRoomDetail(1L);
 
             // Then
             assertThat(response.getContentId()).isEqualTo(3L);
@@ -591,7 +594,7 @@ class RoomServiceTest {
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
 
             // When
-            RoomDetailResponse response = roomService.getRoomDetail(1L);
+            RoomDetailResponse response = roomQueryService.getRoomDetail(1L);
 
             // Then
             assertThat(response.getContentId()).isEqualTo(3L);
@@ -606,7 +609,7 @@ class RoomServiceTest {
             given(roomRepository.findById(999L)).willReturn(Optional.empty());
 
             // When & Then
-            assertThatThrownBy(() -> roomService.getRoomDetail(999L))
+            assertThatThrownBy(() -> roomQueryService.getRoomDetail(999L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_ROOM);
         }
@@ -645,7 +648,7 @@ class RoomServiceTest {
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
 
             // When
-            RoomDetailResponse response = roomService.getRoomDetail(1L);
+            RoomDetailResponse response = roomQueryService.getRoomDetail(1L);
 
             // Then
             assertThat(response).isNotNull();

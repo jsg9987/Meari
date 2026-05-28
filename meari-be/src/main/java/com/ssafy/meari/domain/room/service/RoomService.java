@@ -64,7 +64,6 @@ public class RoomService {
     private final RoomSessionService roomSessionService;
     private final RoomBroadcastService roomBroadcastService;
     private final AnalysisService analysisService;
-    private final RoomQueryService roomQueryService;
 
     @Value("${cloud.aws.s3.bucket}")
     private String s3Bucket;
@@ -139,21 +138,6 @@ public class RoomService {
         roomSessionService.setMemberRoom(owner.getMemberId(), room.getRoomId());
 
         return room;
-    }
-
-    /**
-     * 방 목록 조회 (커서 기반 페이징)
-     */
-    public CursorPageResponse<RoomListResponse> getRoomList(Long themeId, Long cursor, int size) {
-        return roomQueryService.getRoomList(themeId, cursor, size);
-    }
-
-    /**
-     * 방 상세 조회
-     * Redis의 실제 참여자로 필터링하여 이미 나간 사람이 보이지 않도록 처리
-     */
-    public RoomDetailResponse getRoomDetail(Long roomId) {
-        return roomQueryService.getRoomDetail(roomId);
     }
 
     /**

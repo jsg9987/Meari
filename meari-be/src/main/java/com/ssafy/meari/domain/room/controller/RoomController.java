@@ -10,6 +10,7 @@ import com.ssafy.meari.domain.room.dto.request.RoomEnterRequest;
 import com.ssafy.meari.domain.room.dto.response.RoomDetailResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomListResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomResponse;
+import com.ssafy.meari.domain.room.service.RoomQueryService;
 import com.ssafy.meari.domain.room.service.RoomService;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
 import com.ssafy.meari.global.common.ApiResponse;
@@ -33,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 public class RoomController {
 
     private final RoomService roomService;
+    private final RoomQueryService roomQueryService;
 
     @Operation(summary = "방 생성", description = "새로운 쉐도잉 방을 생성합니다. 생성자는 자동으로 방장이 됩니다.")
     @PostMapping
@@ -67,7 +69,7 @@ public class RoomController {
             @RequestParam(defaultValue = "10") int size
     ) {
         log.info("방 목록 조회 요청: themeId={}, cursor={}, size={}", themeId, cursor, size);
-        CursorPageResponse<RoomListResponse> response = roomService.getRoomList(themeId, cursor, size);
+        CursorPageResponse<RoomListResponse> response = roomQueryService.getRoomList(themeId, cursor, size);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -77,7 +79,7 @@ public class RoomController {
             @Parameter(description = "방 ID") @PathVariable Long roomId
     ) {
         log.info("방 상세 조회 요청: roomId={}", roomId);
-        RoomDetailResponse response = roomService.getRoomDetail(roomId);
+        RoomDetailResponse response = roomQueryService.getRoomDetail(roomId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
