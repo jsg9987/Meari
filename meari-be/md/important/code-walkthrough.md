@@ -102,40 +102,33 @@
 
 ## 섹션 4 — ⭐ Room 도메인: REST + 상태 머신 (~1,900 LOC) — **B1의 대상**
 
-가장 복잡한 도메인. 1316L의 RoomService를 메서드 그룹으로 쪼개서 다룸.
+가장 복잡한 도메인. 1316L의 RoomService가 핵심.
 
-| | 단위 | 파일/메서드 그룹 | 주요 도입 개념 |
+| | 단위 (학습 순서) | 다루는 것 | 주요 개념 |
 |---|---|---|---|
-| [ ] | **4A** | Room Entity + GamePhase 등 enum | 상태 머신 모델링, JPA enum 매핑, @Enumerated(STRING) |
-| [ ] | **4B** | MemberRoom, MemberRound 조인 엔티티 | N:M 관계 풀어내기, 복합키 vs 별도 ID |
-| [ ] | **4C** | `RoomRepository` 등 모든 Repository | 커서 페이지네이션 쿼리, fetch join, projection |
-| [ ] | **4D** | `RoomController` (193L) — REST API | 입장/퇴장/조회 엔드포인트 매핑 |
-| [ ] | **4E** | `RoomService` 부분 1: 생성·조회 (createRoom, createQuickRoom, getRoomList, getRoomDetail) | @Transactional, DTO 변환 |
-| [ ] | **4F** | `RoomService` 부분 2: 입장·퇴장 (enterRoom, leaveRoom, kickMember, handleAbnormalDisconnect) | 동시성 고려, 정원 체크 |
-| [ ] | **4G** | `RoomService` 부분 3: Phase 전이 (startGame, finishWatching, recordingComplete, finishGame) | 상태 머신 전이 트리거, 브로드캐스트 호출 |
-| [ ] | **4H** | `RoomService` 부분 4: 역할 (selectRole, confirmRoles, selectContent) | 협상 패턴 |
-| [ ] | **4I** | `RoomService` 부분 5: 라운드/녹화 (startRound, watchingComplete) | 라운드 단위 진행 |
-| [ ] | **4J** | RoomService 종합 — 책임 분류표 정리 | **B1 분해 직전 매핑표 작성** |
+| [ ] | **4-0 상태 모델** [4A+4B] | Room / RoomStatus / GamePhase / MemberRoom (+MemberRound) | 방 생애주기 지도(WAITING→IN_PROGRESS{WATCHING→ROLE_PICK→ROUND}), @Enumerated(STRING), 조인 엔티티, **RoomStatus(DB) vs GamePhase(Redis)** 이원 관리 |
+| [ ] | **4-1 흐름: 방 생성·조회** [4D+4E+4C] | RoomController(해당부분) → createRoom/createQuickRoom/getRoomList/getRoomDetail → Repository | REST 매핑, @Transactional(readOnly), DTO 변환, 커서 페이지네이션, N+1 점검(C1) |
+| [ ] | **4-2 흐름: 입장·퇴장** [4F] | enterRoom/leaveRoom/kickMember/handleAbnormalDisconnect (+ RoomSessionService 세션) | 정원·권한 체크, 방장 위임(handleOwnerLeave), Redis 세션, **섹션 5와 연결점** |
+| [ ] | **4-3 흐름: 게임 진행 ★** [4G+4H+4I] | startGame→selectContent→finishWatching→watchingComplete→confirmRoles→startRound→recordingComplete→finishRound→finishGame | Phase 전이 패턴(**반복되는 상태검증**), 브로드캐스트(**트랜잭션 밖 원칙**), 분석 트리거, 세그먼트 빌드. 1316L의 대부분 |
+| [ ] | **4-4 종합 → B1 설계** [4J] | 메서드 → 책임 분류표 + 분해 설계 | Query/Command/Phase/Broadcast/Membership 매핑, **트랜잭션 경계·커밋 후 브로드캐스트**, PhaseHandler 필요성 판단, **Facade는 보류(과설계 — 모듈화부터)** |
 
 ---
 
 ## 섹션 5 — WebSocket·WebRTC (~1,700 LOC) — **B2의 대상**
 
-실시간 통신 영역. 0A에서 본 "MVC 영역"이 아닌 별도 영역.
+실시간 통신 영역. 0A/0D에서 본 "MVC 영역"이 아닌 별도 영역.
 
-| | 단위 | 파일 | 주요 도입 개념 |
+> 인프라(설정) → **연결 생애주기(연결→메시지→종료)를 세로 관통** → 세션 모델 종합 → WebRTC 레이어 순. `RoomSessionService`(772L)는 흐름 중 등장 시 참조하고 끝에 한 번 전체를 묶음.
+
+| | 단위 (학습 순서) | 다루는 것 | 주요 개념 |
 |---|---|---|---|
-| [ ] | **5A** | `WebSocketConfig` + STOMP 기본 | STOMP 프로토콜, /topic vs /queue vs /app, MessageBroker |
-| [ ] | **5B** | `JwtChannelInterceptor` | ChannelInterceptor, CONNECT 프레임 인증 |
-| [ ] | **5C** | `RoomSessionMappingInterceptor` | sessionId ↔ roomId 매핑 |
-| [ ] | **5D** | `RoomWebSocketController` (255L) | @MessageMapping, @SendTo, SimpMessagingTemplate |
-| [ ] | **5E** | `RoomSessionService` 부분 1: 세션 추적 | ConcurrentHashMap, sessionId 관리 |
-| [ ] | **5F** | `RoomSessionService` 부분 2: 브로드캐스트 | STOMP 메시지 발행 |
-| [ ] | **5G** | `RoomSessionService` 부분 3: 정리 (disconnect 처리) | EventListener, SessionDisconnectEvent |
-| [ ] | **5H** | WebRTC 개념 + OpenVidu 도입 | SFU/MCU, ICE/STUN/TURN, OpenVidu의 역할 |
-| [ ] | **5I** | `OpenViduService` (313L) | 외부 SaaS 클라이언트, 세션·토큰 발급, 녹화 |
-| [ ] | **5J** | `WebRtcRoomService` + 컨트롤러 | Room lifecycle ↔ OpenVidu 세션 연결 |
-| [ ] | **5K** | RoomWebSocketController 종합 — 비즈니스 로직 식별 | **B2 정리 직전 매핑표 작성** |
+| [ ] | **5-0 인프라** [5A] | `WebSocketConfig` + STOMP 기본 | STOMP, /app vs /topic vs /queue, MessageBroker, MVC 밖 영역(0D 연결) |
+| [ ] | **5-1 연결 흐름** [5B+5C] | `JwtChannelInterceptor`(CONNECT 인증) → `RoomSessionMappingInterceptor`(session↔room) | ChannelInterceptor, 핸드셰이크/CONNECT 인증, sessionId↔roomId 매핑 |
+| [ ] | **5-2 메시지 흐름** [5D+5E/5F] | `RoomWebSocketController`(@MessageMapping) → `RoomSessionService`(세션상태) → 브로드캐스트(/topic) | @MessageMapping, ready/role/chat, **컨트롤러에 박힌 비즈니스 로직(B2 식별)** |
+| [ ] | **5-3 종료 흐름** [5G] | `SessionDisconnectEvent` → 세션 정리 (handleWebSocketDisconnect + RoomSessionService) | EventListener, Grace Period, **Redis 정리 순서가 컨트롤러에 있는 문제** |
+| [ ] | **5-4 세션 모델 종합** [5E~5G] | `RoomSessionService`(772L) 전체 | Redis 기반 세션/ready/role/phase 상태 모델 한 그림 |
+| [ ] | **5-5 WebRTC 레이어** [5H+5I+5J] | WebRTC/OpenVidu 개념 → `OpenViduService`(313L) → `WebRtcRoomService`+컨트롤러 | SFU/MCU, ICE/STUN/TURN, 외부 SaaS, Room lifecycle↔OpenVidu 세션 |
+| [ ] | **5-6 종합 → B2 설계** [5K] | RoomWebSocketController 비즈니스 로직 식별 → 매핑표 | Service 이동 대상, **`/user/queue/errors` 구현** 포함 |
 
 ---
 
