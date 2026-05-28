@@ -64,6 +64,7 @@ public class RoomService {
     private final RoomSessionService roomSessionService;
     private final RoomBroadcastService roomBroadcastService;
     private final AnalysisService analysisService;
+    private final RoomQueryService roomQueryService;
 
     @Value("${cloud.aws.s3.bucket}")
     private String s3Bucket;
@@ -75,36 +76,13 @@ public class RoomService {
     public RoomResponse createRoom(RoomCreateRequest request, Long memberId) {
         log.info("방 생성 시작: memberId={}, title={}", memberId, request.getTitle());
 
-        // 회원 조회
         Member owner = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-
-        // 테마 조회
         Theme theme = themeRepository.findById(request.getThemeId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_THEME));
 
-        // 방 생성
-        Room room = Room.builder()
-                .owner(owner)
-                .theme(theme)
-                .title(request.getTitle())
-                .maxPeople(request.getMaxPeople())
-                .password(request.getPassword())
-                .build();
-
-        room = roomRepository.save(room);
-        log.info("방 생성 완료: roomId={}", room.getRoomId());
-
-        // 방장 자동 입장 (MemberRoom)
-        MemberRoom memberRoom = MemberRoom.builder()
-                .room(room)
-                .member(owner)
-                .build();
-        memberRoomRepository.save(memberRoom);
-
-        // Redis에 참여자 추가 및 멤버→방 매핑
-        roomSessionService.addMember(room.getRoomId(), memberId);
-        roomSessionService.setMemberRoom(memberId, room.getRoomId());
+        Room room = createRoomWithOwner(owner, theme,
+                request.getTitle(), request.getMaxPeople(), request.getPassword());
 
         return RoomResponse.from(room, 1);
     }
@@ -117,11 +95,8 @@ public class RoomService {
     public RoomResponse createQuickRoom(Long themeId, Long memberId) {
         log.info("빠른 방 생성 시작: memberId={}, themeId={}", memberId, themeId);
 
-        // 회원 조회
         Member owner = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-
-        // 테마 조회
         Theme theme = themeRepository.findById(themeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_THEME));
 
@@ -130,104 +105,47 @@ public class RoomService {
         if (contents.isEmpty()) {
             throw new BusinessException(ErrorCode.NO_CONTENT_IN_THEME);
         }
-        int randomIndex = ThreadLocalRandom.current().nextInt(contents.size());
-        Content selectedContent = contents.get(randomIndex);
-
-        // 자동 제목 생성
+        Content selectedContent = contents.get(ThreadLocalRandom.current().nextInt(contents.size()));
         String title = theme.getName() + " 테마 같이 공부해요~";
 
-        // 방 생성 (비밀번호 없음, maxPeople은 콘텐츠 기준)
+        Room room = createRoomWithOwner(owner, theme,
+                title, selectedContent.getMaxPeople(), null);
+
+        // Redis에 콘텐츠 설정 (방 생성 즉시)
+        roomSessionService.setContent(room.getRoomId(), selectedContent.getContentId());
+        log.info("빠른 방 생성 완료: roomId={}, contentId={}", room.getRoomId(), selectedContent.getContentId());
+
+        return RoomResponse.from(room, 1);
+    }
+
+    /**
+     * 방 + 방장 입장(MemberRoom) + Redis 세션 등록을 한 단위로 처리.
+     * createRoom / createQuickRoom 공통 본문 추출.
+     */
+    private Room createRoomWithOwner(Member owner, Theme theme, String title,
+                                     Integer maxPeople, String password) {
         Room room = Room.builder()
                 .owner(owner)
                 .theme(theme)
                 .title(title)
-                .maxPeople(selectedContent.getMaxPeople())
-                .password(null)
+                .maxPeople(maxPeople)
+                .password(password)
                 .build();
-
         room = roomRepository.save(room);
-        log.info("빠른 방 생성 완료: roomId={}, contentId={}", room.getRoomId(), selectedContent.getContentId());
 
-        // 방장 자동 입장 (MemberRoom)
-        MemberRoom memberRoom = MemberRoom.builder()
-                .room(room)
-                .member(owner)
-                .build();
-        memberRoomRepository.save(memberRoom);
+        memberRoomRepository.save(MemberRoom.builder().room(room).member(owner).build());
 
-        // Redis에 참여자 추가 및 멤버→방 매핑
-        roomSessionService.addMember(room.getRoomId(), memberId);
-        roomSessionService.setMemberRoom(memberId, room.getRoomId());
+        roomSessionService.addMember(room.getRoomId(), owner.getMemberId());
+        roomSessionService.setMemberRoom(owner.getMemberId(), room.getRoomId());
 
-        // Redis에 콘텐츠 설정 (방 생성 즉시)
-        roomSessionService.setContent(room.getRoomId(), selectedContent.getContentId());
-
-        return RoomResponse.from(room, 1);
+        return room;
     }
 
     /**
      * 방 목록 조회 (커서 기반 페이징)
      */
     public CursorPageResponse<RoomListResponse> getRoomList(Long themeId, Long cursor, int size) {
-        log.info("방 목록 조회: themeId={}, cursor={}, size={}", themeId, cursor, size);
-
-        // size + 1개 조회해서 다음 페이지 존재 여부 확인
-        List<Room> rooms;
-        if (themeId != null) {
-            rooms = roomRepository.findRoomsWithCursor(
-                    themeId, cursor, RoomStatus.COMPLETED, PageRequest.of(0, size + 1));
-        } else {
-            rooms = roomRepository.findAllRoomsWithCursor(
-                    cursor, RoomStatus.COMPLETED, PageRequest.of(0, size + 1));
-        }
-
-        boolean hasNext = rooms.size() > size;
-        if (hasNext) {
-            rooms = rooms.subList(0, size);
-        }
-
-        // 각 방의 현재 Redis 기준 인원 수 및 썸네일 조회
-        List<RoomListResponse> contents = rooms.stream()
-                .map(room -> {
-                    Set<String> members = roomSessionService.getMembers(room.getRoomId());
-                    int currentPeople = (members != null) ? members.size() : 0;
-
-                    // Redis에 아무도 없는데 방이 아직 열려있으면 → 좀비방 정리
-                    if (currentPeople == 0 && room.getStatus() != RoomStatus.COMPLETED) {
-                        room.updateStatus(RoomStatus.COMPLETED);
-                        memberRoomRepository.deleteAllByRoom_RoomId(room.getRoomId());
-                        log.info("좀비방 정리: roomId={}", room.getRoomId());
-                    }
-
-                    // 상태에 따라 썸네일 결정
-                    String thumbnail;
-                    if (room.getStatus() == RoomStatus.WAITING) {
-                        // 대기중: 테마 썸네일
-                        thumbnail = room.getTheme().getThemeUrl();
-                    } else if (room.getStatus() == RoomStatus.IN_PROGRESS) {
-                        // 진행중: 컨텐츠 썸네일 (없으면 테마 썸네일로 fallback)
-                        Long contentId = roomSessionService.getContentId(room.getRoomId());
-                        if (contentId != null) {
-                            thumbnail = contentRepository.findById(contentId)
-                                    .map(Content::getThumbnailUrl)
-                                    .orElse(room.getTheme().getThemeUrl());
-                        } else {
-                            thumbnail = room.getTheme().getThemeUrl();
-                        }
-                    } else {
-                        // COMPLETED 등 기타 상태: 테마 썸네일
-                        thumbnail = room.getTheme().getThemeUrl();
-                    }
-
-                    return RoomListResponse.from(room, currentPeople, thumbnail);
-                })
-                .collect(Collectors.toList());
-
-        Long nextCursor = hasNext && !rooms.isEmpty()
-                ? rooms.get(rooms.size() - 1).getRoomId()
-                : null;
-
-        return CursorPageResponse.of(contents, nextCursor, hasNext);
+        return roomQueryService.getRoomList(themeId, cursor, size);
     }
 
     /**
@@ -235,47 +153,7 @@ public class RoomService {
      * Redis의 실제 참여자로 필터링하여 이미 나간 사람이 보이지 않도록 처리
      */
     public RoomDetailResponse getRoomDetail(Long roomId) {
-        log.info("방 상세 조회: roomId={}", roomId);
-
-        Room room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
-
-        // DB에서 모든 참여 기록 조회
-        List<MemberRoom> allMemberRooms = memberRoomRepository.findByRoomIdWithMember(roomId);
-
-        // Redis의 현재 실제 참여자 조회 (연결이 끊기지 않은 사람들)
-        Set<String> redisMembers = roomSessionService.getMembers(roomId);
-
-        // DB 데이터를 Redis로 필터링 (실제 참여 중인 멤버만 남김)
-        // 이렇게 하면 나갔을 때 leaveRoom이 호출되지 않은 경우에도
-        // Redis의 실제 상태를 기준으로 표시됨
-        List<MemberRoom> memberRooms = allMemberRooms.stream()
-                .filter(mr -> redisMembers != null &&
-                             redisMembers.contains(mr.getMember().getMemberId().toString()))
-                .collect(Collectors.toList());
-
-        log.debug("방 상세 조회 필터링: 전체={}, 필터 후={}", allMemberRooms.size(), memberRooms.size());
-
-        // Redis에서 준비 상태, 역할 선점 정보 조회
-        Map<Long, Boolean> readyStatus = roomSessionService.getAllReadyStatus(roomId);
-        Map<Long, String> roles = roomSessionService.getAllRoles(roomId);
-
-        List<RoomMemberResponse> members = memberRooms.stream()
-                .map(mr -> {
-                    Member member = mr.getMember();
-                    boolean isOwner = room.getOwner().getMemberId().equals(member.getMemberId());
-                    boolean isReady = readyStatus.getOrDefault(member.getMemberId(), false);
-                    Long roleId = findRoleIdByMemberId(roles, member.getMemberId());
-                    return RoomMemberResponse.from(member, isOwner, isReady, roleId);
-                })
-                .collect(Collectors.toList());
-
-        // Redis에서 게임 상태 정보 조회
-        Long contentId = roomSessionService.getContentId(roomId);
-        GamePhase phase = roomSessionService.getPhase(roomId);
-        Boolean rolesConfirmed = roomSessionService.isRolesConfirmed(roomId) ? true : null;
-
-        return RoomDetailResponse.from(room, members, contentId, phase, rolesConfirmed);
+        return roomQueryService.getRoomDetail(roomId);
     }
 
     /**
@@ -397,15 +275,9 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // WAITING 상태 확인
-        if (room.getStatus() != RoomStatus.WAITING) {
-            throw new BusinessException(ErrorCode.ROOM_NOT_WAITING);
-        }
-
-        // 방장 권한 확인
-        if (!room.getOwner().getMemberId().equals(requestMemberId)) {
-            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
-        }
+        // 권한·상태 검증 (도메인 메서드)
+        room.checkWaitingOrThrow();
+        room.checkOwnerOrThrow(requestMemberId);
 
         // 자기 자신 강퇴 방지
         if (requestMemberId.equals(targetMemberId)) {
@@ -501,17 +373,11 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // 방장 권한 확인
-        if (!room.getOwner().getMemberId().equals(memberId)) {
-            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
-        }
+        // 권한·상태 검증 (도메인 메서드)
+        room.checkOwnerOrThrow(memberId);
+        room.checkWaitingOrThrow();
 
-        // 이미 진행 중인지 확인
-        if (room.getStatus() != RoomStatus.WAITING) {
-            throw new BusinessException(ErrorCode.ROOM_NOT_WAITING);
-        }
-
-        // 동영상이 선택되었는지 확인 (Redis의 contentId와 일치해야 함)
+        // 콘텐츠 선택·일치 확인 (Redis)
         Long selectedContentId = roomSessionService.getContentId(roomId);
         if (selectedContentId == null) {
             throw new BusinessException(ErrorCode.CONTENT_NOT_SELECTED);
@@ -520,23 +386,21 @@ public class RoomService {
             throw new BusinessException(ErrorCode.CONTENT_MISMATCH);
         }
 
-        // 모든 참여자(방장 제외)가 준비 완료인지 확인
+        // 모든 참여자(방장 제외) 준비 완료 확인
         if (!isAllMembersReady(roomId, memberId)) {
             throw new BusinessException(ErrorCode.NOT_ALL_READY);
         }
 
-        // 방 상태 변경
+        // 상태 전이: WAITING → IN_PROGRESS(WATCHING)
         room.updateStatus(RoomStatus.IN_PROGRESS);
         roomSessionService.setPhase(roomId, GamePhase.WATCHING);
         roomSessionService.clearWatchingComplete(roomId);
 
-        // 전체 스크립트(자막) 조회 및 segments 생성
+        // 전체 스크립트(자막) 조회 및 segments 생성 + 게임 시작 브로드캐스트
         List<Sentence> sentences = sentenceRepository.findByContent_ContentId(contentId);
         List<MemberSegmentInfo> scriptSegments = buildScriptSegments(sentences);
-
-        // 게임 시작 알림 브로드캐스트 (contentId + phase + 전체 자막)
-        RoomStateMessage message = RoomStateMessage.gameStart(contentId, GamePhase.WATCHING, scriptSegments);
-        roomBroadcastService.broadcastState(roomId, message);
+        roomBroadcastService.broadcastState(roomId,
+                RoomStateMessage.gameStart(contentId, GamePhase.WATCHING, scriptSegments));
 
         log.info("게임 시작 완료: roomId={}, contentId={}, 전체 스크립트 segments 수={}",
                 roomId, contentId, scriptSegments.size());
@@ -613,15 +477,9 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // 방장 권한 확인
-        if (!room.getOwner().getMemberId().equals(memberId)) {
-            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
-        }
-
-        // 진행 중인 방인지 확인
-        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
-            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
-        }
+        // 권한·상태 검증 (도메인 메서드)
+        room.checkOwnerOrThrow(memberId);
+        room.checkInProgressOrThrow();
 
         // 현재 phase가 WATCHING인지 확인
         GamePhase currentPhase = roomSessionService.getPhase(roomId);
@@ -689,14 +547,8 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        if (!room.getOwner().getMemberId().equals(memberId)) {
-            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
-        }
-
-        // 진행 중인 방인지 확인
-        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
-            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
-        }
+        room.checkOwnerOrThrow(memberId);
+        room.checkInProgressOrThrow();
 
         GamePhase phase = roomSessionService.getPhase(roomId);
         if (phase != GamePhase.ROLE_PICK) {
@@ -788,14 +640,8 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        if (!room.getOwner().getMemberId().equals(memberId)) {
-            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
-        }
-
-        // 진행 중인 방인지 확인
-        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
-            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
-        }
+        room.checkOwnerOrThrow(memberId);
+        room.checkInProgressOrThrow();
 
         // 현재 phase 검증
         GamePhase currentPhase = roomSessionService.getPhase(roomId);
@@ -1151,12 +997,10 @@ public class RoomService {
     public void finishRound(Long roomId, Integer round, Long memberId) {
         log.info("라운드 종료 요청: roomId={}, round={}, memberId={}", roomId, round, memberId);
 
-        // 1. 방장 권한 확인
+        // 1. 방장 권한 확인 (도메인 메서드)
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
-        if (!room.getOwner().getMemberId().equals(memberId)) {
-            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
-        }
+        room.checkOwnerOrThrow(memberId);
 
         // 2. Phase 확인
         GamePhase currentPhase = roomSessionService.getPhase(roomId);
@@ -1191,15 +1035,9 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // 방장 권한 확인
-        if (!room.getOwner().getMemberId().equals(memberId)) {
-            throw new BusinessException(ErrorCode.NOT_ROOM_OWNER);
-        }
-
-        // 진행 중인 방인지 확인
-        if (room.getStatus() != RoomStatus.IN_PROGRESS) {
-            throw new BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS);
-        }
+        // 권한·상태 검증 (도메인 메서드)
+        room.checkOwnerOrThrow(memberId);
+        room.checkInProgressOrThrow();
 
         // Round2 단계에서만 종료 가능
         GamePhase currentPhase = roomSessionService.getPhase(roomId);

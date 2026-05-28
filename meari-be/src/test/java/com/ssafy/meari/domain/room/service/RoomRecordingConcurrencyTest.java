@@ -98,7 +98,8 @@ class RoomRecordingConcurrencyTest {
                 mock(ShadowingReportRepository.class),
                 roomSessionService,
                 mock(RoomBroadcastService.class),
-                analysisService
+                analysisService,
+                mock(RoomQueryService.class)
         );
         ReflectionTestUtils.setField(roomService, "s3Bucket", "test-bucket");
 
