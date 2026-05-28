@@ -42,7 +42,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,7 +62,7 @@ public class RoomService {
     private final SentenceRepository sentenceRepository;
     private final ShadowingReportRepository shadowingReportRepository;
     private final RoomSessionService roomSessionService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RoomBroadcastService roomBroadcastService;
     private final AnalysisService analysisService;
 
     @Value("${cloud.aws.s3.bucket}")
@@ -336,7 +335,7 @@ public class RoomService {
 
         // 입장 알림 브로드캐스트
         RoomStateMessage message = RoomStateMessage.memberJoin(memberId, member.getNickname());
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
 
         log.info("방 입장 완료: roomId={}, memberId={}", roomId, memberId);
     }
@@ -375,7 +374,7 @@ public class RoomService {
 
         // 퇴장 알림 브로드캐스트
         RoomStateMessage message = RoomStateMessage.memberLeave(memberId, newOwnerId);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
 
         // 마지막 사람이 나간 경우 방 종료
         long remainingCount = memberRoomRepository.countByRoom_RoomId(roomId);
@@ -427,7 +426,7 @@ public class RoomService {
 
         // 강퇴 알림 브로드캐스트
         RoomStateMessage message = RoomStateMessage.memberKicked(targetMemberId);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
 
         log.info("멤버 강퇴 완료: roomId={}, targetMemberId={}", roomId, targetMemberId);
     }
@@ -537,7 +536,7 @@ public class RoomService {
 
         // 게임 시작 알림 브로드캐스트 (contentId + phase + 전체 자막)
         RoomStateMessage message = RoomStateMessage.gameStart(contentId, GamePhase.WATCHING, scriptSegments);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
 
         log.info("게임 시작 완료: roomId={}, contentId={}, 전체 스크립트 segments 수={}",
                 roomId, contentId, scriptSegments.size());
@@ -598,7 +597,7 @@ public class RoomService {
 
         // 동영상 선택 알림 브로드캐스트
         RoomStateMessage message = RoomStateMessage.contentSelected(contentId);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
 
         log.info("동영상 선택 완료: roomId={}, contentId={}", roomId, contentId);
     }
@@ -635,7 +634,7 @@ public class RoomService {
 
         // 브로드캐스트
         RoomStateMessage message = RoomStateMessage.phaseChange(GamePhase.ROLE_PICK);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
 
         log.info("영상 시청 완료, 역할 선택 단계 전환: roomId={}", roomId);
     }
@@ -676,7 +675,7 @@ public class RoomService {
         roomSessionService.setPhase(roomId, GamePhase.ROLE_PICK);
 
         RoomStateMessage message = RoomStateMessage.phaseChange(GamePhase.ROLE_PICK);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
     }
 
     /**
@@ -772,7 +771,7 @@ public class RoomService {
                 segments.stream().map(MemberSegmentInfo::getMemberId).collect(java.util.stream.Collectors.toList()));
 
         RoomStateMessage message = RoomStateMessage.rolesConfirmed(segments);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
 
         log.info("역할 확정 완료 및 segments 브로드캐스트: roomId={}, segments 수={} (시스템 역할 포함)", roomId, segments.size());
     }
@@ -852,7 +851,7 @@ public class RoomService {
 
         // ROUND_START 브로드캐스트 (재생 시작 시간 전달)
         RoomStateMessage message = RoomStateMessage.roundStart(newPhase, round, playStartTime, segments);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
 
         log.info("Round 시작 완료: roomId={}, round={}, phase={}, 재생시작={}ms 후, 타임아웃={}초",
                 roomId, round, newPhase, 2, videoDurationSeconds + 40);
@@ -995,7 +994,7 @@ public class RoomService {
         log.info("모든 멤버 영상 시청 및 녹음 전송 완료: roomId={}, round={}", roomId, round);
         roomSessionService.markRoundCompleted(roomId, round);
         RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+        roomBroadcastService.broadcastState(roomId, completeMessage);
     }
 
     /**
@@ -1216,7 +1215,7 @@ public class RoomService {
 
         // 게임 종료 브로드캐스트 (프론트엔드에서 준비 단계로 복귀)
         RoomStateMessage message = RoomStateMessage.gameFinished();
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", message);
+        roomBroadcastService.broadcastState(roomId, message);
 
         log.info("게임 종료 완료, 준비 단계로 복귀: roomId={}", roomId);
     }
@@ -1294,7 +1293,7 @@ public class RoomService {
     private void broadcastRoundComplete(Long roomId, Integer round, GamePhase currentPhase) {
         roomSessionService.markRoundCompleted(roomId, round);
         RoomStateMessage completeMessage = RoomStateMessage.recordingsComplete(currentPhase, round);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", completeMessage);
+        roomBroadcastService.broadcastState(roomId, completeMessage);
         log.debug("라운드 완료 브로드캐스트: roomId={}, round={}", roomId, round);
     }
 

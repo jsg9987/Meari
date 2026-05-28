@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -98,7 +97,7 @@ class RoomRecordingConcurrencyTest {
                 mock(SentenceRepository.class),
                 mock(ShadowingReportRepository.class),
                 roomSessionService,
-                mock(SimpMessagingTemplate.class),
+                mock(RoomBroadcastService.class),
                 analysisService
         );
         ReflectionTestUtils.setField(roomService, "s3Bucket", "test-bucket");
