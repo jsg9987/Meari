@@ -256,11 +256,7 @@ public class RoomService {
 
         // 마지막 사람이 나간 경우 방 종료
         long remainingCount = memberRoomRepository.countByRoom_RoomId(roomId);
-        if (remainingCount == 0) {
-            room.updateStatus(RoomStatus.COMPLETED);
-            roomSessionService.clearRoomSession(roomId);
-            log.info("방 종료 (마지막 참여자 퇴장): roomId={}", roomId);
-        }
+        closeRoomIfEmpty(remainingCount, roomId, room);
 
         log.info("방 퇴장 완료: roomId={}, memberId={}", roomId, memberId);
     }
@@ -338,11 +334,7 @@ public class RoomService {
 
         // 남은 인원 확인
         long remainingCount = memberRoomRepository.countByRoom_RoomId(roomId);
-        if (remainingCount == 0) {
-            room.updateStatus(RoomStatus.COMPLETED);
-            roomSessionService.clearRoomSession(roomId);
-            log.info("비정상 종료: 마지막 사람 퇴장으로 방 종료, roomId={}", roomId);
-        }
+        closeRoomIfEmpty(remainingCount, roomId, room);
 
         log.info("비정상 종료 처리 완료: roomId={}, memberId={}, 남은 인원={}", roomId, memberId, remainingCount);
     }
@@ -361,6 +353,18 @@ public class RoomService {
                     return newOwnerId;
                 })
                 .orElse(null);
+    }
+
+    /**
+     * 남은 인원이 없으면 방을 COMPLETED로 닫는다.
+     * (leaveRoom / handleAbnormalDisconnect 공통 처리)
+     */
+    private void closeRoomIfEmpty(long remainingCount, Long roomId, Room room) {
+        if (remainingCount == 0) {
+            room.updateStatus(RoomStatus.COMPLETED);
+            roomSessionService.clearRoomSession(roomId);
+            log.info("방 종료 (마지막 참여자 퇴장): roomId={}", roomId);
+        }
     }
 
     /**
@@ -643,17 +647,8 @@ public class RoomService {
         room.checkOwnerOrThrow(memberId);
         room.checkInProgressOrThrow();
 
-        // 현재 phase 검증
-        GamePhase currentPhase = roomSessionService.getPhase(roomId);
-        if (round == 1) {
-            if (currentPhase != GamePhase.ROLE_PICK) {
-                throw new BusinessException(ErrorCode.INVALID_PHASE);
-            }
-        } else if (round == 2) {
-            if (currentPhase != GamePhase.ROUND_1) {
-                throw new BusinessException(ErrorCode.INVALID_PHASE);
-            }
-        }
+        // 라운드별 phase 검증
+        validateRoundStartPhase(roomId, round);
 
         // 역할이 확정되었는지 확인
         if (!roomSessionService.isRolesConfirmed(roomId)) {
@@ -678,29 +673,44 @@ public class RoomService {
 
         List<MemberSegmentInfo> segments = buildMemberSegments(memberRooms, roleAssignments, sentences);
 
-        // 각 멤버별 예상 문장수 저장
+        // 라운드 세션 상태 초기화 (멤버별 총문장수 / 시작시각 / 타임아웃) — 재생 시작 시각 반환
+        long playStartTime = initializeRoundSessionState(roomId, round, segments, content);
+
+        // ROUND_START 브로드캐스트
+        roomBroadcastService.broadcastState(roomId, RoomStateMessage.roundStart(newPhase, round, playStartTime, segments));
+
+        log.info("Round 시작 완료: roomId={}, round={}, phase={}", roomId, round, newPhase);
+    }
+
+    /**
+     * 라운드 시작 시 phase 검증 (round=1 → ROLE_PICK, round=2 → ROUND_1).
+     */
+    private void validateRoundStartPhase(Long roomId, Integer round) {
+        GamePhase currentPhase = roomSessionService.getPhase(roomId);
+        if (round == 1 && currentPhase != GamePhase.ROLE_PICK) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
+        }
+        if (round == 2 && currentPhase != GamePhase.ROUND_1) {
+            throw new BusinessException(ErrorCode.INVALID_PHASE);
+        }
+    }
+
+    /**
+     * 라운드 시작에 필요한 Redis 세션 상태 초기화
+     * (멤버별 총문장수, Round 시작 시각, 타임아웃).
+     * @return 클라이언트 동기화용 재생 시작 시각 (epoch millis)
+     */
+    private long initializeRoundSessionState(Long roomId, Integer round,
+                                             List<MemberSegmentInfo> segments, Content content) {
         for (MemberSegmentInfo segment : segments) {
             roomSessionService.setMemberTotalSentences(roomId, round, segment.getMemberId(), segment.getSentences().size());
         }
-
-        // Round 시작 시각 저장 (타임아웃 계산용)
         long currentTime = System.currentTimeMillis();
         roomSessionService.setRoundStartTime(roomId, currentTime);
-
-        // 실제 재생 시작 시간 (현재 시간 + 2초)
         long playStartTime = currentTime + 2000L;
-
-        // 타임아웃 시간 계산 및 저장 (재생 시작 시간 + 영상 길이 + 40초)
-        int videoDurationSeconds = content.getTotalDuration().intValue();
-        long timeoutMillis = playStartTime + (videoDurationSeconds * 1000L) + 40000L;
+        long timeoutMillis = playStartTime + (content.getTotalDuration().intValue() * 1000L) + 40000L;
         roomSessionService.setRoundTimeout(roomId, round, timeoutMillis);
-
-        // ROUND_START 브로드캐스트 (재생 시작 시간 전달)
-        RoomStateMessage message = RoomStateMessage.roundStart(newPhase, round, playStartTime, segments);
-        roomBroadcastService.broadcastState(roomId, message);
-
-        log.info("Round 시작 완료: roomId={}, round={}, phase={}, 재생시작={}ms 후, 타임아웃={}초",
-                roomId, round, newPhase, 2, videoDurationSeconds + 40);
+        return playStartTime;
     }
 
     /**
