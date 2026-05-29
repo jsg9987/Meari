@@ -44,6 +44,9 @@ class RoomServiceWebSocketTest {
     @InjectMocks
     private RoomService roomService;
 
+    @InjectMocks
+    private RoomPhaseService roomPhaseService;
+
     @Mock
     private SimpMessagingTemplate messagingTemplate;
 
@@ -264,7 +267,7 @@ class RoomServiceWebSocketTest {
             given(contentRepository.existsById(contentId)).willReturn(true);
 
             // When
-            roomService.selectContent(roomId, contentId, memberId);
+            roomPhaseService.selectContent(roomId, contentId, memberId);
 
             // Then
             ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
@@ -294,7 +297,7 @@ class RoomServiceWebSocketTest {
             given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.WATCHING);
 
             // When
-            roomService.finishWatching(roomId, 1L);
+            roomPhaseService.finishWatching(roomId, 1L);
 
             // Then
             ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
@@ -327,7 +330,7 @@ class RoomServiceWebSocketTest {
             given(roomSessionService.isAllWatchingComplete(roomId)).willReturn(true);
 
             // When
-            roomService.watchingComplete(roomId, memberId);
+            roomPhaseService.watchingComplete(roomId, memberId);
 
             // Then
             ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
@@ -357,7 +360,7 @@ class RoomServiceWebSocketTest {
             given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.ROUND_2);
 
             // When
-            roomService.finishGame(roomId, 1L);
+            roomPhaseService.finishGame(roomId, 1L);
 
             // Then
             ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
@@ -389,7 +392,7 @@ class RoomServiceWebSocketTest {
             given(memberRoomRepository.findByRoomIdWithMember(roomId)).willReturn(List.of());
 
             // When
-            roomService.startGame(roomId, contentId, memberId);
+            roomPhaseService.startGame(roomId, contentId, memberId);
 
             // Then
             ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
@@ -453,7 +456,7 @@ class RoomServiceWebSocketTest {
             given(sentenceRepository.findByContent_ContentId(1L)).willReturn(List.of(sentence1, sentence2));
 
             // When
-            roomService.startRound(roomId, 1, 1L);
+            roomPhaseService.startRound(roomId, 1, 1L);
 
             // Then
             ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
@@ -503,7 +506,7 @@ class RoomServiceWebSocketTest {
             given(roomSessionService.isAllRecordingsComplete(roomId, 1)).willReturn(true);
 
             // When
-            roomService.recordingComplete(roomId, message);
+            roomPhaseService.recordingComplete(roomId, message);
 
             // Then
             ArgumentCaptor<RoomStateMessage> messageCaptor = ArgumentCaptor.forClass(RoomStateMessage.class);
@@ -536,7 +539,7 @@ class RoomServiceWebSocketTest {
             given(roomSessionService.isAllWatchingComplete(roomId, 2)).willReturn(false);
 
             // When
-            roomService.recordingComplete(roomId, message);
+            roomPhaseService.recordingComplete(roomId, message);
 
             // Then
             verify(roomSessionService).markRecordingComplete(roomId, 2, 1L, 10L);

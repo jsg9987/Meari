@@ -17,6 +17,7 @@ import com.ssafy.meari.domain.room.dto.websocket.RoleSelectMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
 import com.ssafy.meari.domain.room.dto.websocket.WatchingCompleteMessage;
 import com.ssafy.meari.domain.room.service.ChatService;
+import com.ssafy.meari.domain.room.service.RoomPhaseService;
 import com.ssafy.meari.domain.room.service.RoomService;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
 
@@ -37,6 +38,7 @@ public class RoomWebSocketController {
     private final SimpMessagingTemplate messagingTemplate;
     private final RoomSessionService roomSessionService;
     private final RoomService roomService;
+    private final RoomPhaseService roomPhaseService;
     private final ChatService chatService;
 
     private static final String TOPIC_STATE = "/topic/room/%d/state";
@@ -165,7 +167,7 @@ public class RoomWebSocketController {
 
         clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
-        roomService.watchingComplete(roomId, message.getMemberId());
+        roomPhaseService.watchingComplete(roomId, message.getMemberId());
     }
 
     /**
@@ -182,7 +184,7 @@ public class RoomWebSocketController {
 
         clearDisconnectedIfNeeded(roomId, message.getMemberId());
 
-        roomService.recordingComplete(roomId, message);
+        roomPhaseService.recordingComplete(roomId, message);
     }
 
 

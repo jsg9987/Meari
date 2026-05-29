@@ -4,13 +4,11 @@ import com.ssafy.meari.domain.analysis.service.AnalysisService;
 import com.ssafy.meari.domain.content.repository.ContentRepository;
 import com.ssafy.meari.domain.content.repository.RoleRepository;
 import com.ssafy.meari.domain.content.repository.SentenceRepository;
-import com.ssafy.meari.domain.member.repository.MemberRepository;
 import com.ssafy.meari.domain.report.repository.ShadowingReportRepository;
 import com.ssafy.meari.domain.room.dto.websocket.RecordingCompleteMessage;
 import com.ssafy.meari.domain.room.entity.GamePhase;
 import com.ssafy.meari.domain.room.repository.MemberRoomRepository;
 import com.ssafy.meari.domain.room.repository.RoomRepository;
-import com.ssafy.meari.domain.theme.repository.ThemeRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,7 +60,7 @@ class RoomRecordingConcurrencyTest {
 
     private LettuceConnectionFactory connectionFactory;
     private RoomSessionService roomSessionService;
-    private RoomService roomService;
+    private RoomPhaseService roomPhaseService;
     private AnalysisService analysisService; // mock — 호출 횟수 카운트용
 
     @BeforeEach
@@ -87,11 +85,9 @@ class RoomRecordingConcurrencyTest {
         analysisService = mock(AnalysisService.class);
 
         // recordingComplete()는 DB를 타지 않고 Redis만 사용하므로 Repository류는 mock으로 충분
-        roomService = new RoomService(
+        roomPhaseService = new RoomPhaseService(
                 mock(RoomRepository.class),
                 mock(MemberRoomRepository.class),
-                mock(MemberRepository.class),
-                mock(ThemeRepository.class),
                 mock(ContentRepository.class),
                 mock(RoleRepository.class),
                 mock(SentenceRepository.class),
@@ -100,7 +96,7 @@ class RoomRecordingConcurrencyTest {
                 mock(RoomBroadcastService.class),
                 analysisService
         );
-        ReflectionTestUtils.setField(roomService, "s3Bucket", "test-bucket");
+        ReflectionTestUtils.setField(roomPhaseService, "s3Bucket", "test-bucket");
 
         // 초기 상태: ROUND_1 진행 중, 멤버 1명, 총 5문장, 1~4번 이미 녹음 완료 (마지막 5번만 남음)
         roomSessionService.setPhase(ROOM_ID, GamePhase.ROUND_1);
@@ -137,7 +133,7 @@ class RoomRecordingConcurrencyTest {
                 ready.countDown();
                 try {
                     start.await();                 // 모든 스레드가 동시에 출발하도록 정렬
-                    roomService.recordingComplete(ROOM_ID, message);
+                    roomPhaseService.recordingComplete(ROOM_ID, message);
                 } catch (Exception ignored) {
                     // 본 테스트의 관심사는 분석 요청 횟수
                 } finally {

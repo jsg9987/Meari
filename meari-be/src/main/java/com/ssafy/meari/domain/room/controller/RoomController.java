@@ -10,6 +10,7 @@ import com.ssafy.meari.domain.room.dto.request.RoomEnterRequest;
 import com.ssafy.meari.domain.room.dto.response.RoomDetailResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomListResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomResponse;
+import com.ssafy.meari.domain.room.service.RoomPhaseService;
 import com.ssafy.meari.domain.room.service.RoomQueryService;
 import com.ssafy.meari.domain.room.service.RoomService;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
@@ -35,6 +36,7 @@ public class RoomController {
 
     private final RoomService roomService;
     private final RoomQueryService roomQueryService;
+    private final RoomPhaseService roomPhaseService;
 
     @Operation(summary = "방 생성", description = "새로운 쉐도잉 방을 생성합니다. 생성자는 자동으로 방장이 됩니다.")
     @PostMapping
@@ -125,7 +127,7 @@ public class RoomController {
             @AuthenticationPrincipal UserDetailsImpl userDetails,
             @Valid @RequestBody ContentSelectRequest request
     ) {
-        roomService.selectContent(roomId, request.getContentId(), userDetails.getMember().getMemberId());
+        roomPhaseService.selectContent(roomId, request.getContentId(), userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -136,7 +138,7 @@ public class RoomController {
             @AuthenticationPrincipal UserDetailsImpl userDetails,
             @Valid @RequestBody GameStartRequest request
     ) {
-        roomService.startGame(roomId, request.getContentId(), userDetails.getMember().getMemberId());
+        roomPhaseService.startGame(roomId, request.getContentId(), userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -146,7 +148,7 @@ public class RoomController {
             @Parameter(description = "방 ID") @PathVariable Long roomId,
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        roomService.finishWatching(roomId, userDetails.getMember().getMemberId());
+        roomPhaseService.finishWatching(roomId, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -157,7 +159,7 @@ public class RoomController {
             @Valid @RequestBody RoleConfirmRequest request,
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        roomService.confirmRoles(roomId, request, userDetails.getMember().getMemberId());
+        roomPhaseService.confirmRoles(roomId, request, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -168,7 +170,7 @@ public class RoomController {
             @AuthenticationPrincipal UserDetailsImpl userDetails,
             @Valid @RequestBody RoundStartRequest request
     ) {
-        roomService.startRound(roomId, request.getRound(), userDetails.getMember().getMemberId());
+        roomPhaseService.startRound(roomId, request.getRound(), userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -179,7 +181,7 @@ public class RoomController {
             @Parameter(description = "라운드 번호 (1 또는 2)") @PathVariable Integer round,
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        roomService.finishRound(roomId, round, userDetails.getMember().getMemberId());
+        roomPhaseService.finishRound(roomId, round, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -189,7 +191,7 @@ public class RoomController {
             @Parameter(description = "방 ID") @PathVariable Long roomId,
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        roomService.finishGame(roomId, userDetails.getMember().getMemberId());
+        roomPhaseService.finishGame(roomId, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 }

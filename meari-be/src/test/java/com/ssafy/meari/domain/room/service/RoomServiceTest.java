@@ -53,6 +53,9 @@ class RoomServiceTest {
     @InjectMocks
     private RoomService roomService;
 
+    @InjectMocks
+    private RoomPhaseService roomPhaseService;
+
     // RoomServiceTest.java 상단 Mock 정의 구역에 추가
     @Mock
     private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
@@ -1132,7 +1135,7 @@ class RoomServiceTest {
             given(roleRepository.existsById(anyLong())).willReturn(true);
 
             // When
-            roomService.confirmRoles(1L, request, 1L);
+            roomPhaseService.confirmRoles(1L, request, 1L);
 
             // Then
             verify(roomSessionService).clearRoles(1L);
@@ -1161,7 +1164,7 @@ class RoomServiceTest {
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
 
             // When & Then
-            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 999L))
+            assertThatThrownBy(() -> roomPhaseService.confirmRoles(1L, request, 999L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
         }
@@ -1179,7 +1182,7 @@ class RoomServiceTest {
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
 
             // When & Then
-            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+            assertThatThrownBy(() -> roomPhaseService.confirmRoles(1L, request, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_IN_PROGRESS);
         }
@@ -1200,7 +1203,7 @@ class RoomServiceTest {
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.WATCHING);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+            assertThatThrownBy(() -> roomPhaseService.confirmRoles(1L, request, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
         }
@@ -1239,7 +1242,7 @@ class RoomServiceTest {
             given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1, mr2, mr3, mr4));
 
             // When & Then
-            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+            assertThatThrownBy(() -> roomPhaseService.confirmRoles(1L, request, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROLE_COUNT_MISMATCH);
         }
@@ -1261,7 +1264,7 @@ class RoomServiceTest {
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(true);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+            assertThatThrownBy(() -> roomPhaseService.confirmRoles(1L, request, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROLES_ALREADY_CONFIRMED);
         }
@@ -1287,7 +1290,7 @@ class RoomServiceTest {
             given(memberRoomRepository.findByRoomIdWithMember(1L)).willReturn(java.util.List.of(mr1));
 
             // When & Then
-            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+            assertThatThrownBy(() -> roomPhaseService.confirmRoles(1L, request, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_MEMBER);
         }
@@ -1313,7 +1316,7 @@ class RoomServiceTest {
             given(roleRepository.existsById(999L)).willReturn(false);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+            assertThatThrownBy(() -> roomPhaseService.confirmRoles(1L, request, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_ROLE);
         }
@@ -1347,7 +1350,7 @@ class RoomServiceTest {
             given(roleRepository.existsById(anyLong())).willReturn(true);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+            assertThatThrownBy(() -> roomPhaseService.confirmRoles(1L, request, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_MEMBER_ROLE);
         }
@@ -1381,7 +1384,7 @@ class RoomServiceTest {
             given(roleRepository.existsById(anyLong())).willReturn(true);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.confirmRoles(1L, request, 1L))
+            assertThatThrownBy(() -> roomPhaseService.confirmRoles(1L, request, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_ROLE_ASSIGNMENT);
         }
@@ -1400,7 +1403,7 @@ class RoomServiceTest {
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.WATCHING);
 
             // When
-            roomService.finishWatching(1L, 1L);
+            roomPhaseService.finishWatching(1L, 1L);
 
             // Then
             verify(roomSessionService).setPhase(1L, GamePhase.ROLE_PICK);
@@ -1416,7 +1419,7 @@ class RoomServiceTest {
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
 
             // When & Then
-            assertThatThrownBy(() -> roomService.finishWatching(1L, 999L))
+            assertThatThrownBy(() -> roomPhaseService.finishWatching(1L, 999L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
         }
@@ -1428,7 +1431,7 @@ class RoomServiceTest {
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
 
             // When & Then
-            assertThatThrownBy(() -> roomService.finishWatching(1L, 1L))
+            assertThatThrownBy(() -> roomPhaseService.finishWatching(1L, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_IN_PROGRESS);
         }
@@ -1442,7 +1445,7 @@ class RoomServiceTest {
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.finishWatching(1L, 1L))
+            assertThatThrownBy(() -> roomPhaseService.finishWatching(1L, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
         }
@@ -1465,7 +1468,7 @@ class RoomServiceTest {
             given(roomSessionService.isAllWatchingComplete(roomId)).willReturn(true);
 
             // When
-            roomService.watchingComplete(roomId, memberId);
+            roomPhaseService.watchingComplete(roomId, memberId);
 
             // Then
             verify(roomSessionService).markWatchingComplete(roomId, memberId);
@@ -1489,7 +1492,7 @@ class RoomServiceTest {
             given(roomSessionService.isAllWatchingComplete(roomId)).willReturn(false);
 
             // When
-            roomService.watchingComplete(roomId, memberId);
+            roomPhaseService.watchingComplete(roomId, memberId);
 
             // Then
             verify(roomSessionService).markWatchingComplete(roomId, memberId);
@@ -1503,7 +1506,7 @@ class RoomServiceTest {
         void watchingComplete_Fail_NotInProgress() {
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
 
-            assertThatThrownBy(() -> roomService.watchingComplete(1L, 1L))
+            assertThatThrownBy(() -> roomPhaseService.watchingComplete(1L, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_IN_PROGRESS);
         }
@@ -1515,7 +1518,7 @@ class RoomServiceTest {
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROLE_PICK);
 
-            assertThatThrownBy(() -> roomService.watchingComplete(1L, 1L))
+            assertThatThrownBy(() -> roomPhaseService.watchingComplete(1L, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
         }
@@ -1528,7 +1531,7 @@ class RoomServiceTest {
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.WATCHING);
             given(roomSessionService.isMember(1L, 999L)).willReturn(false);
 
-            assertThatThrownBy(() -> roomService.watchingComplete(1L, 999L))
+            assertThatThrownBy(() -> roomPhaseService.watchingComplete(1L, 999L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_MEMBER);
         }
@@ -1547,7 +1550,7 @@ class RoomServiceTest {
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROUND_2);
 
             // When
-            roomService.finishGame(1L, 1L);
+            roomPhaseService.finishGame(1L, 1L);
 
             // Then
             assertThat(testRoom.getStatus()).isEqualTo(RoomStatus.WAITING);
@@ -1564,7 +1567,7 @@ class RoomServiceTest {
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
 
             // When & Then
-            assertThatThrownBy(() -> roomService.finishGame(1L, 999L))
+            assertThatThrownBy(() -> roomPhaseService.finishGame(1L, 999L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
         }
@@ -1576,7 +1579,7 @@ class RoomServiceTest {
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
 
             // When & Then
-            assertThatThrownBy(() -> roomService.finishGame(1L, 1L))
+            assertThatThrownBy(() -> roomPhaseService.finishGame(1L, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROOM_NOT_IN_PROGRESS);
         }
@@ -1590,7 +1593,7 @@ class RoomServiceTest {
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.ROUND_1);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.finishGame(1L, 1L))
+            assertThatThrownBy(() -> roomPhaseService.finishGame(1L, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
         }
@@ -1657,7 +1660,7 @@ class RoomServiceTest {
             given(sentenceRepository.findByContent_ContentId(1L)).willReturn(java.util.List.of(sentence1, sentence2));
 
             // When
-            roomService.startRound(1L, 1, 1L);
+            roomPhaseService.startRound(1L, 1, 1L);
 
             // Then
             verify(shadowingReportRepository, times(2)).save(any());
@@ -1698,7 +1701,7 @@ class RoomServiceTest {
             given(sentenceRepository.findByContent_ContentId(1L)).willReturn(java.util.List.of(sentence1, sentence2));
 
             // When
-            roomService.startRound(1L, 1, 1L);
+            roomPhaseService.startRound(1L, 1, 1L);
 
             // Then
             org.mockito.ArgumentCaptor<com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage> captor =
@@ -1745,7 +1748,7 @@ class RoomServiceTest {
             given(sentenceRepository.findByContent_ContentId(1L)).willReturn(java.util.List.of(sentence1, sentence2));
 
             // When
-            roomService.startRound(1L, 2, 1L);
+            roomPhaseService.startRound(1L, 2, 1L);
 
             // Then
             verify(shadowingReportRepository, never()).save(any());
@@ -1760,7 +1763,7 @@ class RoomServiceTest {
             given(roomRepository.findById(1L)).willReturn(Optional.of(testRoom));
 
             // When & Then
-            assertThatThrownBy(() -> roomService.startRound(1L, 1, 999L))
+            assertThatThrownBy(() -> roomPhaseService.startRound(1L, 1, 999L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_OWNER);
         }
@@ -1774,7 +1777,7 @@ class RoomServiceTest {
             given(roomSessionService.getPhase(1L)).willReturn(GamePhase.WATCHING);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.startRound(1L, 1, 1L))
+            assertThatThrownBy(() -> roomPhaseService.startRound(1L, 1, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
         }
@@ -1789,7 +1792,7 @@ class RoomServiceTest {
             given(roomSessionService.isRolesConfirmed(1L)).willReturn(false);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.startRound(1L, 1, 1L))
+            assertThatThrownBy(() -> roomPhaseService.startRound(1L, 1, 1L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ROLES_NOT_CONFIRMED);
         }
@@ -1938,7 +1941,7 @@ class RoomServiceTest {
             given(roomSessionService.isAllRecordingsComplete(roomId, 1)).willReturn(false);
 
             // When
-            roomService.recordingComplete(roomId, message);
+            roomPhaseService.recordingComplete(roomId, message);
 
             // Then
             verify(roomSessionService).markRecordingComplete(roomId, 1, 1L, 10L);
@@ -1964,7 +1967,7 @@ class RoomServiceTest {
             given(roomSessionService.isAllRecordingsComplete(roomId, 1)).willReturn(true);
 
             // When
-            roomService.recordingComplete(roomId, message);
+            roomPhaseService.recordingComplete(roomId, message);
 
             // Then
             verify(roomSessionService).markRecordingComplete(roomId, 1, 2L, 11L);
@@ -1995,7 +1998,7 @@ class RoomServiceTest {
             given(roomSessionService.isAllRecordingsComplete(roomId, 2)).willReturn(false);
 
             // When
-            roomService.recordingComplete(roomId, message);
+            roomPhaseService.recordingComplete(roomId, message);
 
             // Then
             verify(roomSessionService).markRecordingComplete(roomId, 2, 1L, 10L);
@@ -2014,7 +2017,7 @@ class RoomServiceTest {
             given(roomSessionService.getPhase(roomId)).willReturn(GamePhase.WATCHING);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.recordingComplete(roomId, message))
+            assertThatThrownBy(() -> roomPhaseService.recordingComplete(roomId, message))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PHASE);
         }
@@ -2033,7 +2036,7 @@ class RoomServiceTest {
             given(roomSessionService.isMember(roomId, 999L)).willReturn(false);
 
             // When & Then
-            assertThatThrownBy(() -> roomService.recordingComplete(roomId, message))
+            assertThatThrownBy(() -> roomPhaseService.recordingComplete(roomId, message))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_ROOM_MEMBER);
         }
