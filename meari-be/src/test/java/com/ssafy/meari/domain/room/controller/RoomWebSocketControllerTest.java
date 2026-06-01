@@ -25,7 +25,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import com.ssafy.meari.domain.room.dto.websocket.ChatMessage;
 import com.ssafy.meari.domain.room.service.ChatService;
-import com.ssafy.meari.domain.room.service.RoomService;
+import com.ssafy.meari.domain.room.service.RoomCommandService;
+import com.ssafy.meari.domain.room.service.RoomPhaseService;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,7 +43,10 @@ class RoomWebSocketControllerTest {
     private RoomSessionService roomSessionService;
 
     @Mock
-    private RoomService roomService;
+    private RoomCommandService roomCommandService;
+
+    @Mock
+    private RoomPhaseService roomPhaseService;
 
     @Mock
     private ChatService chatService;

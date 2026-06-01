@@ -17,8 +17,8 @@ import com.ssafy.meari.domain.room.dto.websocket.RoleSelectMessage;
 import com.ssafy.meari.domain.room.dto.websocket.RoomStateMessage;
 import com.ssafy.meari.domain.room.dto.websocket.WatchingCompleteMessage;
 import com.ssafy.meari.domain.room.service.ChatService;
+import com.ssafy.meari.domain.room.service.RoomCommandService;
 import com.ssafy.meari.domain.room.service.RoomPhaseService;
-import com.ssafy.meari.domain.room.service.RoomService;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
 
 import lombok.RequiredArgsConstructor;
@@ -37,7 +37,7 @@ public class RoomWebSocketController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final RoomSessionService roomSessionService;
-    private final RoomService roomService;
+    private final RoomCommandService roomCommandService;
     private final RoomPhaseService roomPhaseService;
     private final ChatService chatService;
 
@@ -246,7 +246,7 @@ public class RoomWebSocketController {
                 log.info("비정상 종료: Redis 제거 완료, roomId={}, memberId={}", roomId, memberId);
 
                 // Service 호출해서 DB 정리 및 방장 위임/방 종료 처리
-                roomService.handleAbnormalDisconnect(roomId, memberId);
+                roomCommandService.handleAbnormalDisconnect(roomId, memberId);
             } else {
                 log.debug("WebSocket 연결 끊김: sessionId 매핑 정보 없음 (아직 메시지 미전송 상태)");
             }

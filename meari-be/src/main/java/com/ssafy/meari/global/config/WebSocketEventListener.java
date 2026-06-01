@@ -1,6 +1,6 @@
 package com.ssafy.meari.global.config;
 
-import com.ssafy.meari.domain.room.service.RoomService;
+import com.ssafy.meari.domain.room.service.RoomCommandService;
 import com.ssafy.meari.domain.room.service.RoomSessionService;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
 import com.ssafy.meari.global.error.ErrorCode;
@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class WebSocketEventListener {
 
-    private final RoomService roomService;
+    private final RoomCommandService roomCommandService;
     private final RoomSessionService roomSessionService;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
@@ -80,7 +80,7 @@ public class WebSocketEventListener {
         log.info("Grace Period 만료, 자동 퇴장 실행: roomId={}, memberId={}", roomId, memberId);
 
         try {
-            roomService.leaveRoom(roomId, memberId);
+            roomCommandService.leaveRoom(roomId, memberId);
         } catch (BusinessException e) {
             // 이미 퇴장된 경우는 정상으로 처리
             if (e.getErrorCode() == ErrorCode.NOT_FOUND_MEMBER_ROOM) {

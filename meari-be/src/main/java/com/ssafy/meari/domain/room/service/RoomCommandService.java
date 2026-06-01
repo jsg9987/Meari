@@ -18,7 +18,7 @@ import com.ssafy.meari.domain.theme.repository.ThemeRepository;
 import com.ssafy.meari.global.error.ErrorCode;
 import com.ssafy.meari.global.error.exception.BusinessException;
 
-import java.util.*;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import lombok.RequiredArgsConstructor;
@@ -26,11 +26,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Room 도메인의 생성·입퇴장·강퇴·방장 위임 등 명령(Command) 워크플로우 전담 서비스.
+ *
+ * 기존 God Service였던 RoomService의 마지막 책임을 옮겨 받으며 RoomService를 제거.
+ * 외부(Controller·WSController·WebSocketEventListener)는 RoomCommandService를 직접 주입·호출.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class RoomService {
+public class RoomCommandService {
 
     private final RoomRepository roomRepository;
     private final MemberRoomRepository memberRoomRepository;
@@ -59,8 +65,7 @@ public class RoomService {
     }
 
     /**
-     * 빠른 방 생성 (테마 배너 클릭)
-     * 테마 ID만 받아 랜덤 콘텐츠를 선택하고 자동으로 방을 생성합니다.
+     * 빠른 방 생성 (테마 배너 클릭). 테마 ID만 받아 랜덤 콘텐츠를 선택하고 자동으로 방을 생성.
      */
     @Transactional
     public RoomResponse createQuickRoom(Long themeId, Long memberId) {
@@ -71,7 +76,6 @@ public class RoomService {
         Theme theme = themeRepository.findById(themeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_THEME));
 
-        // 해당 테마의 콘텐츠 목록 조회 및 랜덤 선택
         List<Content> contents = contentRepository.findByTheme_ThemeId(themeId);
         if (contents.isEmpty()) {
             throw new BusinessException(ErrorCode.NO_CONTENT_IN_THEME);
@@ -82,7 +86,6 @@ public class RoomService {
         Room room = createRoomWithOwner(owner, theme,
                 title, selectedContent.getMaxPeople(), null);
 
-        // Redis에 콘텐츠 설정 (방 생성 즉시)
         roomSessionService.setContent(room.getRoomId(), selectedContent.getContentId());
         log.info("빠른 방 생성 완료: roomId={}, contentId={}", room.getRoomId(), selectedContent.getContentId());
 
@@ -113,9 +116,8 @@ public class RoomService {
     }
 
     /**
-     * 방 입장
-     * 비정상 종료는 SessionDisconnectEvent에서 즉시 처리되므로,
-     * 여기서는 단순히 DB 중복만 체크 (Redis는 이미 정리됨)
+     * 방 입장.
+     * 비정상 종료는 SessionDisconnectEvent에서 즉시 처리되므로 여기서는 DB 중복만 체크.
      */
     @Transactional
     public void enterRoom(Long roomId, RoomEnterRequest request, Long memberId) {
@@ -124,50 +126,41 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // 입장 가능 상태인지 확인
         if (!room.isJoinable()) {
             throw new BusinessException(ErrorCode.ROOM_NOT_JOINABLE);
         }
 
-        // 비밀번호 확인
         if (!room.isPasswordMatch(request.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_ROOM_PASSWORD);
         }
 
-        // Redis에 이미 있으면 중복 입장 (현재 접속 중)
         if (roomSessionService.isMember(roomId, memberId)) {
             throw new BusinessException(ErrorCode.ROOM_ALREADY_JOINED);
         }
 
-        // DB에 잔존 데이터가 있으면 삭제 (비정상 종료 후 재입장)
         memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(roomId, memberId)
                 .ifPresent(existingMemberRoom -> {
                     memberRoomRepository.delete(existingMemberRoom);
                     log.info("비정상 종료 잔존 데이터 삭제: roomId={}, memberId={}", roomId, memberId);
                 });
 
-        // 정원 확인
         long currentCount = memberRoomRepository.countByRoom_RoomId(roomId);
         if (currentCount >= room.getMaxPeople()) {
             throw new BusinessException(ErrorCode.ROOM_FULL);
         }
 
-        // 회원 조회
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
 
-        // MemberRoom 저장
         MemberRoom memberRoom = MemberRoom.builder()
                 .room(room)
                 .member(member)
                 .build();
         memberRoomRepository.save(memberRoom);
 
-        // Redis에 참여자 추가 및 멤버→방 매핑
         roomSessionService.addMember(roomId, memberId);
         roomSessionService.setMemberRoom(memberId, roomId);
 
-        // 입장 알림 브로드캐스트
         RoomStateMessage message = RoomStateMessage.memberJoin(memberId, member.getNickname());
         roomBroadcastService.broadcastState(roomId, message);
 
@@ -175,7 +168,7 @@ public class RoomService {
     }
 
     /**
-     * 방 퇴장 (정상 퇴장)
+     * 방 퇴장 (정상 퇴장).
      */
     @Transactional
     public void leaveRoom(Long roomId, Long memberId) {
@@ -184,7 +177,6 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // 참여 중인지 확인 (WebSocket disconnect로 이미 처리된 경우 정상 종료)
         MemberRoom memberRoom = memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(roomId, memberId)
                 .orElse(null);
 
@@ -193,24 +185,19 @@ public class RoomService {
             return;
         }
 
-        // MemberRoom 삭제
         memberRoomRepository.delete(memberRoom);
 
-        // Redis에서 참여자 제거 (준비 상태, 역할도 함께 제거됨)
         roomSessionService.removeMember(roomId, memberId);
         roomSessionService.clearMemberRoom(memberId);
 
-        // 방장이 나간 경우 처리 및 새 방장 ID 반환
         Long newOwnerId = null;
         if (room.getOwner().getMemberId().equals(memberId)) {
             newOwnerId = handleOwnerLeave(room);
         }
 
-        // 퇴장 알림 브로드캐스트
         RoomStateMessage message = RoomStateMessage.memberLeave(memberId, newOwnerId);
         roomBroadcastService.broadcastState(roomId, message);
 
-        // 마지막 사람이 나간 경우 방 종료
         long remainingCount = memberRoomRepository.countByRoom_RoomId(roomId);
         closeRoomIfEmpty(remainingCount, roomId, room);
 
@@ -227,28 +214,22 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROOM));
 
-        // 권한·상태 검증 (도메인 메서드)
         room.checkWaitingOrThrow();
         room.checkOwnerOrThrow(requestMemberId);
 
-        // 자기 자신 강퇴 방지
         if (requestMemberId.equals(targetMemberId)) {
             throw new BusinessException(ErrorCode.CANNOT_KICK_SELF);
         }
 
-        // 대상 멤버가 방에 참여 중인지 확인
         MemberRoom memberRoom = memberRoomRepository.findByRoom_RoomIdAndMember_MemberId(roomId, targetMemberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER_ROOM));
 
-        // MemberRoom DB 삭제
         memberRoomRepository.delete(memberRoom);
 
-        // Redis 정리 (멤버/준비상태/역할 제거 + 멤버→방 매핑 제거 + Grace Period 마킹 제거)
         roomSessionService.removeMember(roomId, targetMemberId);
         roomSessionService.clearMemberRoom(targetMemberId);
         roomSessionService.clearDisconnected(roomId, targetMemberId);
 
-        // 강퇴 알림 브로드캐스트
         RoomStateMessage message = RoomStateMessage.memberKicked(targetMemberId);
         roomBroadcastService.broadcastState(roomId, message);
 
@@ -256,8 +237,7 @@ public class RoomService {
     }
 
     /**
-     * 비정상 종료 처리 (WebSocket 연결 끊김)
-     * SessionDisconnectEvent에서 호출됨
+     * 비정상 종료 처리 (WebSocket 연결 끊김). SessionDisconnectEvent에서 호출됨.
      */
     @Transactional
     public void handleAbnormalDisconnect(Long roomId, Long memberId) {
@@ -278,17 +258,14 @@ public class RoomService {
             return;
         }
 
-        // DB에서 삭제
         memberRoomRepository.delete(memberRoom);
         log.debug("비정상 종료: MemberRoom 삭제 완료, roomId={}, memberId={}", roomId, memberId);
 
-        // 방장이었으면 위임
         if (room.getOwner().getMemberId().equals(memberId)) {
             Long newOwnerId = handleOwnerLeave(room);
             log.info("비정상 종료: 방장 위임 완료, roomId={}, newOwnerId={}", roomId, newOwnerId);
         }
 
-        // 남은 인원 확인
         long remainingCount = memberRoomRepository.countByRoom_RoomId(roomId);
         closeRoomIfEmpty(remainingCount, roomId, room);
 
@@ -296,11 +273,10 @@ public class RoomService {
     }
 
     /**
-     * 방장 퇴장 시 처리 (위임)
+     * 방장 퇴장 시 처리 (위임). 가장 먼저 입장한 사람에게 방장 위임.
      * @return 새 방장 ID (위임된 경우), 없으면 null
      */
     private Long handleOwnerLeave(Room room) {
-        // 가장 먼저 입장한 사람에게 방장 위임
         return memberRoomRepository.findFirstByRoomIdOrderByCreatedAtAsc(room.getRoomId())
                 .map(mr -> {
                     room.updateOwner(mr.getMember());
@@ -322,5 +298,4 @@ public class RoomService {
             log.info("방 종료 (마지막 참여자 퇴장): roomId={}", roomId);
         }
     }
-
 }

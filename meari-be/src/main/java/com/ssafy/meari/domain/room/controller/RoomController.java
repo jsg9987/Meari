@@ -10,9 +10,9 @@ import com.ssafy.meari.domain.room.dto.request.RoomEnterRequest;
 import com.ssafy.meari.domain.room.dto.response.RoomDetailResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomListResponse;
 import com.ssafy.meari.domain.room.dto.response.RoomResponse;
+import com.ssafy.meari.domain.room.service.RoomCommandService;
 import com.ssafy.meari.domain.room.service.RoomPhaseService;
 import com.ssafy.meari.domain.room.service.RoomQueryService;
-import com.ssafy.meari.domain.room.service.RoomService;
 import com.ssafy.meari.global.auth.UserDetailsImpl;
 import com.ssafy.meari.global.common.ApiResponse;
 import com.ssafy.meari.global.common.CursorPageResponse;
@@ -34,7 +34,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class RoomController {
 
-    private final RoomService roomService;
+    private final RoomCommandService roomCommandService;
     private final RoomQueryService roomQueryService;
     private final RoomPhaseService roomPhaseService;
 
@@ -45,7 +45,7 @@ public class RoomController {
             @Valid @RequestBody RoomCreateRequest request
     ) {
         Long memberId = userDetails.getMember().getMemberId();
-        RoomResponse response = roomService.createRoom(request, memberId);
+        RoomResponse response = roomCommandService.createRoom(request, memberId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
@@ -56,7 +56,7 @@ public class RoomController {
             @Valid @RequestBody QuickRoomCreateRequest request
     ) {
         Long memberId = userDetails.getMember().getMemberId();
-        RoomResponse response = roomService.createQuickRoom(request.getThemeId(), memberId);
+        RoomResponse response = roomCommandService.createQuickRoom(request.getThemeId(), memberId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
@@ -95,7 +95,7 @@ public class RoomController {
         // 방 입장 시 비밀번호가 없는 경우
         if (request == null) request = new RoomEnterRequest();
 
-        roomService.enterRoom(roomId, request, userDetails.getMember().getMemberId());
+        roomCommandService.enterRoom(roomId, request, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -105,7 +105,7 @@ public class RoomController {
             @Parameter(description = "방 ID") @PathVariable Long roomId,
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        roomService.leaveRoom(roomId, userDetails.getMember().getMemberId());
+        roomCommandService.leaveRoom(roomId, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
@@ -116,7 +116,7 @@ public class RoomController {
             @Parameter(description = "강퇴 대상 멤버 ID") @PathVariable Long memberId,
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        roomService.kickMember(roomId, memberId, userDetails.getMember().getMemberId());
+        roomCommandService.kickMember(roomId, memberId, userDetails.getMember().getMemberId());
         return ResponseEntity.ok(ApiResponse.successWithoutData());
     }
 
