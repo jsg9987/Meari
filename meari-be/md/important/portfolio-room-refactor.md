@@ -46,11 +46,13 @@
 | 새 컴포넌트 | 책임 |
 |---|---|
 | `RoomBroadcastService` | STOMP 송신 전담 (`messagingTemplate` 12개 호출 일원화) |
-| `RoomQueryService` | 조회 전용 (`@Transactional(readOnly=true)`) — `RoomController`가 직접 호출 |
+| `RoomQueryService` | 조회 전용 (`@Transactional(readOnly=true)`) |
 | `RoomCleanupService` | 좀비방 종료 (`@Transactional(propagation=REQUIRES_NEW)`) |
-| (예정) `RoomPhaseService`, `RoomCommandService` | 게임 진행 / 생성·입퇴장 |
+| `RoomPhaseService` | 게임 진행 워크플로우 (phase 전이 / 녹음 / 라운드 / 분석 트리거) |
+| `RoomCommandService` | 방 생성·입퇴장·강퇴·방장 위임 |
 
-→ 외부(Controller·Scheduler·WSController)가 필요한 module을 직접 주입. **추가 Facade 층 없음.**
+→ 외부(Controller·Scheduler·WSController·WebSocketEventListener)가 필요한 module을 **직접 주입**. **추가 Facade 층 없음.**
+→ 분해 완료 시점에 `RoomService.java` 삭제 (1316 LOC → 0). 외부 호출자가 module을 직접 사용하므로 wrapper 층이 더 이상 필요 없음 — 처음에 검토했던 "2층 Facade" 안티패턴을 실제로 회피한 결과가 코드로 증명됨.
 
 ### 2) 도메인 메서드 강화 (Entity 내부로 규칙 이동)
 `Room` 엔티티에 추가:
@@ -91,8 +93,9 @@
 - 추가 layer 없이 module을 외부 호출자가 직접 주입하는 단순한 구조 (2층 Facade 안티패턴 회피)
 - 비판적 검토를 통해 과한 추출을 도메인 메서드로 대체 (재사용성 확보)
 
-### 정량 지표 (진행 중 — Phase/Command 분리 미완료)
-- RoomService: 1316 LOC → 진행 중 (조회·브로드캐스트·중복부 제거 완료, 게임 진행·입퇴장 분리 예정)
+### 정량 지표
+- **`RoomService` 1316 LOC → 0 (클래스 제거)** — 책임을 5개 module(`Broadcast` / `Query` / `Cleanup` / `Phase` / `Command`)로 완전 분해
+- 의존성 주입: 11개 단일 클래스 → 각 module 평균 7개 (책임 범위에 비례)
 - `messagingTemplate.convertAndSend` 호출: 12곳 → 1곳 (`RoomBroadcastService`)
 - 검증 코드 중복: 8곳 이상 → Room 도메인 메서드 3개로 일원화 (7곳 재사용)
 - `createRoom`/`createQuickRoom` 중복: 80% → 공통 메서드 추출 (-33줄)
@@ -105,5 +108,11 @@
 
 ## 진행 현황 메모 (포트폴리오엔 빼도 됨)
 
-- ✅ Broadcast / Query / Cleanup 분리, 도메인 메서드 추가·적용, createRoom·startRound·leave 중복/긴 메서드 정리, Controller가 RoomQueryService 직접 호출
-- ⏳ RoomPhaseService 분리, RoomCommandService 분리, RoomService 제거, 브로드캐스트 AFTER_COMMIT, WebSocket B2 (disconnect 이중 핸들러 + `/queue/errors`)
+- ✅ Broadcast / Query / Cleanup 분리, 도메인 메서드 추가·적용, createRoom·startRound·leave 중복/긴 메서드 정리
+- ✅ Controller가 RoomQueryService 직접 호출 (wrapper 제거)
+- ✅ RoomPhaseService 분리 + Controller·WSController가 직접 호출
+- ✅ RoomCommandService 분리 + Controller·WSController·WebSocketEventListener가 직접 호출
+- ✅ **`RoomService.java` 삭제 — God Service 완전 소멸**
+- ⏳ 브로드캐스트 AFTER_COMMIT (`@TransactionalEventListener`)
+- ⏳ WebSocket B2 (disconnect 이중 핸들러 단일화 + `/queue/errors`)
+- ⏳ module별 단위 테스트 재작성 (@Disabled stub 제거됨)
